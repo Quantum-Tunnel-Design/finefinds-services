@@ -1,8 +1,8 @@
 {
-  "name": "finefinds",
+  "name": "finefinds-services",
   "version": "0.0.1",
   "description": "FineFinds Education Platform",
-  "author": "",
+  "author": "QuantumTunnelsLLC",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
