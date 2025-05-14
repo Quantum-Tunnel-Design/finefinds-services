@@ -26,9 +26,9 @@ export class UsersService {
     });
   }
 
-  async findByCognitoId(cognitoId: string): Promise<User | null> {
+  async findByCognitoId(cognitoSub: string): Promise<User | null> {
     return this.prisma.user.findUnique({
-      where: { cognitoId },
+      where: { cognitoSub },
     });
   }
 
@@ -37,10 +37,33 @@ export class UsersService {
     firstName: string;
     lastName: string;
     role: UserRole;
-    cognitoId: string;
+    cognitoSub: string; // Changed from cognitoId
+    children?: {
+      firstName: string;
+      lastName: string;
+      gender: 'male' | 'female';
+      dateOfBirth: Date;
+    }[];
   }): Promise<User> {
     return this.prisma.user.create({
-      data,
+      data: {
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        role: data.role,
+        cognitoSub: data.cognitoSub,
+        children: data.children ? {
+          create: data.children.map(child => ({
+            firstName: child.firstName,
+            lastName: child.lastName,
+            gender: child.gender,
+            dateOfBirth: child.dateOfBirth,
+          }))
+        } : undefined,
+      },
+      include: {
+        children: true,
+      },
     });
   }
 
@@ -71,20 +94,23 @@ export class UsersService {
   async createOrUpdateFromCognito(
     cognitoSub: string,
     email: string,
-    name: string,
+    firstName: string, // Changed from name
+    lastName: string,  // Added lastName parameter
     role: UserRole,
   ): Promise<User> {
     return this.prisma.user.upsert({
       where: { cognitoSub },
       update: {
         email,
-        name,
+        firstName,  // Changed from name
+        lastName,   // Added lastName
         role,
       },
       create: {
         cognitoSub,
         email,
-        name,
+        firstName,  // Changed from name
+        lastName,   // Added lastName
         role,
       },
     });
@@ -127,12 +153,12 @@ export class UsersService {
    * Lists all users (admin only)
    */
   async listUsers(currentUser: User): Promise<User[]> {
-    if (currentUser.role !== UserRole.VENDOR) {
-      throw new ForbiddenException('Only vendors can list all users');
+    if (currentUser.role !== UserRole.ADMIN) { // Changed from VENDOR to ADMIN (seems more logical)
+      throw new ForbiddenException('Only admins can list all users');
     }
 
     return this.prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
     });
   }
-} 
+}

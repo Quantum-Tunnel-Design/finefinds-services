@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   CognitoIdentityProviderClient,
@@ -15,6 +15,7 @@ import { SignInInput } from './dto/sign-in.input';
 import { ConfirmSignUpInput } from './dto/confirm-sign-up.input';
 import { ForgotPasswordInput } from './dto/forgot-password.input';
 import { ResetPasswordInput } from './dto/reset-password.input';
+import { ParentSignUpInput } from './dto/parent-sign-up.input';
 import { UserRole } from '@prisma/client';
 import { AuthResponse } from './models/auth-response.model';
 
@@ -134,6 +135,73 @@ export class AuthService {
         message: 'Password reset successfully. You can now sign in with your new password.',
       };
     } catch (error) {
+      throw new UnauthorizedException(error.message);
+    }
+  }
+
+  async parentSignUp(input: ParentSignUpInput): Promise<AuthResponse> {
+    try {
+      // Validate password match
+      if (input.password !== input.confirmPassword) {
+        throw new BadRequestException('Passwords do not match');
+      }
+
+      // Validate terms acceptance
+      if (!input.termsAccepted) {
+        throw new BadRequestException('Terms and conditions must be accepted');
+      }
+
+      // Validate at least one child
+      if (!input.children || input.children.length === 0) {
+        throw new BadRequestException('At least one child is required');
+      }
+
+      // Validate date of birth is not in the future
+      const now = new Date();
+      for (const child of input.children) {
+        if (child.dateOfBirth > now) {
+          throw new BadRequestException('Date of birth cannot be in the future');
+        }
+      }
+
+      // Create Cognito user
+      const signUpCommand = new SignUpCommand({
+        ClientId: this.clientId,
+        Username: input.email,
+        Password: input.password,
+        UserAttributes: [
+          { Name: 'email', Value: input.email },
+          { Name: 'given_name', Value: input.firstName },
+          { Name: 'family_name', Value: input.lastName },
+          { Name: 'phone_number', Value: input.phoneNumber },
+          { Name: 'custom:role', Value: UserRole.PARENT },
+        ],
+      });
+
+      const cognitoResponse = await this.cognitoClient.send(signUpCommand);
+
+      // Create user in database with children
+      await this.usersService.create({
+        email: input.email,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        role: UserRole.PARENT,
+        cognitoSub: cognitoResponse.UserSub,
+        children: input.children.map(child => ({
+          firstName: child.firstName,
+          lastName: child.lastName,
+          gender: child.gender,
+          dateOfBirth: child.dateOfBirth,
+        })),
+      });
+
+      return {
+        message: 'Parent registered successfully. Please check your email for verification code.',
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       throw new UnauthorizedException(error.message);
     }
   }

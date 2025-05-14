@@ -46,13 +46,16 @@ enum CourseLevel {
 model User {
   id            String         @id @default(uuid())
   cognitoSub    String         @unique
-  name          String
+  firstName     String
+  lastName      String
   email         String         @unique
+  phoneNumber   String?
   role          UserRole
   avatarUrl     String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   vendorProfile VendorProfile?
+  children      Child[]
   courses       Course[]       @relation("VendorCourses")
   enrollments   Enrollment[]
   reviews       Review[]
@@ -161,4 +164,18 @@ model Notification {
   updatedAt DateTime @updatedAt
 
   @@map("notifications")
+}
+
+model Child {
+  id          String   @id @default(uuid())
+  firstName   String
+  lastName    String
+  gender      String
+  dateOfBirth DateTime
+  parentId    String
+  parent      User     @relation(fields: [parentId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("children")
 } 

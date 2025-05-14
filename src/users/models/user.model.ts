@@ -1,21 +1,28 @@
-import { ObjectType, Field, ID } from '@nestjs/graphql';
+// src/users/models/user.model.ts
+import { Field, ObjectType } from '@nestjs/graphql';
 import { UserRole } from '@prisma/client';
 
 @ObjectType()
 export class User {
-  @Field(() => ID)
+  @Field()
   id: string;
 
   @Field()
-  cognitoSub: string;
+  cognitoSub: string; // Changed from cognitoId
 
   @Field()
-  name: string;
+  firstName: string; // Changed from name
+
+  @Field()
+  lastName: string;
 
   @Field()
   email: string;
 
-  @Field(() => UserRole)
+  @Field({ nullable: true })
+  phoneNumber?: string;
+
+  @Field()
   role: UserRole;
 
   @Field({ nullable: true })
@@ -26,4 +33,4 @@ export class User {
 
   @Field()
   updatedAt: Date;
-} 
+}

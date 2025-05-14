@@ -11,6 +11,7 @@ import { PrismaService } from './prisma/prisma.service';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: `config/${process.env.NODE_ENV || 'local'}.env`,
     }),
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,

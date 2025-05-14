@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { AuthResolver } from './auth.resolver';
 import { CognitoStrategy } from './strategies/cognito.strategy';
 import { UsersModule } from '../users/users.module';
+import { AuthController } from './auth.controller';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { UsersModule } from '../users/users.module';
     UsersModule,
   ],
   providers: [AuthService, AuthResolver, CognitoStrategy],
+  controllers: [AuthController],
   exports: [AuthService],
 })
 export class AuthModule {} 

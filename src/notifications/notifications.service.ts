@@ -2,6 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { Notification as PrismaNotification } from '@prisma/client';
+import { CreateNotificationInput } from './dto/create-notification.input';
+import { Notification } from './models/notification.model';
 
 @Injectable()
 export class NotificationsService {
@@ -9,6 +13,7 @@ export class NotificationsService {
 
   constructor(
     @InjectQueue('notifications') private notificationsQueue: Queue,
+    private prisma: PrismaService,
     private configService: ConfigService,
   ) {}
 
@@ -95,4 +100,37 @@ export class NotificationsService {
       this.logger.error(`Failed to queue push notification: ${error.message}`, error.stack);
     }
   }
-} 
+
+  async getUserNotifications(userId: string): Promise<Notification[]> {
+    const notifications = await this.prisma.notification.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    
+    return notifications.map(notification => ({
+      ...notification,
+      title: notification.type,
+      data: {},
+    }));
+  }
+
+  async createNotification(userId: string, input: CreateNotificationInput): Promise<PrismaNotification> {
+    const notification = await this.prisma.notification.create({
+      data: {
+        userId,
+        ...input,
+      },
+    });
+
+    return notification;
+  }
+
+  async markNotificationAsRead(id: string, userId: string): Promise<PrismaNotification> {
+    const notification = await this.prisma.notification.update({
+      where: { id, userId },
+      data: { read: true },
+    });
+
+    return notification;
+  }
+}

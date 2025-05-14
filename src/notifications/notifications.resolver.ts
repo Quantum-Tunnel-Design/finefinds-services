@@ -13,7 +13,12 @@ export class NotificationsResolver {
   @Query(() => [Notification])
   @UseGuards(JwtAuthGuard)
   async myNotifications(@Context('user') user: User): Promise<Notification[]> {
-    return this.notificationsService.getUserNotifications(user.id);
+    const notifications = await this.notificationsService.getUserNotifications(user.id);
+    return notifications.map(notification => ({
+      ...notification,
+      title: notification.type,
+      data: {},
+    }));
   }
 
   @Mutation(() => Notification)
@@ -22,7 +27,12 @@ export class NotificationsResolver {
     @Args('input') input: CreateNotificationInput,
     @Context('user') user: User,
   ): Promise<Notification> {
-    return this.notificationsService.createNotification(user.id, input);
+    const notification = await this.notificationsService.createNotification(user.id, input);
+    return {
+      ...notification,
+      title: notification.type,
+      data: {},
+    };
   }
 
   @Mutation(() => Notification)
@@ -31,6 +41,11 @@ export class NotificationsResolver {
     @Args('id') id: string,
     @Context('user') user: User,
   ): Promise<Notification> {
-    return this.notificationsService.markAsRead(id, user.id);
+    const notification = await this.notificationsService.markNotificationAsRead(id, user.id);
+    return {
+      ...notification,
+      title: notification.type,
+      data: {},
+    };
   }
 } 

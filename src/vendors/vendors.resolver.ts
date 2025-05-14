@@ -8,13 +8,15 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User, UserRole } from '@prisma/client';
+import { Roles } from './guards/roles.guard';
 
 @Resolver(() => VendorProfile)
 export class VendorsResolver {
   constructor(private readonly vendorsService: VendorsService) {}
 
   @Mutation(() => VendorProfile)
-  @UseGuards(JwtAuthGuard, new RolesGuard([UserRole.VENDOR]))
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR)
   async registerVendorProfile(
     @CurrentUser() user: User,
     @Args('input') dto: CreateVendorProfileDto,
@@ -23,7 +25,8 @@ export class VendorsResolver {
   }
 
   @Mutation(() => VendorProfile)
-  @UseGuards(JwtAuthGuard, new RolesGuard([UserRole.VENDOR]))
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR)
   async updateVendorProfile(
     @CurrentUser() user: User,
     @Args('input') dto: UpdateVendorProfileDto,
@@ -32,7 +35,8 @@ export class VendorsResolver {
   }
 
   @Mutation(() => VendorProfile)
-  @UseGuards(JwtAuthGuard, new RolesGuard([UserRole.ADMIN]))
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   async approveVendor(
     @CurrentUser() user: User,
     @Args('vendorId') vendorId: string,
@@ -41,13 +45,15 @@ export class VendorsResolver {
   }
 
   @Query(() => VendorProfile)
-  @UseGuards(JwtAuthGuard, new RolesGuard([UserRole.VENDOR]))
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR)
   async myVendorProfile(@CurrentUser() user: User) {
     return this.vendorsService.getMyVendorProfile(user.id);
   }
 
   @Query(() => [VendorProfile])
-  @UseGuards(JwtAuthGuard, new RolesGuard([UserRole.ADMIN]))
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   async listVendors(@CurrentUser() user: User) {
     return this.vendorsService.listVendorProfiles(user);
   }

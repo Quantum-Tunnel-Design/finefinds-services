@@ -71,7 +71,7 @@ export class CoursesService {
     };
 
     return this.prisma.course.findMany({
-      where,
+      where: { isPublished: true },
       include: { vendor: true },
       orderBy: { createdAt: 'desc' },
     });
