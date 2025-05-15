@@ -1,0 +1,54 @@
+name: Database Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to run migration on'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - staging
+          - prod
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY_BACKEND: finefinds-services
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-${{ inputs.environment == 'prod' && 'prod' || inputs.environment }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-duration-seconds: 3600
+          
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        
+      - name: Run database migration
+        run: |
+          aws ecs run-task \
+            --cluster finefinds-${{ inputs.environment }} \
+            --task-definition finefinds-backend-migration \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.SUBNET_IDS }}],securityGroups=[${{ secrets.SECURITY_GROUP_IDS }}]}" \
+            --launch-type FARGATE
+            
+      - name: Notify Slack
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,commit,author,action,eventName,ref,workflow,job,took
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: always() 

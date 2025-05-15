@@ -1,0 +1,123 @@
+name: Version-based Deployment
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy'
+        required: true
+        type: string
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - staging
+          - prod
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY_BACKEND: finefinds-services
+  SERVICES_ENV: >-
+    ${{ 
+      github.ref == 'refs/heads/main' && 'prod' || 
+      github.ref == 'refs/heads/staging' && 'staging' || 
+      github.ref == 'refs/heads/qa' && 'qa' || 
+      'dev' 
+    }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || github.ref_name == 'refs/tags/v*' && 'prod' || 'staging' }}
+    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-${{ github.ref_name == 'refs/tags/v*' && 'prod' || 'staging' }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-duration-seconds: 3600
+          
+      - name: Get version
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION=${{ inputs.version }}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service \
+            --cluster finefinds-${{ github.ref_name == 'refs/tags/v*' && 'prod' || 'staging' }} \
+            --service finefinds-backend \
+            --force-new-deployment \
+            --task-definition finefinds-backend:${{ steps.version.outputs.version }}
+            
+      - name: Slack Notification (Success)
+        if: success()
+        uses: slackapi/slack-github-action@v2.1.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: webhook-trigger
+          payload: |
+            {
+              "channel": "${{ secrets.SLACK_CHANNEL }}",
+              "attachments": [
+                {
+                  "color": "#36a64f",
+                  "pretext": ":white_check_mark: *Backend Services Deployment Succeeded*",
+                  "fields": [
+                    { "title": "Environment", "value": "${{ env.SERVICES_ENV }}", "short": true },
+                    { "title": "Branch", "value": "${{ github.ref_name }}", "short": true },
+                    { "title": "Actor", "value": "${{ github.actor }}", "short": true },
+                    { "title": "Commit", "value": "${{ github.sha }}", "short": false }
+                  ],
+                  "actions": [
+                    {
+                      "type": "button",
+                      "text": "View Workflow",
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+      - name: Slack Notification (Failure)
+        if: failure()
+        uses: slackapi/slack-github-action@v2.1.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: webhook-trigger
+          payload: |
+            {
+              "channel": "${{ secrets.SLACK_CHANNEL }}",
+              "attachments": [
+                {
+                  "color": "#36a64f",
+                  "pretext": ":white_check_mark: *Backend Services Deployment Failed*",
+                  "fields": [
+                    { "title": "Environment", "value": "${{ env.SERVICES_ENV }}", "short": true },
+                    { "title": "Branch", "value": "${{ github.ref_name }}", "short": true },
+                    { "title": "Actor", "value": "${{ github.actor }}", "short": true },
+                    { "title": "Commit", "value": "${{ github.sha }}", "short": false }
+                  ],
+                  "actions": [
+                    {
+                      "type": "button",
+                      "text": "View Workflow",
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
