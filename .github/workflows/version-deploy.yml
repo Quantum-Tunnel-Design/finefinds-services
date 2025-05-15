@@ -20,7 +20,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY_BACKEND: finefinds-services
+  ECR_REPOSITORY_BACKEND: finefinds-services-${{ github.ref == 'refs/heads/main' && 'prod' || github.ref == 'refs/heads/staging' && 'staging' || github.ref == 'refs/heads/qa' && 'qa' || github.ref == 'refs/heads/dev' && 'dev' || 'sandbox' }}
   SERVICES_ENV: >-
     ${{ 
       github.ref == 'refs/heads/main' && 'prod' || 

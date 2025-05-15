@@ -19,7 +19,6 @@ on:
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: finefindslk/base/node-services
-  ECR_REPOSITORY_BACKEND: finefinds-services
   SERVICES_ENV: >-
     ${{ 
       github.ref == 'refs/heads/main' && 'prod' || 
@@ -28,6 +27,7 @@ env:
       github.ref == 'refs/heads/dev' && 'dev' ||
       'sandbox'
     }}
+  ECR_REPOSITORY_BACKEND: finefinds-services-${{ github.ref == 'refs/heads/main' && 'prod' || github.ref == 'refs/heads/staging' && 'staging' || github.ref == 'refs/heads/qa' && 'qa' || github.ref == 'refs/heads/dev' && 'dev' || 'sandbox' }}
 
 jobs:
   test:
