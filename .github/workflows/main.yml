@@ -54,6 +54,17 @@ env:
   ECR_REPOSITORY_BACKEND: finefinds-services-${{ github.event_name == 'workflow_dispatch' && inputs.environment || github.ref == 'refs/heads/main' && 'prod' || github.ref == 'refs/heads/staging' && 'staging' || github.ref == 'refs/heads/qa' && 'qa' || github.ref == 'refs/heads/dev' && 'dev' || 'sandbox' }}
 
 jobs:
+  input_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for inputs to validate
+        id: input_check
+        run: |
+          echo "Input Env: ${{inputs.environment }}"
+          echo "Env: ${{env.SERVICES_ENV}}"
+          echo "Branch: ${{inputs.branch}}"
+          echo "Skip Deploy: ${{inputs.skip_deploy}}"
+
   test:
     runs-on: ubuntu-latest
     steps:
