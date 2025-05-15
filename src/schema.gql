@@ -1,0 +1,83 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type AuthResponse {
+  accessToken: String
+  idToken: String
+  message: String
+  refreshToken: String
+  user: User
+}
+
+input ConfirmSignUpInput {
+  code: String!
+  email: String!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+input ForgotPasswordInput {
+  email: String!
+}
+
+type Mutation {
+  confirmSignUp(input: ConfirmSignUpInput!): AuthResponse!
+  forgotPassword(input: ForgotPasswordInput!): AuthResponse!
+  resetPassword(input: ResetPasswordInput!): AuthResponse!
+  signIn(input: SignInInput!): AuthResponse!
+  signUp(input: SignUpInput!): AuthResponse!
+  updateMyProfile(input: UpdateUserDto!): User!
+}
+
+type Query {
+  listUsers: [User!]!
+  me: User!
+}
+
+input ResetPasswordInput {
+  code: String!
+  email: String!
+  newPassword: String!
+}
+
+input SignInInput {
+  email: String!
+  password: String!
+}
+
+input SignUpInput {
+  email: String!
+  firstName: String!
+  lastName: String!
+  password: String!
+  role: UserRole!
+}
+
+input UpdateUserDto {
+  avatarUrl: String
+  name: String
+}
+
+type User {
+  avatarUrl: String
+  cognitoSub: String!
+  createdAt: DateTime!
+  email: String!
+  firstName: String!
+  id: String!
+  lastName: String!
+  phoneNumber: String
+  role: String!
+  updatedAt: DateTime!
+}
+
+enum UserRole {
+  ADMIN
+  PARENT
+  STUDENT
+  VENDOR
+}

@@ -1,6 +1,8 @@
 // src/users/models/user.model.ts
-import { Field, ObjectType } from '@nestjs/graphql';
+import { Field, ObjectType, registerEnumType } from '@nestjs/graphql';
 import { UserRole } from '@prisma/client';
+
+registerEnumType(UserRole, { name: 'UserRole' });
 
 @ObjectType()
 export class Notification {
