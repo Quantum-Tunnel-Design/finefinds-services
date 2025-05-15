@@ -7,36 +7,27 @@ on:
       - qa
       - staging
       - main
-  workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Branch to deploy'
-        required: true
-        type: choice
-        options:
-          - dev
-          - qa
-          - staging
-          - main
-      environment:
-        description: 'Environment to deploy to'
-        required: true
-        type: choice
-        options:
-          - dev
-          - qa
-          - staging
-          - prod
-      skip_deploy:
-        description: 'Skip deployment (only build and push)'
-        required: false
-        type: boolean
-        default: false
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+      - staging
+      - qa
+      - dev
+      - sandbox
 
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: finefindslk/base/node-services
   ECR_REPOSITORY_BACKEND: finefinds-services
+  SERVICES_ENV: >-
+    ${{ 
+      github.ref == 'refs/heads/main' && 'prod' || 
+      github.ref == 'refs/heads/staging' && 'staging' || 
+      github.ref == 'refs/heads/qa' && 'qa' || 
+      github.ref == 'refs/heads/dev' && 'dev' ||
+      'sandbox'
+    }}
 
 jobs:
   test:
@@ -65,14 +56,15 @@ jobs:
       contents: read
       packages: write
       id-token: write
-      
+    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') }}
+    
     steps:
       - uses: actions/checkout@v4
       
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-${{ env.SERVICES_ENV }}
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
           
@@ -117,11 +109,14 @@ jobs:
           name: version
           path: version.txt
 
-  deploy:
+  deploy-sandbox:
     needs: build-and-push
-    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/sandbox' || github.event.pull_request.base.ref == 'sandbox') }}
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name }}
+    environment: sandbox
+    permissions:
+      id-token: write
+      contents: read
     
     steps:
       - uses: actions/checkout@v4
@@ -134,7 +129,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-sandbox
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
           
@@ -142,16 +137,204 @@ jobs:
         run: |
           VERSION=$(cat version.txt)
           aws ecs update-service \
-            --cluster finefinds-${{ github.ref_name }} \
+            --cluster finefinds-sandbox \
             --service finefinds-backend \
             --force-new-deployment \
             --task-definition finefinds-backend:$VERSION
-            
-      - name: Notify Slack
-        uses: 8398a7/action-slack@v3
+
+  deploy-dev:
+    needs: build-and-push
+    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/dev' || github.event.pull_request.base.ref == 'dev') }}
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download version file
+        uses: actions/download-artifact@v4
         with:
-          status: ${{ job.status }}
-          fields: repo,message,commit,author,action,eventName,ref,workflow,job,took
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        if: always() 
+          name: version
+          
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-dev
+          aws-region: ${{ env.AWS_REGION }}
+          role-duration-seconds: 3600
+          
+      - name: Deploy to ECS
+        run: |
+          VERSION=$(cat version.txt)
+          aws ecs update-service \
+            --cluster finefinds-dev \
+            --service finefinds-backend \
+            --force-new-deployment \
+            --task-definition finefinds-backend:$VERSION
+
+  deploy-qa:
+    needs: build-and-push
+    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/qa' || github.event.pull_request.base.ref == 'qa') }}
+    runs-on: ubuntu-latest
+    environment: qa
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download version file
+        uses: actions/download-artifact@v4
+        with:
+          name: version
+          
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-qa
+          aws-region: ${{ env.AWS_REGION }}
+          role-duration-seconds: 3600
+          
+      - name: Deploy to ECS
+        run: |
+          VERSION=$(cat version.txt)
+          aws ecs update-service \
+            --cluster finefinds-qa \
+            --service finefinds-backend \
+            --force-new-deployment \
+            --task-definition finefinds-backend:$VERSION
+
+  deploy-staging:
+    needs: build-and-push
+    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/staging' || github.event.pull_request.base.ref == 'staging') }}
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download version file
+        uses: actions/download-artifact@v4
+        with:
+          name: version
+          
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-staging
+          aws-region: ${{ env.AWS_REGION }}
+          role-duration-seconds: 3600
+          
+      - name: Deploy to ECS
+        run: |
+          VERSION=$(cat version.txt)
+          aws ecs update-service \
+            --cluster finefinds-staging \
+            --service finefinds-backend \
+            --force-new-deployment \
+            --task-definition finefinds-backend:$VERSION
+
+  deploy-prod:
+    needs: build-and-push
+    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/main' || github.event.pull_request.base.ref == 'main') }}
+    runs-on: ubuntu-latest
+    environment: prod
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download version file
+        uses: actions/download-artifact@v4
+        with:
+          name: version
+          
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-prod
+          aws-region: ${{ env.AWS_REGION }}
+          role-duration-seconds: 3600
+          
+      - name: Deploy to ECS
+        run: |
+          VERSION=$(cat version.txt)
+          aws ecs update-service \
+            --cluster finefinds-prod \
+            --service finefinds-backend \
+            --force-new-deployment \
+            --task-definition finefinds-backend:$VERSION
+
+  notify:
+    needs: [deploy-sandbox, deploy-dev, deploy-qa, deploy-staging, deploy-prod]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Slack Notification (Success)
+        if: success()
+        uses: slackapi/slack-github-action@v2.1.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: webhook-trigger
+          payload: |
+            {
+              "channel": "${{ secrets.SLACK_CHANNEL }}",
+              "attachments": [
+                {
+                  "color": "#36a64f",
+                  "pretext": ":white_check_mark: *Backend Services Deployment Succeeded*",
+                  "fields": [
+                    { "title": "Environment", "value": "${{ env.SERVICES_ENV }}", "short": true },
+                    { "title": "Branch", "value": "${{ github.ref_name }}", "short": true },
+                    { "title": "Actor", "value": "${{ github.actor }}", "short": true },
+                    { "title": "Commit", "value": "${{ github.sha }}", "short": false }
+                  ],
+                  "actions": [
+                    {
+                      "type": "button",
+                      "text": "View Workflow",
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+
+      - name: Slack Notification (Failure)
+        if: failure()
+        uses: slackapi/slack-github-action@v2.1.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: webhook-trigger
+          payload: |
+            {
+              "channel": "${{ secrets.SLACK_CHANNEL }}",
+              "attachments": [
+                {
+                  "color": "#ff0000",
+                  "pretext": ":x: *Backend Services Deployment Failed*",
+                  "fields": [
+                    { "title": "Environment", "value": "${{ env.SERVICES_ENV }}", "short": true },
+                    { "title": "Branch", "value": "${{ github.ref_name }}", "short": true },
+                    { "title": "Actor", "value": "${{ github.actor }}", "short": true },
+                    { "title": "Commit", "value": "${{ github.sha }}", "short": false }
+                  ],
+                  "actions": [
+                    {
+                      "type": "button",
+                      "text": "View Workflow",
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
