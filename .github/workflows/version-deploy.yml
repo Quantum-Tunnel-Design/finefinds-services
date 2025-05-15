@@ -44,7 +44,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-${{ github.ref_name == 'refs/tags/v*' && 'prod' || 'staging' }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-${{github.event.repository.name}}-${{ github.ref_name == 'refs/tags/v*' && 'prod' || 'staging' }}
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
           
