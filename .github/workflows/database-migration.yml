@@ -21,7 +21,7 @@ on:
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY_BACKEND: finefinds-services-${{ inputs.environment }}
-  CLUSTER_NAME: finefinds-${{ inputs.environment }}
+  CLUSTER_NAME: finefinds-${{ inputs.environment }}-cluster
   TASK_DEFINITION: finefinds-backend-migration
 
 jobs:
