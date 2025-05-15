@@ -12,10 +12,17 @@ on:
           - qa
           - staging
           - prod
+      version:
+        description: 'Docker image tag to use for migration'
+        required: true
+        type: string
+        default: 'latest'
 
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY_BACKEND: finefinds-services-${{ inputs.environment }}
+  CLUSTER_NAME: finefinds-${{ inputs.environment }}
+  TASK_DEFINITION: finefinds-backend-migration
 
 jobs:
   migrate:
@@ -38,14 +45,63 @@ jobs:
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-        
+
+      - name: Get subnet IDs
+        id: get-subnets
+        run: |
+          SUBNET_IDS=$(aws cloudformation describe-stacks \
+            --stack-name FineFinds-${{ inputs.environment }} \
+            --query "Stacks[0].Outputs[?ExportName=='finefinds-${{ inputs.environment }}-migration-task-subnet-ids'].OutputValue" \
+            --output text)
+          echo "subnet_ids=$SUBNET_IDS" >> $GITHUB_OUTPUT
+
+      - name: Get security group ID
+        id: get-sg
+        run: |
+          SG_ID=$(aws cloudformation describe-stacks \
+            --stack-name FineFinds-${{ inputs.environment }} \
+            --query "Stacks[0].Outputs[?ExportName=='finefinds-${{ inputs.environment }}-migration-task-sg-id'].OutputValue" \
+            --output text)
+          echo "sg_id=$SG_ID" >> $GITHUB_OUTPUT
+          
       - name: Run database migration
         run: |
-          aws ecs run-task \
-            --cluster finefinds-${{ inputs.environment }} \
-            --task-definition finefinds-backend-migration \
-            --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.SUBNET_IDS }}],securityGroups=[${{ secrets.SECURITY_GROUP_IDS }}]}" \
-            --launch-type FARGATE
+          TASK_ARN=$(aws ecs run-task \
+            --cluster ${{ env.CLUSTER_NAME }} \
+            --task-definition ${{ env.TASK_DEFINITION }} \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ steps.get-subnets.outputs.subnet_ids }}],securityGroups=[${{ steps.get-sg.outputs.sg_id }}]}" \
+            --launch-type FARGATE \
+            --query 'tasks[0].taskArn' \
+            --output text)
+          
+          echo "Waiting for migration task to complete..."
+          aws ecs wait tasks-stopped \
+            --cluster ${{ env.CLUSTER_NAME }} \
+            --tasks $TASK_ARN
+            
+          # Check task status
+          TASK_STATUS=$(aws ecs describe-tasks \
+            --cluster ${{ env.CLUSTER_NAME }} \
+            --tasks $TASK_ARN \
+            --query 'tasks[0].lastStatus' \
+            --output text)
+            
+          if [ "$TASK_STATUS" != "STOPPED" ]; then
+            echo "Migration task failed with status: $TASK_STATUS"
+            exit 1
+          fi
+          
+          # Check container exit code
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster ${{ env.CLUSTER_NAME }} \
+            --tasks $TASK_ARN \
+            --query 'tasks[0].containers[0].exitCode' \
+            --output text)
+            
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "Migration failed with exit code: $EXIT_CODE"
+            exit 1
+          fi
             
       - name: Notify Slack
         uses: 8398a7/action-slack@v3
@@ -54,4 +110,4 @@ jobs:
           fields: repo,message,commit,author,action,eventName,ref,workflow,job,took
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        if: always() 
+        if: always()
