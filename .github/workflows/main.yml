@@ -15,19 +15,43 @@ on:
       - qa
       - dev
       - sandbox
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - staging
+          - main
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - staging
+          - prod
+      skip_deploy:
+        description: 'Skip deployment (only build and push)'
+        required: false
+        type: boolean
+        default: false
 
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: finefindslk/base/node-services
   SERVICES_ENV: >-
-    ${{ 
-      github.ref == 'refs/heads/main' && 'prod' || 
-      github.ref == 'refs/heads/staging' && 'staging' || 
-      github.ref == 'refs/heads/qa' && 'qa' || 
-      github.ref == 'refs/heads/dev' && 'dev' ||
-      'sandbox'
-    }}
-  ECR_REPOSITORY_BACKEND: finefinds-services-${{ github.ref == 'refs/heads/main' && 'prod' || github.ref == 'refs/heads/staging' && 'staging' || github.ref == 'refs/heads/qa' && 'qa' || github.ref == 'refs/heads/dev' && 'dev' || 'sandbox' }}
+    ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 
+    github.ref == 'refs/heads/main' && 'prod' || 
+    github.ref == 'refs/heads/staging' && 'staging' || 
+    github.ref == 'refs/heads/qa' && 'qa' || 
+    github.ref == 'refs/heads/dev' && 'dev' ||
+    'sandbox' }}
+  ECR_REPOSITORY_BACKEND: finefinds-services-${{ github.event_name == 'workflow_dispatch' && inputs.environment || github.ref == 'refs/heads/main' && 'prod' || github.ref == 'refs/heads/staging' && 'staging' || github.ref == 'refs/heads/qa' && 'qa' || github.ref == 'refs/heads/dev' && 'dev' || 'sandbox' }}
 
 jobs:
   test:
@@ -111,7 +135,7 @@ jobs:
 
   deploy-sandbox:
     needs: build-and-push
-    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/sandbox' || github.event.pull_request.base.ref == 'sandbox') }}
+    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/sandbox' || github.event.pull_request.base.ref == 'sandbox' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'sandbox')) }}
     runs-on: ubuntu-latest
     environment: sandbox
     permissions:
@@ -144,7 +168,7 @@ jobs:
 
   deploy-dev:
     needs: build-and-push
-    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/dev' || github.event.pull_request.base.ref == 'dev') }}
+    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/dev' || github.event.pull_request.base.ref == 'dev' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'dev')) }}
     runs-on: ubuntu-latest
     environment: dev
     permissions:
@@ -177,7 +201,7 @@ jobs:
 
   deploy-qa:
     needs: build-and-push
-    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/qa' || github.event.pull_request.base.ref == 'qa') }}
+    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/qa' || github.event.pull_request.base.ref == 'qa' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'qa')) }}
     runs-on: ubuntu-latest
     environment: qa
     permissions:
@@ -210,7 +234,7 @@ jobs:
 
   deploy-staging:
     needs: build-and-push
-    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/staging' || github.event.pull_request.base.ref == 'staging') }}
+    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/staging' || github.event.pull_request.base.ref == 'staging' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging')) }}
     runs-on: ubuntu-latest
     environment: staging
     permissions:
@@ -243,7 +267,7 @@ jobs:
 
   deploy-prod:
     needs: build-and-push
-    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/main' || github.event.pull_request.base.ref == 'main') }}
+    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/main' || github.event.pull_request.base.ref == 'main' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'prod')) }}
     runs-on: ubuntu-latest
     environment: prod
     permissions:
