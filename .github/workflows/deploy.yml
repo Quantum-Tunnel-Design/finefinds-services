@@ -23,6 +23,9 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v3
 
@@ -42,6 +45,9 @@ jobs:
     name: Build and Push Image
     needs: test
     if: github.event.pull_request.merged == true
+    permissions:
+      id-token: write
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -68,6 +74,9 @@ jobs:
   notify:
     name: Send Notifications
     needs: [deploy-sandbox, deploy-dev, deploy-qa, deploy-staging, deploy-prod]
+    permissions:
+      id-token: write
+      contents: read
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -100,6 +109,9 @@ jobs:
     needs: build
     if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'sandbox'
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     environment: sandbox
     steps:
       - uses: actions/checkout@v3
@@ -129,6 +141,9 @@ jobs:
     needs: build
     if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'dev'
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     environment: dev
     steps:
       - uses: actions/checkout@v3
@@ -158,6 +173,9 @@ jobs:
     needs: build
     if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'qa'
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     environment: qa
     steps:
       - uses: actions/checkout@v3
@@ -187,6 +205,9 @@ jobs:
     needs: build
     if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'staging'
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     environment: staging
     steps:
       - uses: actions/checkout@v3
@@ -216,6 +237,9 @@ jobs:
     needs: build
     if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     environment: production
     steps:
       - uses: actions/checkout@v3
