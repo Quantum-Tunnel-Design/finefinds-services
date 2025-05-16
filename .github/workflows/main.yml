@@ -64,8 +64,10 @@ jobs:
           echo "Env: ${{env.SERVICES_ENV}}"
           echo "Branch: ${{inputs.branch}}"
           echo "Skip Deploy: ${{inputs.skip_deploy}}"
+          echo "Role Id: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-${{github.event.repository.name}}-${{ env.SERVICES_ENV }}"
 
   test:
+    needs: input_check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
