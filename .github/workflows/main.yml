@@ -80,7 +80,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-finefinds-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
+          role-to-assume: arn:aws:iam::891076991993:role/github-actions-finefinds-services-dev
           aws-region: us-east-1
           role-duration-seconds: 3600  # Increase session duration to 1 hour
 
