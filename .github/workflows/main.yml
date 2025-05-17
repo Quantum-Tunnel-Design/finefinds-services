@@ -267,7 +267,7 @@ jobs:
           else
             echo "Found existing task definition. Updating with new image..."
             # Get the latest revision
-            LATEST_REVISION=$(echo $TASK_DEF_ARN | rev | cut -d: -f1 | rev)
+            LATEST_REVISION=$(echo $TASK_DEF_ARN | rev | cut -d: -f1 | rev | tr -d 'None')
             echo "Latest revision: $LATEST_REVISION"
             
             # Get the current task definition
@@ -317,11 +317,11 @@ jobs:
             fi
           fi
           
-          echo "Updating service with new task definition..."
+          echo "Updating existing service..."
           # Update the service with the new task definition
           aws ecs update-service \
             --cluster finefinds-dev-cluster \
-            --service finefinds-backend \
+            --service FineFinds-dev-EcsService5196398A-gBUy7Nla9Poj \
             --task-definition $NEW_TASK_DEF_ARN \
             --force-new-deployment
 
