@@ -135,6 +135,18 @@ create_role_policy() {
                 "arn:aws:iam::${ACCOUNT_ID}:role/ecsTaskExecutionRole",
                 "arn:aws:iam::${ACCOUNT_ID}:role/ecsInstanceRole"
             ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+                "logs:DescribeLogStreams"
+            ],
+            "Resource": [
+                "arn:aws:logs:${AWS_REGION}:${ACCOUNT_ID}:log-group:/ecs/finefinds-backend:*"
+            ]
         }
     ]
 }
