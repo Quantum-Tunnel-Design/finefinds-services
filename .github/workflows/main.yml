@@ -140,8 +140,8 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           build-args: |
-            BUILDPLATFORM=${{ runner.arch }}
-            TARGETPLATFORM=${{ runner.arch }}
+            BUILDPLATFORM=${{ runner.arch == 'x64' && 'linux/amd64' || 'linux/arm64' }}
+            TARGETPLATFORM=${{ runner.arch == 'x64' && 'linux/amd64' || 'linux/arm64' }}
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ steps.version.outputs.version }}
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ github.ref_name }}
