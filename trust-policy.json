@@ -9,7 +9,16 @@
             "Action": "sts:AssumeRoleWithWebIdentity",
             "Condition": {
                 "StringLike": {
-                    "token.actions.githubusercontent.com:sub": "repo:amalgamage/finefinds-services:*"
+                    "token.actions.githubusercontent.com:sub": [
+                        "repo:amalgamage/finefinds-services:environment:dev",
+                        "repo:amalgamage/finefinds-services:environment:qa",
+                        "repo:amalgamage/finefinds-services:environment:staging",
+                        "repo:amalgamage/finefinds-services:environment:prod",
+                        "repo:amalgamage/finefinds-services:ref:refs/heads/dev",
+                        "repo:amalgamage/finefinds-services:ref:refs/heads/qa",
+                        "repo:amalgamage/finefinds-services:ref:refs/heads/staging",
+                        "repo:amalgamage/finefinds-services:ref:refs/heads/main"
+                    ]
                 },
                 "StringEquals": {
                     "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
