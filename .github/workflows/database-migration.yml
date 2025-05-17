@@ -124,8 +124,7 @@ jobs:
                   "options": {
                     "awslogs-group": "/finefinds/${{ inputs.environment }}/migration",
                     "awslogs-region": "'"${{ env.AWS_REGION }}"'",
-                    "awslogs-stream-prefix": "ecs/MigrationContainer",
-                    "awslogs-stream-name": "initial"
+                    "awslogs-stream-prefix": "migration"
                   }
                 }
               }
@@ -161,14 +160,6 @@ jobs:
             
           if [ "$TASK_STATUS" != "STOPPED" ]; then
             echo "Migration task failed with status: $TASK_STATUS"
-            echo "Container logs:"
-            # Wait for logs to be available
-            sleep 10
-            aws logs get-log-events \
-              --log-group-name "/finefinds/${{ inputs.environment }}/migration" \
-              --log-stream-name "ecs/MigrationContainer/initial" \
-              --query 'events[*].message' \
-              --output text || echo "No logs available yet"
             exit 1
           fi
           
@@ -181,14 +172,6 @@ jobs:
             
           if [ "$EXIT_CODE" != "0" ]; then
             echo "Migration failed with exit code: $EXIT_CODE"
-            echo "Container logs:"
-            # Wait for logs to be available
-            sleep 10
-            aws logs get-log-events \
-              --log-group-name "/finefinds/${{ inputs.environment }}/migration" \
-              --log-stream-name "ecs/MigrationContainer/initial" \
-              --query 'events[*].message' \
-              --output text || echo "No logs available yet"
             exit 1
           fi
             
