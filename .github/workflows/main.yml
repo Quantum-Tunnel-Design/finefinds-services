@@ -241,7 +241,7 @@ jobs:
               "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/ecsTaskExecutionRole",
               "containerDefinitions": [
                 {
-                  "name": "finefinds-backend",
+                  "name": "AppContainer",
                   "image": "'"${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION"'",
                   "essential": true,
                   "portMappings": [
@@ -285,7 +285,7 @@ jobs:
                 "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/ecsTaskExecutionRole",
                 "containerDefinitions": [
                   {
-                    "name": "finefinds-backend",
+                    "name": "AppContainer",
                     "image": "'"${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION"'",
                     "essential": true,
                     "portMappings": [
