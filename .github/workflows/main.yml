@@ -97,7 +97,10 @@ jobs:
       - name: Build
         run: |
           npm run build
+          echo "Contents of dist directory:"
           ls -la dist/
+          echo "Contents of dist directory (recursive):"
+          find dist/ -type f
 
   build-and-push:
     needs: test

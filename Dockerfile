@@ -14,7 +14,11 @@ RUN npm ci
 COPY . .
 
 # Build the application
-RUN npm run build
+RUN npm run build && \
+    echo "Contents of dist directory after build:" && \
+    ls -la dist/ && \
+    echo "Contents of dist directory (recursive):" && \
+    find dist/ -type f
 
 # Production stage
 FROM --platform=$TARGETPLATFORM node:18-alpine
@@ -31,6 +35,14 @@ RUN npm ci --only=production
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
+
+# Debug: Verify files are copied correctly
+RUN echo "Contents of /app directory:" && \
+    ls -la /app && \
+    echo "Contents of /app/dist directory:" && \
+    ls -la /app/dist && \
+    echo "Contents of /app/dist directory (recursive):" && \
+    find /app/dist -type f
 
 # Set environment variables
 ENV NODE_ENV=production
