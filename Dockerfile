@@ -25,6 +25,9 @@ FROM --platform=$TARGETPLATFORM node:18-alpine
 
 WORKDIR /app
 
+# Install OpenSSL
+RUN apk add --no-cache openssl
+
 # Copy package files
 COPY package*.json ./
 COPY prisma ./prisma/
