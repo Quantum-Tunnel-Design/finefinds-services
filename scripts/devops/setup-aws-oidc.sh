@@ -104,7 +104,7 @@ create_role_policy() {
             "Effect": "Allow",
             "Action": [
                 "ecs:DescribeTaskDefinition",
-                "ecs:DescribeTaskDefinitions"
+                "ecs:ListTaskDefinitions"
             ],
             "Resource": "*"
         },
