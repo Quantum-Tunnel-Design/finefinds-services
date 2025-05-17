@@ -124,7 +124,7 @@ jobs:
                   "options": {
                     "awslogs-group": "/finefinds/${{ inputs.environment }}/migration",
                     "awslogs-region": "'"${{ env.AWS_REGION }}"'",
-                    "awslogs-stream-prefix": "migration-task"
+                    "awslogs-stream-prefix": "ecs"
                   }
                 }
               }
@@ -163,7 +163,7 @@ jobs:
             echo "Container logs:"
             aws logs get-log-events \
               --log-group-name "/finefinds/${{ inputs.environment }}/migration" \
-              --log-stream-name "migration-task/$(echo $TASK_ARN | cut -d/ -f3)" \
+              --log-stream-name "ecs/MigrationContainer/$(echo $TASK_ARN | cut -d/ -f3)" \
               --query 'events[*].message' \
               --output text
             exit 1
@@ -181,7 +181,7 @@ jobs:
             echo "Container logs:"
             aws logs get-log-events \
               --log-group-name "/finefinds/${{ inputs.environment }}/migration" \
-              --log-stream-name "migration-task/$(echo $TASK_ARN | cut -d/ -f3)" \
+              --log-stream-name "ecs/MigrationContainer/$(echo $TASK_ARN | cut -d/ -f3)" \
               --query 'events[*].message' \
               --output text
             exit 1
