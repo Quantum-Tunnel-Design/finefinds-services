@@ -71,7 +71,7 @@ jobs:
           echo "Env: ${{env.SERVICES_ENV}}"
           echo "Branch: ${{inputs.branch}}"
           echo "Skip Deploy: ${{inputs.skip_deploy}}"
-          echo "Role Id: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-test"
+          echo "Role Id: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-finefinds-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}"
           echo "Repository: ${{ github.repository }}"
           echo "Ref: ${{ github.ref }}"
           echo "Event Name: ${{ github.event_name }}"
@@ -80,10 +80,9 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-test
-          aws-region: ${{ env.AWS_REGION }}
-          role-duration-seconds: 3600
-          mask-aws-account-id: false
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-finefinds-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
+          aws-region: us-east-1
+          role-duration-seconds: 3600  # Increase session duration to 1 hour
 
   test:
     needs: input_check
