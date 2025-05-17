@@ -96,8 +96,8 @@ create_role_policy() {
                 "ecr:ListTagsForResource"
             ],
             "Resource": [
-                "arn:aws:ecr:${AWS_REGION}:${ACCOUNT_ID}:repository/finefinds-${repo}-${env}",
-                "arn:aws:ecr:${AWS_REGION}:${ACCOUNT_ID}:repository/finefinds-${repo}-${env}/*"
+                "arn:aws:ecr:${AWS_REGION}:${ACCOUNT_ID}:repository/${repo}-${env}",
+                "arn:aws:ecr:${AWS_REGION}:${ACCOUNT_ID}:repository/${repo}-${env}/*"
             ]
         },
         {
