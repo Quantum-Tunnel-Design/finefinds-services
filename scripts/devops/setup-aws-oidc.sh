@@ -114,6 +114,8 @@ create_role_policy() {
                 "ecs:UpdateService",
                 "ecs:DescribeServices",
                 "ecs:DescribeTaskDefinition",
+                "ecs:DescribeTasks",
+                "ecs:ListTasks",
                 "ecs:RegisterTaskDefinition",
                 "ecs:CreateService",
                 "ecs:DeleteService",
@@ -150,6 +152,27 @@ create_role_policy() {
             "Resource": [
                 "arn:aws:logs:${AWS_REGION}:${ACCOUNT_ID}:log-group:/ecs/finefinds-backend:*"
             ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "cloudwatch:PutMetricAlarm",
+                "cloudwatch:DeleteAlarms",
+                "cloudwatch:DescribeAlarms"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "sns:CreateTopic",
+                "sns:Subscribe",
+                "sns:SetTopicAttributes",
+                "sns:GetTopicAttributes",
+                "sns:ListSubscriptionsByTopic",
+                "sns:Publish"
+            ],
+            "Resource": "*"
         }
     ]
 }

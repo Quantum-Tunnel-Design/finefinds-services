@@ -254,7 +254,7 @@ jobs:
                   "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'"${{ env.ECR_REPOSITORY_BACKEND }}"':'"$VERSION"'",
                   "essential": true,
                   "workingDirectory": "/app",
-                  "command": ["npm", "run", "start:prod"],
+                  "command": ["node", "dist/src/main.js"],
                   "portMappings": [
                     {
                       "containerPort": 3000,
@@ -288,9 +288,17 @@ jobs:
                       "awslogs-region": "'"${{ env.AWS_REGION }}"'",
                       "awslogs-stream-prefix": "finefinds"
                     }
+                  },
+                  "healthCheck": {
+                    "command": ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1"],
+                    "interval": 30,
+                    "timeout": 5,
+                    "retries": 5,
+                    "startPeriod": 60
                   }
                 }
-              ]
+              ],
+              "healthCheckGracePeriodSeconds": 120
             }' > task-definition.json
             
             # Register the new task definition
@@ -325,7 +333,7 @@ jobs:
                     "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'"${{ env.ECR_REPOSITORY_BACKEND }}"':'"$VERSION"'",
                     "essential": true,
                     "workingDirectory": "/app",
-                    "command": ["npm", "run", "start:prod"],
+                    "command": ["node", "dist/src/main.js"],
                     "portMappings": [
                       {
                         "containerPort": 3000,
@@ -359,9 +367,17 @@ jobs:
                         "awslogs-region": "'"${{ env.AWS_REGION }}"'",
                         "awslogs-stream-prefix": "finefinds"
                       }
+                    },
+                    "healthCheck": {
+                      "command": ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1"],
+                      "interval": 30,
+                      "timeout": 5,
+                      "retries": 5,
+                      "startPeriod": 60
                     }
                   }
-                ]
+                ],
+                "healthCheckGracePeriodSeconds": 120
               }' > task-definition.json
               
               # Register the new task definition
@@ -390,6 +406,21 @@ jobs:
             --service FineFinds-dev-EcsService5196398A-gBUy7Nla9Poj \
             --task-definition $NEW_TASK_DEF_ARN \
             --force-new-deployment
+
+          # Create or update CloudWatch alarm for service health
+          aws cloudwatch put-metric-alarm \
+            --alarm-name finefinds-dev-service-health \
+            --alarm-description "Alarm when service running count drops below desired count" \
+            --metric-name RunningTaskCount \
+            --namespace AWS/ECS \
+            --statistic Average \
+            --period 60 \
+            --threshold 1 \
+            --comparison-operator LessThanThreshold \
+            --dimensions Name=ClusterName,Value=finefinds-dev-cluster Name=ServiceName,Value=FineFinds-dev-EcsService5196398A-gBUy7Nla9Poj \
+            --evaluation-periods 2 \
+            --alarm-actions arn:aws:sns:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:finefinds-dev-alerts \
+            --ok-actions arn:aws:sns:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:finefinds-dev-alerts
 
   deploy-qa:
     needs: build-and-push
