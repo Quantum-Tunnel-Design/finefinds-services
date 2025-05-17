@@ -286,19 +286,15 @@ jobs:
                     },
                     {
                       "name": "COGNITO_CLIENT_USER_POOL_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ inputs.environment }}-cognito-config-aVTNzm:COGNITO_CLIENT_USER_POOL_ID::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_CLIENT_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_CLIENT_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ inputs.environment }}-cognito-config-aVTNzm:COGNITO_CLIENT_CLIENT_ID::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_CLIENT_CLIENT_ID::"
                     },
                     {
                       "name": "COGNITO_ADMIN_USER_POOL_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ inputs.environment }}-cognito-config-aVTNzm:COGNITO_ADMIN_USER_POOL_ID::"
-                    },
-                    {
-                      "name": "COGNITO_ADMIN_CLIENT_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ inputs.environment }}-cognito-config-aVTNzm:COGNITO_ADMIN_CLIENT_ID::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_ADMIN_CLIENT_ID::"
                     }
                   ],
                   "logConfiguration": {
@@ -377,19 +373,19 @@ jobs:
                       },
                       {
                         "name": "COGNITO_CLIENT_USER_POOL_ID",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ inputs.environment }}-cognito-config-aVTNzm:COGNITO_CLIENT_USER_POOL_ID::"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_CLIENT_USER_POOL_ID::"
                       },
                       {
                         "name": "COGNITO_CLIENT_CLIENT_ID",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ inputs.environment }}-cognito-config-aVTNzm:COGNITO_CLIENT_CLIENT_ID::"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_CLIENT_CLIENT_ID::"
                       },
                       {
                         "name": "COGNITO_ADMIN_USER_POOL_ID",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ inputs.environment }}-cognito-config-aVTNzm:COGNITO_ADMIN_USER_POOL_ID::"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_ADMIN_USER_POOL_ID::"
                       },
                       {
                         "name": "COGNITO_ADMIN_CLIENT_ID",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ inputs.environment }}-cognito-config-aVTNzm:COGNITO_ADMIN_CLIENT_ID::"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_ADMIN_CLIENT_ID::"
                       }
                     ],
                     "logConfiguration": {
