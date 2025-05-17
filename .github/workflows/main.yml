@@ -95,7 +95,9 @@ jobs:
         run: npm test
         
       - name: Build
-        run: npm run build
+        run: |
+          npm run build
+          ls -la dist/
 
   build-and-push:
     needs: test
@@ -155,6 +157,7 @@ jobs:
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          outputs: type=docker
           
       - name: Save version for deployment
         run: echo "${{ steps.version.outputs.version }}" > version.txt
@@ -245,6 +248,8 @@ jobs:
                   "name": "AppContainer",
                   "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'"${{ env.ECR_REPOSITORY_BACKEND }}"':'"$VERSION"'",
                   "essential": true,
+                  "workingDirectory": "/app",
+                  "command": ["npm", "run", "start:prod"],
                   "portMappings": [
                     {
                       "containerPort": 3000,
@@ -314,6 +319,8 @@ jobs:
                     "name": "AppContainer",
                     "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'"${{ env.ECR_REPOSITORY_BACKEND }}"':'"$VERSION"'",
                     "essential": true,
+                    "workingDirectory": "/app",
+                    "command": ["npm", "run", "start:prod"],
                     "portMappings": [
                       {
                         "containerPort": 3000,
