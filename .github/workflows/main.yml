@@ -273,6 +273,10 @@ jobs:
             # Get the current task definition
             TASK_DEF=$(aws ecs describe-task-definition --task-definition finefinds-backend:$LATEST_REVISION --query 'taskDefinition' --output json || echo "{}")
             
+            # Debug: Print existing task definition container name
+            echo "Existing task definition container name:"
+            echo "$TASK_DEF" | jq '.containerDefinitions[0].name'
+            
             if [ "$TASK_DEF" = "{}" ]; then
               echo "Failed to get task definition. Creating new one..."
               # Create new task definition from scratch
@@ -312,8 +316,16 @@ jobs:
               # Create new task definition with the new image
               NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
               
+              # Debug: Print the task definition
+              echo "New task definition:"
+              echo "$NEW_TASK_DEF" | jq '.'
+              
               # Register the new task definition
               NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
+              
+              # Debug: Verify the registered task definition
+              echo "Verifying registered task definition..."
+              aws ecs describe-task-definition --task-definition $NEW_TASK_DEF_ARN --query 'taskDefinition.containerDefinitions[0].name' --output text
             fi
           fi
           
