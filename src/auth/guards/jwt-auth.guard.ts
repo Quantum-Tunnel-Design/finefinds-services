@@ -4,17 +4,28 @@ import { GqlExecutionContext } from '@nestjs/graphql';
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-  private verifier: CognitoJwtVerifier<any, any, any>;
+  private clientVerifier: CognitoJwtVerifier<any, any, any>;
+  private adminVerifier: CognitoJwtVerifier<any, any, any>;
 
-  constructor(private reflector: Reflector) {
+  constructor(
+    private reflector: Reflector,
+    private configService: ConfigService,
+  ) {
     super();
-    this.verifier = CognitoJwtVerifier.create({
-      userPoolId: process.env.COGNITO_USER_POOL_ID,
+    this.clientVerifier = CognitoJwtVerifier.create({
+      userPoolId: this.configService.get('COGNITO_CLIENT_USER_POOL_ID'),
       tokenUse: 'access',
-      clientId: process.env.COGNITO_CLIENT_ID,
+      clientId: this.configService.get('COGNITO_CLIENT_CLIENT_ID'),
+    });
+
+    this.adminVerifier = CognitoJwtVerifier.create({
+      userPoolId: this.configService.get('COGNITO_ADMIN_USER_POOL_ID'),
+      tokenUse: 'access',
+      clientId: this.configService.get('COGNITO_ADMIN_CLIENT_ID'),
     });
   }
 
@@ -41,16 +52,25 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     }
 
     try {
-      const payload = await this.verifier.verify(token);
-      
-      // Extract user information from Cognito claims
-      request.user = {
-        id: payload.sub,
-        email: payload.email,
-        role: payload['custom:role'],
-      };
-
-      return true;
+      // Try client pool first
+      try {
+        const payload = await this.clientVerifier.verify(token);
+        request.user = {
+          id: payload.sub,
+          email: payload.email,
+          role: payload['custom:role'],
+        };
+        return true;
+      } catch (clientError) {
+        // If client verification fails, try admin pool
+        const payload = await this.adminVerifier.verify(token);
+        request.user = {
+          id: payload.sub,
+          email: payload.email,
+          role: 'ADMIN', // Admin users always have ADMIN role
+        };
+        return true;
+      }
     } catch (error) {
       throw new UnauthorizedException('Invalid token');
     }
