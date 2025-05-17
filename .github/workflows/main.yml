@@ -234,162 +234,99 @@ jobs:
         run: |
           VERSION=$(cat version.txt)
           
-          # Check if task definition exists
-          TASK_DEF_ARN=$(aws ecs list-task-definitions --family-prefix FineFindsdevEcsTaskDef290F30C7 --sort DESC --max-items 1 --query 'taskDefinitionArns[0]' --output text || echo "None")
-          
-          if [ "$TASK_DEF_ARN" = "None" ] || [ -z "$TASK_DEF_ARN" ]; then
-            echo "No existing task definition found. Creating new task definition..."
-            # Create new task definition from scratch
-            echo '{
-              "family": "FineFindsdevEcsTaskDef290F30C7",
-              "networkMode": "awsvpc",
-              "requiresCompatibilities": ["FARGATE"],
-              "cpu": "256",
-              "memory": "512",
-              "executionRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/finefinds-dev-ecs-execution-role",
-              "taskRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/finefinds-dev-ecs-task-role",
-              "containerDefinitions": [
-                {
-                  "name": "AppContainer",
-                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}':'"$VERSION"'",
-                  "essential": true,
-                  "workingDirectory": "/app",
-                  "command": ["node", "dist/src/main.js"],
-                  "portMappings": [
-                    {
-                      "containerPort": 3000,
-                      "protocol": "tcp"
-                    }
-                  ],
-                  "environment": [
-                    {
-                      "name": "PORT",
-                      "value": "3000"
-                    },
-                    {
-                      "name": "NODE_ENV",
-                      "value": "dev"
-                    }
-                  ],
-                  "secrets": [
-                    {
-                      "name": "DATABASE_URL",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection"
-                    },
-                    {
-                      "name": "REDIS_URL",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-redis-connection"
-                    }
-                  ],
-                  "logConfiguration": {
-                    "logDriver": "awslogs",
-                    "options": {
-                      "awslogs-group": "/finefinds/dev/app",
-                      "awslogs-region": "'"${{ env.AWS_REGION }}"'",
-                      "awslogs-stream-prefix": "finefinds"
-                    }
-                  }
-                }
-              ]
-            }' > task-definition.json
-            
-            # Register the new task definition
-            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
-          else
-            echo "Found existing task definition. Updating with new image..."
-            # Get the latest revision
-            LATEST_REVISION=$(echo $TASK_DEF_ARN | rev | cut -d: -f1 | rev | tr -d 'None')
-            echo "Latest revision: $LATEST_REVISION"
-            
-            # Get the current task definition
-            TASK_DEF=$(aws ecs describe-task-definition --task-definition finefinds-backend:$LATEST_REVISION --query 'taskDefinition' --output json || echo "{}")
-            
-            # Debug: Print existing task definition container name
-            echo "Existing task definition container name:"
-            echo "$TASK_DEF" | jq '.containerDefinitions[0].name'
-            
-            if [ "$TASK_DEF" = "{}" ]; then
-              echo "Failed to get task definition. Creating new one..."
-              # Create new task definition from scratch
-              echo '{
-                "family": "FineFindsdevEcsTaskDef290F30C7",
-                "networkMode": "awsvpc",
-                "requiresCompatibilities": ["FARGATE"],
-                "cpu": "256",
-                "memory": "512",
-                "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-dev-ecs-execution-role",
-                "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-dev-ecs-task-role",
-                "containerDefinitions": [
+          # Create new task definition
+          echo "Creating new task definition..."
+          TASK_DEF=$(cat <<EOF
+          {
+            "family": "FineFindsdevEcsTaskDef290F30C7",
+            "networkMode": "awsvpc",
+            "requiresCompatibilities": ["FARGATE"],
+            "cpu": "256",
+            "memory": "512",
+            "executionRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/finefinds-dev-ecs-execution-role",
+            "taskRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/finefinds-dev-ecs-task-role",
+            "containerDefinitions": [
+              {
+                "name": "AppContainer",
+                "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION",
+                "essential": true,
+                "workingDirectory": "/app",
+                "command": ["node", "dist/src/main.js"],
+                "environment": [
                   {
-                    "name": "AppContainer",
-                    "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'"${{ env.ECR_REPOSITORY_BACKEND }}"':'"$VERSION"'",
-                    "essential": true,
-                    "workingDirectory": "/app",
-                    "command": ["node", "dist/src/main.js"],
-                    "portMappings": [
-                      {
-                        "containerPort": 3000,
-                        "protocol": "tcp"
-                      }
-                    ],
-                    "environment": [
-                      {
-                        "name": "PORT",
-                        "value": "3000"
-                      },
-                      {
-                        "name": "NODE_ENV",
-                        "value": "dev"
-                      }
-                    ],
-                    "secrets": [
-                      {
-                        "name": "DATABASE_URL",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection"
-                      },
-                      {
-                        "name": "REDIS_URL",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-redis-connection"
-                      }
-                    ],
-                    "logConfiguration": {
-                      "logDriver": "awslogs",
-                      "options": {
-                        "awslogs-group": "/finefinds/dev/app",
-                        "awslogs-region": "'"${{ env.AWS_REGION }}"'",
-                        "awslogs-stream-prefix": "finefinds"
-                      }
-                    }
+                    "name": "PORT",
+                    "value": "3000"
+                  },
+                  {
+                    "name": "NODE_ENV",
+                    "value": "dev"
                   }
-                ]
-              }' > task-definition.json
-              
-              # Register the new task definition
-              NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
-            else
-              # Create new task definition with the new image
-              NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
-              
-              # Debug: Print the task definition
-              echo "New task definition:"
-              echo "$NEW_TASK_DEF" | jq '.'
-              
-              # Register the new task definition
-              NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
-              
-              # Debug: Verify the registered task definition
-              echo "Verifying registered task definition..."
-              aws ecs describe-task-definition --task-definition $NEW_TASK_DEF_ARN --query 'taskDefinition.containerDefinitions[0].name' --output text
-            fi
-          fi
+                ],
+                "secrets": [
+                  {
+                    "name": "DATABASE_URL",
+                    "valueFrom": "arn:aws:secretsmanager:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:secret:finefinds-dev-db-connection"
+                  },
+                  {
+                    "name": "REDIS_URL",
+                    "valueFrom": "arn:aws:secretsmanager:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:secret:finefinds-dev-redis-connection"
+                  }
+                ],
+                "portMappings": [
+                  {
+                    "containerPort": 3000,
+                    "protocol": "tcp"
+                  }
+                ],
+                "logConfiguration": {
+                  "logDriver": "awslogs",
+                  "options": {
+                    "awslogs-group": "/ecs/finefinds-backend",
+                    "awslogs-region": "${{ env.AWS_REGION }}",
+                    "awslogs-stream-prefix": "ecs",
+                    "awslogs-create-group": "true"
+                  }
+                },
+                "healthCheck": {
+                  "command": ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"],
+                  "interval": 30,
+                  "timeout": 5,
+                  "retries": 3,
+                  "startPeriod": 60
+                }
+              }
+            ]
+          }
+          EOF
+          )
           
-          echo "Updating existing service..."
-          # Update the service with the new task definition
-          aws ecs update-service \
-            --cluster finefinds-dev-cluster \
-            --service FineFinds-dev-EcsService5196398A-gBUy7Nla9Poj \
-            --task-definition $NEW_TASK_DEF_ARN \
-            --force-new-deployment
+          # Register new task definition
+          echo "Registering new task definition..."
+          TASK_DEF_REVISION=$(aws ecs register-task-definition --cli-input-json "$TASK_DEF" --query 'taskDefinition.revision' --output text)
+          echo "Registered task definition revision: $TASK_DEF_REVISION"
+          
+          # Check if service exists
+          echo "Checking if service exists..."
+          if aws ecs describe-services --cluster finefinds-dev --services finefinds-dev-service --query 'services[0].status' --output text | grep -q "ACTIVE"; then
+            echo "Service exists. Updating service..."
+            aws ecs update-service \
+              --cluster finefinds-dev \
+              --service finefinds-dev-service \
+              --task-definition "FineFindsdevEcsTaskDef290F30C7:$TASK_DEF_REVISION" \
+              --desired-count 1 \
+              --force-new-deployment \
+              --health-check-grace-period-seconds 60
+          else
+            echo "Service does not exist. Creating new service..."
+            aws ecs create-service \
+              --cluster finefinds-dev \
+              --service-name finefinds-dev-service \
+              --task-definition "FineFindsdevEcsTaskDef290F30C7:$TASK_DEF_REVISION" \
+              --desired-count 1 \
+              --launch-type FARGATE \
+              --network-configuration "awsvpcConfiguration={subnets=[subnet-0c0c0c0c0c0c0c0c0],securityGroups=[sg-0c0c0c0c0c0c0c0c0],assignPublicIp=ENABLED}" \
+              --health-check-grace-period-seconds 60
+          fi
 
   deploy-qa:
     needs: build-and-push
