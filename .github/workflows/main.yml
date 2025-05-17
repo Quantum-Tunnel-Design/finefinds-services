@@ -231,8 +231,7 @@ jobs:
           
           if [ "$TASK_DEF_ARN" = "None" ]; then
             # Create new task definition from scratch
-            cat > task-definition.json <<EOF
-            {
+            echo '{
               "family": "finefinds-backend",
               "networkMode": "awsvpc",
               "requiresCompatibilities": ["FARGATE"],
@@ -241,7 +240,7 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "finefinds-backend",
-                  "image": "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION",
+                  "image": "'"${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION"'",
                   "essential": true,
                   "portMappings": [
                     {
@@ -253,14 +252,13 @@ jobs:
                     "logDriver": "awslogs",
                     "options": {
                       "awslogs-group": "/ecs/finefinds-backend",
-                      "awslogs-region": "${{ env.AWS_REGION }}",
+                      "awslogs-region": "'"${{ env.AWS_REGION }}"'",
                       "awslogs-stream-prefix": "ecs"
                     }
                   }
                 }
               ]
-            }
-            EOF
+            }' > task-definition.json
             
             # Register the new task definition
             NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
