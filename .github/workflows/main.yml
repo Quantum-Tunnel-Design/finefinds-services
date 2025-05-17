@@ -282,23 +282,23 @@ jobs:
                   "secrets": [
                     {
                       "name": "DB_NAME",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:dbName::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection-DZU5ij:dbName::"
                     },
                     {
                       "name": "DB_USER",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:username::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection-DZU5ij:username::"
                     },
                     {
                       "name": "DB_PASSWORD",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:password::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection-DZU5ij:password::"
                     },
                     {
                       "name": "DB_PORT",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:port::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection-DZU5ij:port::"
                     },
                     {
                       "name": "DATABASE_HOST",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:host::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection-DZU5ij:host::"
                     },
                     {
                       "name": "REDIS_URL",
@@ -393,27 +393,27 @@ jobs:
                     "secrets": [
                       {
                         "name": "DB_NAME",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:dbName::"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection-DZU5ij:dbName::"
                       },
                       {
                         "name": "DB_USER",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:username::"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection-DZU5ij:username::"
                       },
                       {
                         "name": "DB_PASSWORD",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:password::"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection-DZU5ij:password::"
                       },
                       {
                         "name": "DB_PORT",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:port::"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection-DZU5ij:port::"
                       },
                       {
                         "name": "DATABASE_HOST",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:host::"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection-DZU5ij:host::"
                       },
                       {
                         "name": "REDIS_URL",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-redis-connection"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-redis-connection-cuiTEQ"
                       },
                       {
                         "name": "COGNITO_CLIENT_USER_POOL_ID",
