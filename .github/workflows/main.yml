@@ -227,9 +227,10 @@ jobs:
           VERSION=$(cat version.txt)
           
           # Check if task definition exists
-          TASK_DEF_ARN=$(aws ecs list-task-definitions --family-prefix finefinds-backend --sort DESC --max-items 1 --query 'taskDefinitionArns[0]' --output text)
+          TASK_DEF_ARN=$(aws ecs list-task-definitions --family-prefix finefinds-backend --sort DESC --max-items 1 --query 'taskDefinitionArns[0]' --output text || echo "None")
           
-          if [ "$TASK_DEF_ARN" = "None" ]; then
+          if [ "$TASK_DEF_ARN" = "None" ] || [ -z "$TASK_DEF_ARN" ]; then
+            echo "No existing task definition found. Creating new task definition..."
             # Create new task definition from scratch
             echo '{
               "family": "finefinds-backend",
@@ -264,6 +265,7 @@ jobs:
             # Register the new task definition
             NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
           else
+            echo "Found existing task definition. Updating with new image..."
             # Get the latest revision
             LATEST_REVISION=$(echo $TASK_DEF_ARN | rev | cut -d: -f1 | rev)
             
@@ -277,6 +279,7 @@ jobs:
             NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
           fi
           
+          echo "Updating service with new task definition..."
           # Update the service with the new task definition
           aws ecs update-service \
             --cluster finefinds-dev-cluster \
