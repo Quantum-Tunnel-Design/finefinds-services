@@ -2,6 +2,8 @@
 
 set -e
 
+# Set AWS region
+export AWS_REGION=${AWS_REGION:-us-east-1}
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 OIDC_ARN="arn:aws:iam::$ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
 
@@ -55,6 +57,10 @@ create_role_policy() {
     local env=$2
     local policy_file="role-policy-${repo}-${env}.json"
     
+    echo "Creating policy for repo: $repo, env: $env" >&2
+    echo "AWS Region: $AWS_REGION" >&2
+    echo "Account ID: $ACCOUNT_ID" >&2
+    
     cat > $policy_file <<EOF
 {
     "Version": "2012-10-17",
@@ -62,7 +68,13 @@ create_role_policy() {
         {
             "Effect": "Allow",
             "Action": [
-                "ecr:GetAuthorizationToken",
+                "ecr:GetAuthorizationToken"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
                 "ecr:BatchCheckLayerAvailability",
                 "ecr:GetDownloadUrlForLayer",
                 "ecr:GetRepositoryPolicy",
@@ -73,9 +85,20 @@ create_role_policy() {
                 "ecr:InitiateLayerUpload",
                 "ecr:UploadLayerPart",
                 "ecr:CompleteLayerUpload",
-                "ecr:PutImage"
+                "ecr:PutImage",
+                "ecr:CreateRepository",
+                "ecr:DeleteRepository",
+                "ecr:SetRepositoryPolicy",
+                "ecr:DeleteRepositoryPolicy",
+                "ecr:TagResource",
+                "ecr:UntagResource",
+                "ecr:DescribeImages",
+                "ecr:ListTagsForResource"
             ],
-            "Resource": "*"
+            "Resource": [
+                "arn:aws:ecr:${AWS_REGION}:${ACCOUNT_ID}:repository/finefinds-${repo}-${env}",
+                "arn:aws:ecr:${AWS_REGION}:${ACCOUNT_ID}:repository/finefinds-${repo}-${env}/*"
+            ]
         },
         {
             "Effect": "Allow",
@@ -83,14 +106,34 @@ create_role_policy() {
                 "ecs:UpdateService",
                 "ecs:DescribeServices",
                 "ecs:DescribeTaskDefinition",
-                "ecs:RegisterTaskDefinition"
+                "ecs:RegisterTaskDefinition",
+                "ecs:CreateService",
+                "ecs:DeleteService",
+                "ecs:ListServices",
+                "ecs:ListTaskDefinitions",
+                "ecs:ListClusters"
             ],
-            "Resource": "*"
+            "Resource": [
+                "arn:aws:ecs:${AWS_REGION}:${ACCOUNT_ID}:cluster/finefinds-${env}",
+                "arn:aws:ecs:${AWS_REGION}:${ACCOUNT_ID}:service/finefinds-${env}/*",
+                "arn:aws:ecs:${AWS_REGION}:${ACCOUNT_ID}:task-definition/*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:PassRole"
+            ],
+            "Resource": [
+                "arn:aws:iam::${ACCOUNT_ID}:role/ecsTaskExecutionRole",
+                "arn:aws:iam::${ACCOUNT_ID}:role/ecsInstanceRole"
+            ]
         }
     ]
 }
 EOF
-    echo $policy_file
+    echo "Created policy file: $policy_file" >&2
+    echo "$policy_file"
 }
 
 # Clean up existing roles and OIDC provider
@@ -135,16 +178,24 @@ for repo_info in "${REPOS[@]}"; do
         
         # Create role with shorter name
         role_name="github-actions-${repo_short}-${env}"
+        echo "Creating role: $role_name"
         aws iam create-role \
             --role-name $role_name \
             --assume-role-policy-document file://$trust_policy_file
         
         # Create and attach role policy
         role_policy_file=$(create_role_policy $repo_name $env)
+        echo "Attaching policy to role: $role_name"
         aws iam put-role-policy \
             --role-name $role_name \
             --policy-name github-actions-policy \
-            --policy-document file://$role_policy_file
+            --policy-document "file://$role_policy_file"
+        
+        # Verify the role and its policies
+        echo "Verifying role: $role_name"
+        aws iam get-role --role-name $role_name
+        echo "Verifying role policy:"
+        aws iam get-role-policy --role-name $role_name --policy-name github-actions-policy
         
         echo "Created role: $role_name"
         echo "Use this role ARN in your GitHub Actions workflow:"
