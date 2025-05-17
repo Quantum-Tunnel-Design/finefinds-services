@@ -268,15 +268,53 @@ jobs:
             echo "Found existing task definition. Updating with new image..."
             # Get the latest revision
             LATEST_REVISION=$(echo $TASK_DEF_ARN | rev | cut -d: -f1 | rev)
+            echo "Latest revision: $LATEST_REVISION"
             
             # Get the current task definition
-            TASK_DEF=$(aws ecs describe-task-definition --task-definition finefinds-backend:$LATEST_REVISION --query 'taskDefinition' --output json)
+            TASK_DEF=$(aws ecs describe-task-definition --task-definition finefinds-backend:$LATEST_REVISION --query 'taskDefinition' --output json || echo "{}")
             
-            # Create new task definition with the new image
-            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
-            
-            # Register the new task definition
-            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
+            if [ "$TASK_DEF" = "{}" ]; then
+              echo "Failed to get task definition. Creating new one..."
+              # Create new task definition from scratch
+              echo '{
+                "family": "finefinds-backend",
+                "networkMode": "awsvpc",
+                "requiresCompatibilities": ["FARGATE"],
+                "cpu": "256",
+                "memory": "512",
+                "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/ecsTaskExecutionRole",
+                "containerDefinitions": [
+                  {
+                    "name": "finefinds-backend",
+                    "image": "'"${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION"'",
+                    "essential": true,
+                    "portMappings": [
+                      {
+                        "containerPort": 3000,
+                        "protocol": "tcp"
+                      }
+                    ],
+                    "logConfiguration": {
+                      "logDriver": "awslogs",
+                      "options": {
+                        "awslogs-group": "/ecs/finefinds-backend",
+                        "awslogs-region": "'"${{ env.AWS_REGION }}"'",
+                        "awslogs-stream-prefix": "ecs"
+                      }
+                    }
+                  }
+                ]
+              }' > task-definition.json
+              
+              # Register the new task definition
+              NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
+            else
+              # Create new task definition with the new image
+              NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+              
+              # Register the new task definition
+              NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
+            fi
           fi
           
           echo "Updating service with new task definition..."
