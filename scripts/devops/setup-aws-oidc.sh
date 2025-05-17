@@ -134,7 +134,9 @@ create_role_policy() {
             ],
             "Resource": [
                 "arn:aws:iam::${ACCOUNT_ID}:role/ecsTaskExecutionRole",
-                "arn:aws:iam::${ACCOUNT_ID}:role/ecsInstanceRole"
+                "arn:aws:iam::${ACCOUNT_ID}:role/ecsInstanceRole",
+                "arn:aws:iam::${ACCOUNT_ID}:role/finefinds-dev-ecs-task-role",
+                "arn:aws:iam::${ACCOUNT_ID}:role/finefinds-dev-ecs-execution-role"
             ]
         },
         {

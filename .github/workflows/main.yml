@@ -243,7 +243,7 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "AppContainer",
-                  "image": "'"${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION"'",
+                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'"${{ env.ECR_REPOSITORY_BACKEND }}"':'"$VERSION"'",
                   "essential": true,
                   "portMappings": [
                     {
@@ -312,7 +312,7 @@ jobs:
                 "containerDefinitions": [
                   {
                     "name": "AppContainer",
-                    "image": "'"${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION"'",
+                    "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'"${{ env.ECR_REPOSITORY_BACKEND }}"':'"$VERSION"'",
                     "essential": true,
                     "portMappings": [
                       {
@@ -356,7 +356,7 @@ jobs:
               NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
             else
               # Create new task definition with the new image
-              NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+              NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
               
               # Debug: Print the task definition
               echo "New task definition:"
