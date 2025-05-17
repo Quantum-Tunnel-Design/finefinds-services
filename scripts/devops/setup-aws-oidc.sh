@@ -113,6 +113,7 @@ create_role_policy() {
             "Action": [
                 "ecs:UpdateService",
                 "ecs:DescribeServices",
+                "ecs:DescribeTaskDefinition",
                 "ecs:RegisterTaskDefinition",
                 "ecs:CreateService",
                 "ecs:DeleteService",
@@ -122,7 +123,7 @@ create_role_policy() {
             ],
             "Resource": [
                 "arn:aws:ecs:${AWS_REGION}:${ACCOUNT_ID}:cluster/finefinds-${env}",
-                "arn:aws:ecs:${AWS_REGION}:${ACCOUNT_ID}:service/finefinds-${env}/*",
+                "arn:aws:ecs:${AWS_REGION}:${ACCOUNT_ID}:service/finefinds-${env}-cluster/*",
                 "arn:aws:ecs:${AWS_REGION}:${ACCOUNT_ID}:task-definition/*"
             ]
         },
