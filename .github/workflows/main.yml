@@ -227,18 +227,19 @@ jobs:
           VERSION=$(cat version.txt)
           
           # Check if task definition exists
-          TASK_DEF_ARN=$(aws ecs list-task-definitions --family-prefix finefinds-backend --sort DESC --max-items 1 --query 'taskDefinitionArns[0]' --output text || echo "None")
+          TASK_DEF_ARN=$(aws ecs list-task-definitions --family-prefix FineFindsdevEcsTaskDef290F30C7 --sort DESC --max-items 1 --query 'taskDefinitionArns[0]' --output text || echo "None")
           
           if [ "$TASK_DEF_ARN" = "None" ] || [ -z "$TASK_DEF_ARN" ]; then
             echo "No existing task definition found. Creating new task definition..."
             # Create new task definition from scratch
             echo '{
-              "family": "finefinds-backend",
+              "family": "FineFindsdevEcsTaskDef290F30C7",
               "networkMode": "awsvpc",
               "requiresCompatibilities": ["FARGATE"],
               "cpu": "256",
               "memory": "512",
-              "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/ecsTaskExecutionRole",
+              "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-dev-ecs-execution-role",
+              "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-dev-ecs-task-role",
               "containerDefinitions": [
                 {
                   "name": "AppContainer",
@@ -250,12 +251,32 @@ jobs:
                       "protocol": "tcp"
                     }
                   ],
+                  "environment": [
+                    {
+                      "name": "PORT",
+                      "value": "3000"
+                    },
+                    {
+                      "name": "NODE_ENV",
+                      "value": "dev"
+                    }
+                  ],
+                  "secrets": [
+                    {
+                      "name": "DATABASE_URL",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection"
+                    },
+                    {
+                      "name": "REDIS_URL",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-redis-connection"
+                    }
+                  ],
                   "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                      "awslogs-group": "/ecs/finefinds-backend",
+                      "awslogs-group": "/finefinds/dev/app",
                       "awslogs-region": "'"${{ env.AWS_REGION }}"'",
-                      "awslogs-stream-prefix": "ecs"
+                      "awslogs-stream-prefix": "finefinds"
                     }
                   }
                 }
@@ -281,12 +302,13 @@ jobs:
               echo "Failed to get task definition. Creating new one..."
               # Create new task definition from scratch
               echo '{
-                "family": "finefinds-backend",
+                "family": "FineFindsdevEcsTaskDef290F30C7",
                 "networkMode": "awsvpc",
                 "requiresCompatibilities": ["FARGATE"],
                 "cpu": "256",
                 "memory": "512",
-                "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/ecsTaskExecutionRole",
+                "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-dev-ecs-execution-role",
+                "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-dev-ecs-task-role",
                 "containerDefinitions": [
                   {
                     "name": "AppContainer",
@@ -298,12 +320,32 @@ jobs:
                         "protocol": "tcp"
                       }
                     ],
+                    "environment": [
+                      {
+                        "name": "PORT",
+                        "value": "3000"
+                      },
+                      {
+                        "name": "NODE_ENV",
+                        "value": "dev"
+                      }
+                    ],
+                    "secrets": [
+                      {
+                        "name": "DATABASE_URL",
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection"
+                      },
+                      {
+                        "name": "REDIS_URL",
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-redis-connection"
+                      }
+                    ],
                     "logConfiguration": {
                       "logDriver": "awslogs",
                       "options": {
-                        "awslogs-group": "/ecs/finefinds-backend",
+                        "awslogs-group": "/finefinds/dev/app",
                         "awslogs-region": "'"${{ env.AWS_REGION }}"'",
-                        "awslogs-stream-prefix": "ecs"
+                        "awslogs-stream-prefix": "finefinds"
                       }
                     }
                   }
