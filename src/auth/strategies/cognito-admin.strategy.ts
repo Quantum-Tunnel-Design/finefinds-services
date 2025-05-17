@@ -1,0 +1,55 @@
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { PassportStrategy } from '@nestjs/passport';
+import { ExtractJwt, Strategy } from 'passport-jwt';
+import { ConfigService } from '@nestjs/config';
+import { CognitoJwtVerifier } from 'aws-jwt-verify';
+import { UserRole } from '@prisma/client';
+import { passportJwtSecret } from 'jwks-rsa';
+
+@Injectable()
+export class CognitoAdminStrategy extends PassportStrategy(Strategy, 'cognito-admin') {
+  private verifier: any;
+
+  constructor(private configService: ConfigService) {
+    const cognitoConfig = configService.get('cognito.admin');
+    
+    super({
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ignoreExpiration: false,
+      secretOrKeyProvider: passportJwtSecret({
+        cache: true,
+        rateLimit: true,
+        jwksRequestsPerMinute: 5,
+        jwksUri: `https://cognito-idp.${cognitoConfig.region}.amazonaws.com/${cognitoConfig.userPoolId}/.well-known/jwks.json`,
+      }),
+    });
+
+    if (!cognitoConfig.userPoolId || !cognitoConfig.clientId) {
+      throw new Error('Admin Cognito configuration is missing. Please check your environment variables.');
+    }
+
+    this.verifier = CognitoJwtVerifier.create({
+      userPoolId: cognitoConfig.userPoolId,
+      tokenUse: 'access',
+      clientId: cognitoConfig.clientId,
+    });
+  }
+
+  async validate(payload: any) {
+    try {
+      // Verify the token with Cognito
+      await this.verifier.verify(payload);
+
+      // Extract user info from claims
+      const user = {
+        id: payload.sub,
+        email: payload.email,
+        role: UserRole.ADMIN, // Admin users always have ADMIN role
+      };
+
+      return user;
+    } catch (error) {
+      throw new UnauthorizedException('Invalid token');
+    }
+  }
+} 

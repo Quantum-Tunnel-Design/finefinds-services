@@ -49,3 +49,5 @@ terraform.rc
 # AWS
 .aws/
 aws.json 
+
+scripts

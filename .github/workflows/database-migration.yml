@@ -22,7 +22,7 @@ env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY_BACKEND: finefinds-services-${{ inputs.environment }}
   CLUSTER_NAME: finefinds-${{ inputs.environment }}-cluster
-  TASK_DEFINITION: finefinds-backend-migration
+  TASK_DEFINITION: finefinds-backend-migration-${{ inputs.environment }}
 
 jobs:
   migrate:
@@ -38,7 +38,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-${{github.event.repository.name}}-${{ inputs.environment == 'prod' && 'prod' || inputs.environment }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
           
@@ -65,10 +65,62 @@ jobs:
           echo "sg_id=$SG_ID" >> $GITHUB_OUTPUT
           
       - name: Run database migration
+        id: migration
         run: |
+          # Generate task definition
+          echo '{
+            "family": "'"${{ env.TASK_DEFINITION }}"'",
+            "networkMode": "awsvpc",
+            "requiresCompatibilities": ["FARGATE"],
+            "cpu": "256",
+            "memory": "512",
+            "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-${{ inputs.environment }}-ecs-execution-role",
+            "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-${{ inputs.environment }}-ecs-task-role",
+            "containerDefinitions": [
+              {
+                "name": "MigrationContainer",
+                "image": "'"${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ inputs.version }}"'",
+                "essential": true,
+                "workingDirectory": "/app",
+                "command": ["npm", "run", "prisma:migrate"],
+                "environment": [
+                  {
+                    "name": "NODE_ENV",
+                    "value": "'"${{ inputs.environment }}"'"
+                  },
+                  {
+                    "name": "AWS_REGION",
+                    "value": "'"${{ env.AWS_REGION }}"'"
+                  }
+                ],
+                "secrets": [
+                  {
+                    "name": "DATABASE_URL",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ inputs.environment }}-db-connection"
+                  }
+                ],
+                "logConfiguration": {
+                  "logDriver": "awslogs",
+                  "options": {
+                    "awslogs-group": "/finefinds/${{ inputs.environment }}/migration",
+                    "awslogs-region": "'"${{ env.AWS_REGION }}"'",
+                    "awslogs-stream-prefix": "finefinds"
+                  }
+                }
+              }
+            ]
+          }' > task-definition.json
+
+          # Register task definition
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://task-definition.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+
+          # Run migration task
           TASK_ARN=$(aws ecs run-task \
             --cluster ${{ env.CLUSTER_NAME }} \
-            --task-definition ${{ env.TASK_DEFINITION }} \
+            --task-definition $NEW_TASK_DEF_ARN \
             --network-configuration "awsvpcConfiguration={subnets=[${{ steps.get-subnets.outputs.subnet_ids }}],securityGroups=[${{ steps.get-sg.outputs.sg_id }}]}" \
             --launch-type FARGATE \
             --query 'tasks[0].taskArn' \
@@ -88,6 +140,12 @@ jobs:
             
           if [ "$TASK_STATUS" != "STOPPED" ]; then
             echo "Migration task failed with status: $TASK_STATUS"
+            echo "Container logs:"
+            aws logs get-log-events \
+              --log-group-name "/finefinds/${{ inputs.environment }}/migration" \
+              --log-stream-name "finefinds/migration/$TASK_ARN" \
+              --query 'events[*].message' \
+              --output text
             exit 1
           fi
           
@@ -100,14 +158,41 @@ jobs:
             
           if [ "$EXIT_CODE" != "0" ]; then
             echo "Migration failed with exit code: $EXIT_CODE"
+            echo "Container logs:"
+            aws logs get-log-events \
+              --log-group-name "/finefinds/${{ inputs.environment }}/migration" \
+              --log-stream-name "finefinds/migration/$TASK_ARN" \
+              --query 'events[*].message' \
+              --output text
             exit 1
           fi
             
       - name: Notify Slack
-        uses: 8398a7/action-slack@v3
+        uses: slackapi/slack-github-action@v2.1.0
         with:
-          status: ${{ job.status }}
-          fields: repo,message,commit,author,action,eventName,ref,workflow,job,took
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: webhook-trigger
+          payload: |
+            {
+              "channel": "${{ secrets.SLACK_CHANNEL }}",
+              "attachments": [
+                {
+                  "color": "${{ job.status == 'success' && '#36a64f' || '#ff0000' }}",
+                  "pretext": "${{ job.status == 'success' && ':white_check_mark: Database Migration Succeeded' || ':x: Database Migration Failed' }}",
+                  "fields": [
+                    { "title": "Environment", "value": "${{ inputs.environment }}", "short": true },
+                    { "title": "Version", "value": "${{ inputs.version }}", "short": true },
+                    { "title": "Actor", "value": "${{ github.actor }}", "short": true },
+                    { "title": "Task Definition", "value": "${{ steps.migration.outputs.NEW_TASK_DEF_ARN }}", "short": false }
+                  ],
+                  "actions": [
+                    {
+                      "type": "button",
+                      "text": "View Workflow",
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
         if: always()

@@ -6,51 +6,47 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3001:3000"
     volumes:
       - .:/app
       - /app/node_modules
     environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/finefinds?schema=public
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your-secret-key
+      - JWT_EXPIRATION=1d
+      - PORT=3000
       - NODE_ENV=development
+      - AWS_REGION=us-east-1
+      - COGNITO_CLIENT_USER_POOL_ID=${COGNITO_CLIENT_USER_POOL_ID}
+      - COGNITO_CLIENT_CLIENT_ID=${COGNITO_CLIENT_CLIENT_ID}
+      - COGNITO_ADMIN_USER_POOL_ID=${COGNITO_ADMIN_USER_POOL_ID}
+      - COGNITO_ADMIN_CLIENT_ID=${COGNITO_ADMIN_CLIENT_ID}
     env_file:
       - config/local.env
     depends_on:
-      - postgres
-      - mongodb
-      - localstack
+      - db
+      - redis
 
-  postgres:
-    image: postgres:14-alpine
-    ports:
-      - "5432:5432"
+  db:
+    image: postgres:15
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=finefinds
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  mongodb:
-    image: mongo:6
+  redis:
+    image: redis:7
     ports:
-      - "27017:27017"
+      - "6379:6379"
     volumes:
-      - mongodb_data:/data/db
-
-  localstack:
-    image: localstack/localstack:latest
-    ports:
-      - "4566:4566"
-    environment:
-      - SERVICES=s3,secretsmanager,cognito
-      - DEBUG=1
-      - DATA_DIR=/tmp/localstack/data
-      - DOCKER_HOST=unix:///var/run/docker.sock
-    volumes:
-      - localstack_data:/tmp/localstack
-      - "/var/run/docker.sock:/var/run/docker.sock"
+      - redis_data:/data
 
 volumes:
   postgres_data:
-  mongodb_data:
+  redis_data:
   localstack_data: 

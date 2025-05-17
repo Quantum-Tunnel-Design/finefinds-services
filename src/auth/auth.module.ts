@@ -3,17 +3,24 @@ import { ConfigModule } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { AuthResolver } from './auth.resolver';
-import { CognitoStrategy } from './strategies/cognito.strategy';
+import { CognitoClientStrategy } from './strategies/cognito-client.strategy';
+import { CognitoAdminStrategy } from './strategies/cognito-admin.strategy';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
+import cognitoConfig from './cognito.config';
 
 @Module({
   imports: [
-    ConfigModule,
-    PassportModule.register({ defaultStrategy: 'cognito' }),
+    ConfigModule.forFeature(cognitoConfig),
+    PassportModule.register({ defaultStrategy: 'cognito-client' }),
     UsersModule,
   ],
-  providers: [AuthService, AuthResolver, CognitoStrategy],
+  providers: [
+    AuthService,
+    AuthResolver,
+    CognitoClientStrategy,
+    CognitoAdminStrategy,
+  ],
   controllers: [AuthController],
   exports: [AuthService],
 })

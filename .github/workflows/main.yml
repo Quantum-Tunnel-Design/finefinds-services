@@ -269,6 +269,10 @@ jobs:
                     {
                       "name": "NODE_ENV",
                       "value": "dev"
+                    },
+                    {
+                      "name": "AWS_REGION",
+                      "value": "'"${{ env.AWS_REGION }}"'"
                     }
                   ],
                   "secrets": [
@@ -279,6 +283,22 @@ jobs:
                     {
                       "name": "REDIS_URL",
                       "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-redis-connection"
+                    },
+                    {
+                      "name": "COGNITO_CLIENT_USER_POOL_ID",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config:COGNITO_CLIENT_USER_POOL_ID::"
+                    },
+                    {
+                      "name": "COGNITO_CLIENT_CLIENT_ID",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config:COGNITO_CLIENT_CLIENT_ID::"
+                    },
+                    {
+                      "name": "COGNITO_ADMIN_USER_POOL_ID",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config:COGNITO_ADMIN_USER_POOL_ID::"
+                    },
+                    {
+                      "name": "COGNITO_ADMIN_CLIENT_ID",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config:COGNITO_ADMIN_CLIENT_ID::"
                     }
                   ],
                   "logConfiguration": {
@@ -340,6 +360,10 @@ jobs:
                       {
                         "name": "NODE_ENV",
                         "value": "dev"
+                      },
+                      {
+                        "name": "AWS_REGION",
+                        "value": "'"${{ env.AWS_REGION }}"'"
                       }
                     ],
                     "secrets": [
@@ -350,6 +374,22 @@ jobs:
                       {
                         "name": "REDIS_URL",
                         "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-redis-connection"
+                      },
+                      {
+                        "name": "COGNITO_CLIENT_USER_POOL_ID",
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config:COGNITO_CLIENT_USER_POOL_ID::"
+                      },
+                      {
+                        "name": "COGNITO_CLIENT_CLIENT_ID",
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config:COGNITO_CLIENT_CLIENT_ID::"
+                      },
+                      {
+                        "name": "COGNITO_ADMIN_USER_POOL_ID",
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config:COGNITO_ADMIN_USER_POOL_ID::"
+                      },
+                      {
+                        "name": "COGNITO_ADMIN_CLIENT_ID",
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config:COGNITO_ADMIN_CLIENT_ID::"
                       }
                     ],
                     "logConfiguration": {
