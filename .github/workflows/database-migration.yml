@@ -85,10 +85,6 @@ jobs:
                 "command": ["npm", "run", "prisma:migrate"],
                 "secrets": [
                   {
-                    "name": "DATABASE_URL",
-                    "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ inputs.environment }}-db-connection:SecretString:url::"
-                  },
-                  {
                     "name": "DB_NAME",
                     "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ inputs.environment }}-db-connection:SecretString:dbName::"
                   },
