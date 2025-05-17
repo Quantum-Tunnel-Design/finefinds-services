@@ -64,7 +64,7 @@ jobs:
           echo "Env: ${{env.SERVICES_ENV}}"
           echo "Branch: ${{inputs.branch}}"
           echo "Skip Deploy: ${{inputs.skip_deploy}}"
-          echo "Role Id: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-${{github.event.repository.name}}-${{ env.SERVICES_ENV }}"
+          echo "Role Id: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-finefinds-services-${{ env.SERVICES_ENV }}"
 
   test:
     needs: input_check
@@ -101,7 +101,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-${{github.event.repository.name}}-${{ env.SERVICES_ENV }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-finefinds-services-${{ env.SERVICES_ENV }}
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
           
@@ -199,7 +199,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-dev
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-finefinds-services-dev
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
           
@@ -232,7 +232,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-qa
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-finefinds-services-qa
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
           
@@ -265,7 +265,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-staging
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-finefinds-services-staging
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
           
@@ -298,7 +298,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-prod
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-finefinds-services-prod
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
           
