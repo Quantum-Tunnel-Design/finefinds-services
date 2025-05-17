@@ -225,11 +225,21 @@ jobs:
       - name: Deploy to ECS
         run: |
           VERSION=$(cat version.txt)
+           # Get the current task definition
+          TASK_DEF=$(aws ecs describe-task-definition --task-definition finefinds-backend --query 'taskDefinition' --output json)
+          
+          # Create new task definition with the new image
+          NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+          
+          # Register the new task definition
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
+          
+          # Update the service with the new task definition
           aws ecs update-service \
-            --cluster finefinds-dev \
+            --cluster finefinds-dev-cluster \
             --service finefinds-backend \
-            --force-new-deployment \
-            --task-definition finefinds-backend:$VERSION
+            --task-definition $NEW_TASK_DEF_ARN \
+            --force-new-deployment
 
   deploy-qa:
     needs: build-and-push
