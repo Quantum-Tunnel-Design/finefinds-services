@@ -225,8 +225,11 @@ jobs:
       - name: Deploy to ECS
         run: |
           VERSION=$(cat version.txt)
-           # Get the current task definition
-          TASK_DEF=$(aws ecs describe-task-definition --task-definition finefinds-backend --query 'taskDefinition' --output json)
+          # Get the latest task definition revision
+          LATEST_REVISION=$(aws ecs describe-task-definitions --task-definition-prefix finefinds-backend --sort DESC --max-items 1 --query 'taskDefinitions[0].revision' --output text)
+          
+          # Get the current task definition
+          TASK_DEF=$(aws ecs describe-task-definition --task-definition finefinds-backend:$LATEST_REVISION --query 'taskDefinition' --output json)
           
           # Create new task definition with the new image
           NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
