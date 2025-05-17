@@ -273,13 +273,33 @@ jobs:
                     {
                       "name": "AWS_REGION",
                       "value": "'"${{ env.AWS_REGION }}"'"
+                    },
+                    {
+                      "name": "DATABASE_URL",
+                      "value": "postgresql://${DB_USER}:${DB_PASSWORD}@${DATABASE_URL}:${DB_PORT}/${DB_NAME}?schema=public"
+                    },
+                    {
+                      "name": "DB_NAME",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:dbName::"
+                    },
+                    {
+                      "name": "DB_USER",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:username::"
+                    },
+                    {
+                      "name": "DB_PASSWORD",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:password::"
+                    },
+                    {
+                      "name": "DB_PORT",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:port::"
+                    },
+                    {
+                      "name": "DATABASE_HOST",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:host::"
                     }
                   ],
                   "secrets": [
-                    {
-                      "name": "DATABASE_URL",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection"
-                    },
                     {
                       "name": "REDIS_URL",
                       "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-redis-connection"
@@ -364,13 +384,33 @@ jobs:
                       {
                         "name": "AWS_REGION",
                         "value": "'"${{ env.AWS_REGION }}"'"
+                      },
+                      {
+                        "name": "DATABASE_URL",
+                        "value": "postgresql://${DB_USER}:${DB_PASSWORD}@${DATABASE_URL}:${DB_PORT}/${DB_NAME}?schema=public"
+                      },
+                      {
+                        "name": "DB_NAME",
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:dbName::"
+                      },
+                      {
+                        "name": "DB_USER",
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:username::"
+                      },
+                      {
+                        "name": "DB_PASSWORD",
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:password::"
+                      },
+                      {
+                        "name": "DB_PORT",
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:port::"
+                      },
+                      {
+                        "name": "DATABASE_HOST",
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:host::"
                       }
                     ],
                     "secrets": [
-                      {
-                        "name": "DATABASE_URL",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection"
-                      },
                       {
                         "name": "REDIS_URL",
                         "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-redis-connection"
