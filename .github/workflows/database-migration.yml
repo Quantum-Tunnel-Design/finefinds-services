@@ -83,6 +83,32 @@ jobs:
                 "essential": true,
                 "workingDirectory": "/app",
                 "command": ["npm", "run", "prisma:migrate"],
+                "secrets": [
+                  {
+                    "name": "DATABASE_URL",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ inputs.environment }}-db-connection:SecretString:url::"
+                  },
+                  {
+                    "name": "DB_NAME",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ inputs.environment }}-db-connection:SecretString:dbName::"
+                  },
+                  {
+                    "name": "DB_USER",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ inputs.environment }}-db-connection:SecretString:username::"
+                  },
+                  {
+                    "name": "DB_PASSWORD",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ inputs.environment }}-db-connection:SecretString:password::"
+                  },
+                  {
+                    "name": "DB_PORT",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ inputs.environment }}-db-connection:SecretString:port::"
+                  },
+                  {
+                    "name": "DATABASE_HOST",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ inputs.environment }}-db-connection:SecretString:host::"
+                  }
+                ],
                 "environment": [
                   {
                     "name": "NODE_ENV",
@@ -91,12 +117,10 @@ jobs:
                   {
                     "name": "AWS_REGION",
                     "value": "'"${{ env.AWS_REGION }}"'"
-                  }
-                ],
-                "secrets": [
+                  },
                   {
                     "name": "DATABASE_URL",
-                    "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ inputs.environment }}-db-connection"
+                    "value": "postgresql://${DB_USER}:${DB_PASSWORD}@${DATABASE_HOST}:${DB_PORT}/${DB_NAME}?schema=public"
                   }
                 ],
                 "logConfiguration": {
