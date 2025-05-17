@@ -282,23 +282,23 @@ jobs:
                   "secrets": [
                     {
                       "name": "DB_NAME",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:dbName::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:dbName"
                     },
                     {
                       "name": "DB_USER",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:username::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:username"
                     },
                     {
                       "name": "DB_PASSWORD",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:password::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:password"
                     },
                     {
                       "name": "DB_PORT",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:port::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:port"
                     },
                     {
                       "name": "DATABASE_HOST",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:host::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:host"
                     },
                     {
                       "name": "REDIS_URL",
@@ -306,19 +306,19 @@ jobs:
                     },
                     {
                       "name": "COGNITO_CLIENT_USER_POOL_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_CLIENT_USER_POOL_ID::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_CLIENT_USER_POOL_ID"
                     },
                     {
                       "name": "COGNITO_CLIENT_CLIENT_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_CLIENT_CLIENT_ID::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_CLIENT_CLIENT_ID"
                     },
                     {
                       "name": "COGNITO_ADMIN_USER_POOL_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_ADMIN_USER_POOL_ID::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_ADMIN_USER_POOL_ID"
                     },
                     {
                       "name": "COGNITO_ADMIN_CLIENT_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_ADMIN_CLIENT_ID::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_ADMIN_CLIENT_ID"
                     }
                   ],
                   "logConfiguration": {
@@ -393,23 +393,23 @@ jobs:
                     "secrets": [
                       {
                         "name": "DB_NAME",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:dbName::"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:dbName"
                       },
                       {
                         "name": "DB_USER",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:username::"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:username"
                       },
                       {
                         "name": "DB_PASSWORD",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:password::"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:password"
                       },
                       {
                         "name": "DB_PORT",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:port::"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:port"
                       },
                       {
                         "name": "DATABASE_HOST",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:host::"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection:SecretString:host"
                       },
                       {
                         "name": "REDIS_URL",
@@ -417,19 +417,19 @@ jobs:
                       },
                       {
                         "name": "COGNITO_CLIENT_USER_POOL_ID",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_CLIENT_USER_POOL_ID::"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_CLIENT_USER_POOL_ID"
                       },
                       {
                         "name": "COGNITO_CLIENT_CLIENT_ID",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_CLIENT_CLIENT_ID::"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_CLIENT_CLIENT_ID"
                       },
                       {
                         "name": "COGNITO_ADMIN_USER_POOL_ID",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_ADMIN_USER_POOL_ID::"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_ADMIN_USER_POOL_ID"
                       },
                       {
                         "name": "COGNITO_ADMIN_CLIENT_ID",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_ADMIN_CLIENT_ID::"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_ADMIN_CLIENT_ID"
                       }
                     ],
                     "logConfiguration": {
