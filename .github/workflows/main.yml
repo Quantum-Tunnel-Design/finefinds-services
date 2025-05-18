@@ -248,6 +248,36 @@ jobs:
               "memory": "512",
               "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-dev-ecs-execution-role",
               "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-dev-ecs-task-role",
+              "runtimePlatform": {
+                "operatingSystemFamily": "LINUX",
+                "cpuArchitecture": "X86_64"
+              },
+              "proxyConfiguration": {
+                "type": "APPMESH",
+                "containerName": "envoy",
+                "properties": [
+                  {
+                    "name": "IgnoredUID",
+                    "value": "1337"
+                  },
+                  {
+                    "name": "ProxyIngressPort",
+                    "value": "15000"
+                  },
+                  {
+                    "name": "ProxyEgressPort",
+                    "value": "15001"
+                  },
+                  {
+                    "name": "AppPorts",
+                    "value": "3000,5432"
+                  },
+                  {
+                    "name": "EgressIgnoredIPs",
+                    "value": "169.254.170.2,169.254.169.254"
+                  }
+                ]
+              },
               "containerDefinitions": [
                 {
                   "name": "AppContainer",
@@ -258,6 +288,10 @@ jobs:
                   "portMappings": [
                     {
                       "containerPort": 3000,
+                      "protocol": "tcp"
+                    },
+                    {
+                      "containerPort": 5432,
                       "protocol": "tcp"
                     }
                   ],
@@ -275,28 +309,8 @@ jobs:
                       "value": "'"${{ env.AWS_REGION }}"'"
                     },
                     {
-                      "name": "DB_NAME",
-                      "value": "finefinds"
-                    },
-                    {
-                      "name": "DB_USER",
-                      "value": "postgres"
-                    },
-                    {
-                      "name": "DB_PORT",
-                      "value": "5432"
-                    },
-                    {
-                      "name": "DATABASE_HOST",
-                      "value": "finefinds-dev-rdsdatabase74c89a2a-laqn1velntrj.c2x6mggmobz1.us-east-1.rds.amazonaws.com"
-                    },
-                    {
                       "name": "DATABASE_URL",
-                      "value": "postgresql://postgres:${DB_PASSWORD}@finefinds-dev-rdsdatabase74c89a2a-laqn1velntrj.c2x6mggmobz1.us-east-1.rds.amazonaws.com:5432/finefinds?schema=public"
-                    },
-                    {
-                      "name": "DB_PASSWORD",
-                      "value": "OonqwYbElKaCM57fnScMMf9qlsW4FxEmvPjM60aV"
+                      "value": "postgresql://postgres:OonqwYbElKaCM57fnScMMf9qlsW4FxEmvPjM60aV@localhost:5432/finefinds?schema=public"
                     }
                   ],
                   "secrets": [
@@ -359,6 +373,36 @@ jobs:
                 "memory": "512",
                 "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-dev-ecs-execution-role",
                 "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-dev-ecs-task-role",
+                "runtimePlatform": {
+                  "operatingSystemFamily": "LINUX",
+                  "cpuArchitecture": "X86_64"
+                },
+                "proxyConfiguration": {
+                  "type": "APPMESH",
+                  "containerName": "envoy",
+                  "properties": [
+                    {
+                      "name": "IgnoredUID",
+                      "value": "1337"
+                    },
+                    {
+                      "name": "ProxyIngressPort",
+                      "value": "15000"
+                    },
+                    {
+                      "name": "ProxyEgressPort",
+                      "value": "15001"
+                    },
+                    {
+                      "name": "AppPorts",
+                      "value": "3000,5432"
+                    },
+                    {
+                      "name": "EgressIgnoredIPs",
+                      "value": "169.254.170.2,169.254.169.254"
+                    }
+                  ]
+                },
                 "containerDefinitions": [
                   {
                     "name": "AppContainer",
@@ -369,6 +413,10 @@ jobs:
                     "portMappings": [
                       {
                         "containerPort": 3000,
+                        "protocol": "tcp"
+                      },
+                      {
+                        "containerPort": 5432,
                         "protocol": "tcp"
                       }
                     ],
@@ -386,31 +434,11 @@ jobs:
                         "value": "'"${{ env.AWS_REGION }}"'"
                       },
                       {
-                        "name": "DB_NAME",
-                        "value": "finefinds"
-                      },
-                      {
-                        "name": "DB_USER",
-                        "value": "postgres"
-                      },
-                      {
-                        "name": "DB_PORT",
-                        "value": "5432"
-                      },
-                      {
-                        "name": "DATABASE_HOST",
-                        "value": "finefinds-dev-rdsdatabase74c89a2a-laqn1velntrj.c2x6mggmobz1.us-east-1.rds.amazonaws.com"
-                      },
-                      {
                         "name": "DATABASE_URL",
-                        "value": "postgresql://postgres:${DB_PASSWORD}@finefinds-dev-rdsdatabase74c89a2a-laqn1velntrj.c2x6mggmobz1.us-east-1.rds.amazonaws.com:5432/finefinds?schema=public"
+                        "value": "postgresql://postgres:OonqwYbElKaCM57fnScMMf9qlsW4FxEmvPjM60aV@localhost:5432/finefinds?schema=public"
                       }
                     ],
                     "secrets": [
-                      {
-                        "name": "DB_PASSWORD",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:FineFindsdevRdsDatabaseSecr-bq75cAjVfSmy-QS5oW0"
-                      },
                       {
                         "name": "REDIS_URL",
                         "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-redis-connection-cuiTEQ"
