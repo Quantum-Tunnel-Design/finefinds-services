@@ -393,23 +393,23 @@ jobs:
                     "secrets": [
                       {
                         "name": "DB_NAME",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection-DZU5ij:dbName::"
+                        "valueFrom": "finefinds"
                       },
                       {
                         "name": "DB_USER",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection-DZU5ij:username::"
+                        "valueFrom": "postgres"
                       },
                       {
                         "name": "DB_PASSWORD",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection-DZU5ij:password::"
+                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}'":secret:FineFindsdevRdsDatabaseSecr-bq75cAjVfSmy-QS5oW0"
                       },
                       {
                         "name": "DB_PORT",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection-DZU5ij:port::"
+                        "valueFrom": "5432"
                       },
                       {
                         "name": "DATABASE_HOST",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-db-connection-DZU5ij:host::"
+                        "valueFrom": "finefinds-dev-rdsdatabase74c89a2a-laqn1velntrj.c2x6mggmobz1.us-east-1.rds.amazonaws.com"
                       },
                       {
                         "name": "REDIS_URL",
