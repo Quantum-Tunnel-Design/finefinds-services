@@ -293,13 +293,13 @@ jobs:
                     {
                       "name": "DATABASE_URL",
                       "value": "postgresql://postgres:${DB_PASSWORD}@finefinds-dev-rdsdatabase74c89a2a-laqn1velntrj.c2x6mggmobz1.us-east-1.rds.amazonaws.com:5432/finefinds?schema=public"
+                    },
+                    {
+                      "name": "DB_PASSWORD",
+                      "value": "OonqwYbElKaCM57fnScMMf9qlsW4FxEmvPjM60aV"
                     }
                   ],
                   "secrets": [
-                    {
-                      "name": "DB_PASSWORD",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:FineFindsdevRdsDatabaseSecr-bq75cAjVfSmy-QS5oW0"
-                    },
                     {
                       "name": "REDIS_URL",
                       "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-redis-connection-cuiTEQ"
