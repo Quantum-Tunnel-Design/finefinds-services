@@ -275,30 +275,30 @@ jobs:
                       "value": "'"${{ env.AWS_REGION }}"'"
                     },
                     {
+                      "name": "DB_NAME",
+                      "value": "finefinds"
+                    },
+                    {
+                      "name": "DB_USER",
+                      "value": "postgres"
+                    },
+                    {
+                      "name": "DB_PORT",
+                      "value": "5432"
+                    },
+                    {
+                      "name": "DATABASE_HOST",
+                      "value": "finefinds-dev-rdsdatabase74c89a2a-laqn1velntrj.c2x6mggmobz1.us-east-1.rds.amazonaws.com"
+                    },
+                    {
                       "name": "DATABASE_URL",
-                      "value": "postgresql://${DB_USER}:${DB_PASSWORD}@${DATABASE_URL}:${DB_PORT}/${DB_NAME}?schema=public"
+                      "value": "postgresql://postgres:${DB_PASSWORD}@finefinds-dev-rdsdatabase74c89a2a-laqn1velntrj.c2x6mggmobz1.us-east-1.rds.amazonaws.com:5432/finefinds?schema=public"
                     }
                   ],
                   "secrets": [
                     {
-                      "name": "DB_NAME",
-                      "valueFrom": "finefinds"
-                    },
-                    {
-                      "name": "DB_USER",
-                      "valueFrom": "postgres"
-                    },
-                    {
                       "name": "DB_PASSWORD",
                       "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:FineFindsdevRdsDatabaseSecr-bq75cAjVfSmy-QS5oW0"
-                    },
-                    {
-                      "name": "DB_PORT",
-                      "valueFrom": "5432"
-                    },
-                    {
-                      "name": "DATABASE_HOST",
-                      "valueFrom": "finefinds-dev-rdsdatabase74c89a2a-laqn1velntrj.c2x6mggmobz1.us-east-1.rds.amazonaws.com"
                     },
                     {
                       "name": "REDIS_URL",
@@ -386,30 +386,30 @@ jobs:
                         "value": "'"${{ env.AWS_REGION }}"'"
                       },
                       {
+                        "name": "DB_NAME",
+                        "value": "finefinds"
+                      },
+                      {
+                        "name": "DB_USER",
+                        "value": "postgres"
+                      },
+                      {
+                        "name": "DB_PORT",
+                        "value": "5432"
+                      },
+                      {
+                        "name": "DATABASE_HOST",
+                        "value": "finefinds-dev-rdsdatabase74c89a2a-laqn1velntrj.c2x6mggmobz1.us-east-1.rds.amazonaws.com"
+                      },
+                      {
                         "name": "DATABASE_URL",
-                        "value": "postgresql://${DB_USER}:${DB_PASSWORD}@${DATABASE_URL}:${DB_PORT}/${DB_NAME}?schema=public"
+                        "value": "postgresql://postgres:${DB_PASSWORD}@finefinds-dev-rdsdatabase74c89a2a-laqn1velntrj.c2x6mggmobz1.us-east-1.rds.amazonaws.com:5432/finefinds?schema=public"
                       }
                     ],
                     "secrets": [
                       {
-                        "name": "DB_NAME",
-                        "valueFrom": "finefinds"
-                      },
-                      {
-                        "name": "DB_USER",
-                        "valueFrom": "postgres"
-                      },
-                      {
                         "name": "DB_PASSWORD",
                         "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:FineFindsdevRdsDatabaseSecr-bq75cAjVfSmy-QS5oW0"
-                      },
-                      {
-                        "name": "DB_PORT",
-                        "valueFrom": "5432"
-                      },
-                      {
-                        "name": "DATABASE_HOST",
-                        "valueFrom": "finefinds-dev-rdsdatabase74c89a2a-laqn1velntrj.c2x6mggmobz1.us-east-1.rds.amazonaws.com"
                       },
                       {
                         "name": "REDIS_URL",
