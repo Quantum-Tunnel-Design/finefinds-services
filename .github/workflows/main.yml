@@ -56,6 +56,19 @@ env:
     github.ref == 'refs/heads/dev' && 'dev' ||
     'sandbox' }}
   ECR_REPOSITORY_BACKEND: finefinds-services-${{ github.event_name == 'workflow_dispatch' && inputs.environment || github.ref == 'refs/heads/main' && 'prod' || github.ref == 'refs/heads/staging' && 'staging' || github.ref == 'refs/heads/qa' && 'qa' || github.ref == 'refs/heads/dev' && 'dev' || 'sandbox' }}
+  # Task definition and service names for each environment
+  TASK_DEF_FAMILY_DEV: FineFindsdevEcsTaskDef290F30C7
+  TASK_DEF_FAMILY_QA: FineFindsqaEcsTaskDef290F30C7
+  TASK_DEF_FAMILY_STAGING: FineFindsstagingEcsTaskDef290F30C7
+  TASK_DEF_FAMILY_PROD: FineFindsprodEcsTaskDef290F30C7
+  SERVICE_NAME_DEV: FineFinds-dev-EcsService5196398A-gBUy7Nla9Poj
+  SERVICE_NAME_QA: FineFinds-qa-EcsService5196398A-gBUy7Nla9Poj
+  SERVICE_NAME_STAGING: FineFinds-staging-EcsService5196398A-gBUy7Nla9Poj
+  SERVICE_NAME_PROD: FineFinds-prod-EcsService5196398A-gBUy7Nla9Poj
+  CLUSTER_NAME_DEV: finefinds-dev-cluster
+  CLUSTER_NAME_QA: finefinds-qa-cluster
+  CLUSTER_NAME_STAGING: finefinds-staging-cluster
+  CLUSTER_NAME_PROD: finefinds-prod-cluster
 
 jobs:
   input_check:
@@ -230,18 +243,53 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
           
-      - name: Deploy to ECS
+      - name: Get RDS endpoint
+        id: rds
         run: |
+          echo "Fetching RDS endpoint for dev environment..."
+          RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier finefinds-dev-db --query 'DBInstances[0].Endpoint.Address' --output text)
+          if [ -z "$RDS_ENDPOINT" ]; then
+            echo "::error::Failed to get RDS endpoint"
+            exit 1
+          fi
+          echo "RDS endpoint: $RDS_ENDPOINT"
+          echo "rds_endpoint=$RDS_ENDPOINT" >> $GITHUB_OUTPUT
+
+      - name: Get RDS credentials
+        id: rds_creds
+        run: |
+          echo "Fetching RDS credentials from Secrets Manager..."
+          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id finefinds-dev-rds-credentials --query 'SecretString' --output text)
+          if [ -z "$RDS_SECRET" ]; then
+            echo "::error::Failed to get RDS credentials from Secrets Manager"
+            exit 1
+          fi
+          RDS_USERNAME=$(echo $RDS_SECRET | jq -r '.username')
+          RDS_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
+          if [ -z "$RDS_USERNAME" ] || [ -z "$RDS_PASSWORD" ]; then
+            echo "::error::Invalid RDS credentials format in Secrets Manager"
+            exit 1
+          fi
+          echo "RDS credentials retrieved successfully"
+          echo "rds_username=$RDS_USERNAME" >> $GITHUB_OUTPUT
+          echo "rds_password=$RDS_PASSWORD" >> $GITHUB_OUTPUT
+          
+      - name: Deploy to ECS
+        id: deploy
+        run: |
+          set -e
           VERSION=$(cat version.txt)
+          echo "Deploying version: $VERSION"
           
           # Check if task definition exists
-          TASK_DEF_ARN=$(aws ecs list-task-definitions --family-prefix FineFindsdevEcsTaskDef290F30C7 --sort DESC --max-items 1 --query 'taskDefinitionArns[0]' --output text || echo "None")
+          echo "Checking for existing task definition..."
+          TASK_DEF_ARN=$(aws ecs list-task-definitions --family-prefix ${{ env.TASK_DEF_FAMILY_DEV }} --sort DESC --max-items 1 --query 'taskDefinitionArns[0]' --output text || echo "None")
           
           if [ "$TASK_DEF_ARN" = "None" ] || [ -z "$TASK_DEF_ARN" ]; then
             echo "No existing task definition found. Creating new task definition..."
             # Create new task definition from scratch
             echo '{
-              "family": "FineFindsdevEcsTaskDef290F30C7",
+              "family": "'"${{ env.TASK_DEF_FAMILY_DEV }}"'",
               "networkMode": "awsvpc",
               "requiresCompatibilities": ["FARGATE"],
               "cpu": "256",
@@ -310,7 +358,7 @@ jobs:
                     },
                     {
                       "name": "DATABASE_URL",
-                      "value": "postgresql://postgres:OonqwYbElKaCM57fnScMMf9qlsW4FxEmvPjM60aV@localhost:5432/finefinds?schema=public"
+                      "value": "postgresql://${{ steps.rds_creds.outputs.rds_username }}:${{ steps.rds_creds.outputs.rds_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public"
                     }
                   ],
                   "secrets": [
@@ -347,8 +395,13 @@ jobs:
               ]
             }' > task-definition.json
             
-            # Register the new task definition
+            echo "Registering new task definition..."
             NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
+            if [ -z "$NEW_TASK_DEF_ARN" ]; then
+              echo "::error::Failed to register new task definition"
+              exit 1
+            fi
+            echo "New task definition registered: $NEW_TASK_DEF_ARN"
           else
             echo "Found existing task definition. Updating with new image..."
             # Get the latest revision
@@ -356,144 +409,44 @@ jobs:
             echo "Latest revision: $LATEST_REVISION"
             
             # Get the current task definition
-            TASK_DEF=$(aws ecs describe-task-definition --task-definition finefinds-backend:$LATEST_REVISION --query 'taskDefinition' --output json || echo "{}")
+            echo "Fetching current task definition..."
+            TASK_DEF=$(aws ecs describe-task-definition --task-definition ${{ env.TASK_DEF_FAMILY_DEV }}:$LATEST_REVISION --query 'taskDefinition' --output json || echo "{}")
             
             # Debug: Print existing task definition container name
             echo "Existing task definition container name:"
             echo "$TASK_DEF" | jq '.containerDefinitions[0].name'
-            
+                        
             if [ "$TASK_DEF" = "{}" ]; then
-              echo "Failed to get task definition. Creating new one..."
-              # Create new task definition from scratch
-              echo '{
-                "family": "FineFindsdevEcsTaskDef290F30C7",
-                "networkMode": "awsvpc",
-                "requiresCompatibilities": ["FARGATE"],
-                "cpu": "256",
-                "memory": "512",
-                "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-dev-ecs-execution-role",
-                "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-dev-ecs-task-role",
-                "runtimePlatform": {
-                  "operatingSystemFamily": "LINUX",
-                  "cpuArchitecture": "X86_64"
-                },
-                "proxyConfiguration": {
-                  "type": "APPMESH",
-                  "containerName": "envoy",
-                  "properties": [
-                    {
-                      "name": "IgnoredUID",
-                      "value": "1337"
-                    },
-                    {
-                      "name": "ProxyIngressPort",
-                      "value": "15000"
-                    },
-                    {
-                      "name": "ProxyEgressPort",
-                      "value": "15001"
-                    },
-                    {
-                      "name": "AppPorts",
-                      "value": "3000,5432"
-                    },
-                    {
-                      "name": "EgressIgnoredIPs",
-                      "value": "169.254.170.2,169.254.169.254"
-                    }
-                  ]
-                },
-                "containerDefinitions": [
-                  {
-                    "name": "AppContainer",
-                    "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'"${{ env.ECR_REPOSITORY_BACKEND }}"':'"$VERSION"'",
-                    "essential": true,
-                    "workingDirectory": "/app",
-                    "command": ["node", "dist/src/main.js"],
-                    "portMappings": [
-                      {
-                        "containerPort": 3000,
-                        "protocol": "tcp"
-                      },
-                      {
-                        "containerPort": 5432,
-                        "protocol": "tcp"
-                      }
-                    ],
-                    "environment": [
-                      {
-                        "name": "PORT",
-                        "value": "3000"
-                      },
-                      {
-                        "name": "NODE_ENV",
-                        "value": "dev"
-                      },
-                      {
-                        "name": "AWS_REGION",
-                        "value": "'"${{ env.AWS_REGION }}"'"
-                      },
-                      {
-                        "name": "DATABASE_URL",
-                        "value": "postgresql://postgres:OonqwYbElKaCM57fnScMMf9qlsW4FxEmvPjM60aV@localhost:5432/finefinds?schema=public"
-                      }
-                    ],
-                    "secrets": [
-                      {
-                        "name": "REDIS_URL",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-redis-connection-cuiTEQ"
-                      },
-                      {
-                        "name": "COGNITO_CLIENT_USER_POOL_ID",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_CLIENT_USER_POOL_ID::"
-                      },
-                      {
-                        "name": "COGNITO_CLIENT_CLIENT_ID",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_CLIENT_CLIENT_ID::"
-                      },
-                      {
-                        "name": "COGNITO_ADMIN_USER_POOL_ID",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_ADMIN_USER_POOL_ID::"
-                      },
-                      {
-                        "name": "COGNITO_ADMIN_CLIENT_ID",
-                        "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_ADMIN_CLIENT_ID::"
-                      }
-                    ],
-                    "logConfiguration": {
-                      "logDriver": "awslogs",
-                      "options": {
-                        "awslogs-group": "/finefinds/dev/app",
-                        "awslogs-region": "'"${{ env.AWS_REGION }}"'",
-                        "awslogs-stream-prefix": "finefinds"
-                      }
-                    }
-                  }
-                ]
-              }' > task-definition.json
-              
-              # Register the new task definition
-              NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
-            else
-              # Create new task definition with the new image
-              NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "'"${{ inputs.environment }}"'"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
-              
-              # Debug: Print the task definition
-              echo "New task definition:"
-              echo "$NEW_TASK_DEF" | jq '.'
-              
-              # Register the new task definition
-              NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
+              echo "::error::Failed to get task definition"
+              exit 1
             fi
+            
+            echo "Creating new task definition with updated image..."
+            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" --arg DB_URL "postgresql://${{ steps.rds_creds.outputs.rds_username }}:${{ steps.rds_creds.outputs.rds_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "dev"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}, {"name": "DATABASE_URL", "value": $DB_URL}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+            
+            echo "Registering updated task definition..."
+            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
+            if [ -z "$NEW_TASK_DEF_ARN" ]; then
+              echo "::error::Failed to register updated task definition"
+              exit 1
+            fi
+            echo "Updated task definition registered: $NEW_TASK_DEF_ARN"
           fi
           
-          echo "Updating existing service..."
-          # Update the service with the new task definition
+          echo "Updating ECS service..."
           aws ecs update-service \
-            --cluster finefinds-dev-cluster \
-            --service FineFinds-dev-EcsService5196398A-gBUy7Nla9Poj \
+            --cluster ${{ env.CLUSTER_NAME_DEV }} \
+            --service ${{ env.SERVICE_NAME_DEV }} \
             --task-definition $NEW_TASK_DEF_ARN \
             --force-new-deployment
+            
+          echo "Waiting for service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster ${{ env.CLUSTER_NAME_DEV }} \
+            --services ${{ env.SERVICE_NAME_DEV }}
+            
+          echo "Deployment completed successfully"
+          echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
 
   deploy-qa:
     needs: build-and-push
@@ -519,14 +472,203 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
           
+      - name: Get RDS endpoint
+        id: rds
+        run: |
+          echo "Fetching RDS endpoint for qa environment..."
+          RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier finefinds-qa-db --query 'DBInstances[0].Endpoint.Address' --output text)
+          if [ -z "$RDS_ENDPOINT" ]; then
+            echo "::error::Failed to get RDS endpoint"
+            exit 1
+          fi
+          echo "RDS endpoint: $RDS_ENDPOINT"
+          echo "rds_endpoint=$RDS_ENDPOINT" >> $GITHUB_OUTPUT
+
+      - name: Get RDS credentials
+        id: rds_creds
+        run: |
+          echo "Fetching RDS credentials from Secrets Manager..."
+          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id finefinds-qa-rds-credentials --query 'SecretString' --output text)
+          if [ -z "$RDS_SECRET" ]; then
+            echo "::error::Failed to get RDS credentials from Secrets Manager"
+            exit 1
+          fi
+          RDS_USERNAME=$(echo $RDS_SECRET | jq -r '.username')
+          RDS_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
+          if [ -z "$RDS_USERNAME" ] || [ -z "$RDS_PASSWORD" ]; then
+            echo "::error::Invalid RDS credentials format in Secrets Manager"
+            exit 1
+          fi
+          echo "RDS credentials retrieved successfully"
+          echo "rds_username=$RDS_USERNAME" >> $GITHUB_OUTPUT
+          echo "rds_password=$RDS_PASSWORD" >> $GITHUB_OUTPUT
+          
       - name: Deploy to ECS
         run: |
           VERSION=$(cat version.txt)
+          
+          # Check if task definition exists
+          echo "Checking for existing task definition..."
+          TASK_DEF_ARN=$(aws ecs list-task-definitions --family-prefix ${{ env.TASK_DEF_FAMILY_QA }} --sort DESC --max-items 1 --query 'taskDefinitionArns[0]' --output text || echo "None")
+          
+          if [ "$TASK_DEF_ARN" = "None" ] || [ -z "$TASK_DEF_ARN" ]; then
+            echo "No existing task definition found. Creating new task definition..."
+            # Create new task definition from scratch
+            echo '{
+              "family": "'"${{ env.TASK_DEF_FAMILY_QA }}"'",
+              "networkMode": "awsvpc",
+              "requiresCompatibilities": ["FARGATE"],
+              "cpu": "256",
+              "memory": "512",
+              "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-qa-ecs-execution-role",
+              "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-qa-ecs-task-role",
+              "runtimePlatform": {
+                "operatingSystemFamily": "LINUX",
+                "cpuArchitecture": "X86_64"
+              },
+              "proxyConfiguration": {
+                "type": "APPMESH",
+                "containerName": "envoy",
+                "properties": [
+                  {
+                    "name": "IgnoredUID",
+                    "value": "1337"
+                  },
+                  {
+                    "name": "ProxyIngressPort",
+                    "value": "15000"
+                  },
+                  {
+                    "name": "ProxyEgressPort",
+                    "value": "15001"
+                  },
+                  {
+                    "name": "AppPorts",
+                    "value": "3000,5432"
+                  },
+                  {
+                    "name": "EgressIgnoredIPs",
+                    "value": "169.254.170.2,169.254.169.254"
+                  }
+                ]
+              },
+              "containerDefinitions": [
+                {
+                  "name": "AppContainer",
+                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'"${{ env.ECR_REPOSITORY_BACKEND }}"':'"$VERSION"'",
+                  "essential": true,
+                  "workingDirectory": "/app",
+                  "command": ["node", "dist/src/main.js"],
+                  "portMappings": [
+                    {
+                      "containerPort": 3000,
+                      "protocol": "tcp"
+                    },
+                    {
+                      "containerPort": 5432,
+                      "protocol": "tcp"
+                    }
+                  ],
+                  "environment": [
+                    {
+                      "name": "PORT",
+                      "value": "3000"
+                    },
+                    {
+                      "name": "NODE_ENV",
+                      "value": "qa"
+                    },
+                    {
+                      "name": "AWS_REGION",
+                      "value": "'"${{ env.AWS_REGION }}"'"
+                    },
+                    {
+                      "name": "DATABASE_URL",
+                      "value": "postgresql://${{ steps.rds_creds.outputs.rds_username }}:${{ steps.rds_creds.outputs.rds_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public"
+                    }
+                  ],
+                  "secrets": [
+                    {
+                      "name": "REDIS_URL",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-qa-redis-connection-cuiTEQ"
+                    },
+                    {
+                      "name": "COGNITO_CLIENT_USER_POOL_ID",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-qa-cognito-config-aVTNzm:COGNITO_CLIENT_USER_POOL_ID::"
+                    },
+                    {
+                      "name": "COGNITO_CLIENT_CLIENT_ID",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-qa-cognito-config-aVTNzm:COGNITO_CLIENT_CLIENT_ID::"
+                    },
+                    {
+                      "name": "COGNITO_ADMIN_USER_POOL_ID",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-qa-cognito-config-aVTNzm:COGNITO_ADMIN_USER_POOL_ID::"
+                    },
+                    {
+                      "name": "COGNITO_ADMIN_CLIENT_ID",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-qa-cognito-config-aVTNzm:COGNITO_ADMIN_CLIENT_ID::"
+                    }
+                  ],
+                  "logConfiguration": {
+                    "logDriver": "awslogs",
+                    "options": {
+                      "awslogs-group": "/finefinds/qa/app",
+                      "awslogs-region": "'"${{ env.AWS_REGION }}"'",
+                      "awslogs-stream-prefix": "finefinds"
+                    }
+                  }
+                }
+              ]
+            }' > task-definition.json
+            
+            echo "Registering new task definition..."
+            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
+            if [ -z "$NEW_TASK_DEF_ARN" ]; then
+              echo "::error::Failed to register new task definition"
+              exit 1
+            fi
+            echo "New task definition registered: $NEW_TASK_DEF_ARN"
+          else
+            echo "Found existing task definition. Updating with new image..."
+            # Get the latest revision
+            LATEST_REVISION=$(echo $TASK_DEF_ARN | rev | cut -d: -f1 | rev | tr -d 'None')
+            echo "Latest revision: $LATEST_REVISION"
+            
+            # Get the current task definition
+            echo "Fetching current task definition..."
+            TASK_DEF=$(aws ecs describe-task-definition --task-definition ${{ env.TASK_DEF_FAMILY_QA }}:$LATEST_REVISION --query 'taskDefinition' --output json || echo "{}")
+            
+            if [ "$TASK_DEF" = "{}" ]; then
+              echo "::error::Failed to get task definition"
+              exit 1
+            fi
+            
+            echo "Creating new task definition with updated image..."
+            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" --arg DB_URL "postgresql://${{ steps.rds_creds.outputs.rds_username }}:${{ steps.rds_creds.outputs.rds_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "qa"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}, {"name": "DATABASE_URL", "value": $DB_URL}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+            
+            echo "Registering updated task definition..."
+            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
+            if [ -z "$NEW_TASK_DEF_ARN" ]; then
+              echo "::error::Failed to register updated task definition"
+              exit 1
+            fi
+            echo "Updated task definition registered: $NEW_TASK_DEF_ARN"
+          fi
+          
+          echo "Updating ECS service..."
           aws ecs update-service \
-            --cluster finefinds-qa \
-            --service finefinds-backend \
-            --force-new-deployment \
-            --task-definition finefinds-backend:$VERSION
+            --cluster ${{ env.CLUSTER_NAME_QA }} \
+            --service ${{ env.SERVICE_NAME_QA }} \
+            --task-definition $NEW_TASK_DEF_ARN \
+            --force-new-deployment
+            
+          echo "Waiting for service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster ${{ env.CLUSTER_NAME_QA }} \
+            --services ${{ env.SERVICE_NAME_QA }}
+            
+          echo "Deployment completed successfully"
+          echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
 
   deploy-staging:
     needs: build-and-push
@@ -552,14 +694,203 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
           
+      - name: Get RDS endpoint
+        id: rds
+        run: |
+          echo "Fetching RDS endpoint for staging environment..."
+          RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier finefinds-staging-db --query 'DBInstances[0].Endpoint.Address' --output text)
+          if [ -z "$RDS_ENDPOINT" ]; then
+            echo "::error::Failed to get RDS endpoint"
+            exit 1
+          fi
+          echo "RDS endpoint: $RDS_ENDPOINT"
+          echo "rds_endpoint=$RDS_ENDPOINT" >> $GITHUB_OUTPUT
+
+      - name: Get RDS credentials
+        id: rds_creds
+        run: |
+          echo "Fetching RDS credentials from Secrets Manager..."
+          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id finefinds-staging-rds-credentials --query 'SecretString' --output text)
+          if [ -z "$RDS_SECRET" ]; then
+            echo "::error::Failed to get RDS credentials from Secrets Manager"
+            exit 1
+          fi
+          RDS_USERNAME=$(echo $RDS_SECRET | jq -r '.username')
+          RDS_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
+          if [ -z "$RDS_USERNAME" ] || [ -z "$RDS_PASSWORD" ]; then
+            echo "::error::Invalid RDS credentials format in Secrets Manager"
+            exit 1
+          fi
+          echo "RDS credentials retrieved successfully"
+          echo "rds_username=$RDS_USERNAME" >> $GITHUB_OUTPUT
+          echo "rds_password=$RDS_PASSWORD" >> $GITHUB_OUTPUT
+          
       - name: Deploy to ECS
         run: |
           VERSION=$(cat version.txt)
+          
+          # Check if task definition exists
+          echo "Checking for existing task definition..."
+          TASK_DEF_ARN=$(aws ecs list-task-definitions --family-prefix ${{ env.TASK_DEF_FAMILY_STAGING }} --sort DESC --max-items 1 --query 'taskDefinitionArns[0]' --output text || echo "None")
+          
+          if [ "$TASK_DEF_ARN" = "None" ] || [ -z "$TASK_DEF_ARN" ]; then
+            echo "No existing task definition found. Creating new task definition..."
+            # Create new task definition from scratch
+            echo '{
+              "family": "'"${{ env.TASK_DEF_FAMILY_STAGING }}"'",
+              "networkMode": "awsvpc",
+              "requiresCompatibilities": ["FARGATE"],
+              "cpu": "256",
+              "memory": "512",
+              "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-staging-ecs-execution-role",
+              "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-staging-ecs-task-role",
+              "runtimePlatform": {
+                "operatingSystemFamily": "LINUX",
+                "cpuArchitecture": "X86_64"
+              },
+              "proxyConfiguration": {
+                "type": "APPMESH",
+                "containerName": "envoy",
+                "properties": [
+                  {
+                    "name": "IgnoredUID",
+                    "value": "1337"
+                  },
+                  {
+                    "name": "ProxyIngressPort",
+                    "value": "15000"
+                  },
+                  {
+                    "name": "ProxyEgressPort",
+                    "value": "15001"
+                  },
+                  {
+                    "name": "AppPorts",
+                    "value": "3000,5432"
+                  },
+                  {
+                    "name": "EgressIgnoredIPs",
+                    "value": "169.254.170.2,169.254.169.254"
+                  }
+                ]
+              },
+              "containerDefinitions": [
+                {
+                  "name": "AppContainer",
+                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'"${{ env.ECR_REPOSITORY_BACKEND }}"':'"$VERSION"'",
+                  "essential": true,
+                  "workingDirectory": "/app",
+                  "command": ["node", "dist/src/main.js"],
+                  "portMappings": [
+                    {
+                      "containerPort": 3000,
+                      "protocol": "tcp"
+                    },
+                    {
+                      "containerPort": 5432,
+                      "protocol": "tcp"
+                    }
+                  ],
+                  "environment": [
+                    {
+                      "name": "PORT",
+                      "value": "3000"
+                    },
+                    {
+                      "name": "NODE_ENV",
+                      "value": "staging"
+                    },
+                    {
+                      "name": "AWS_REGION",
+                      "value": "'"${{ env.AWS_REGION }}"'"
+                    },
+                    {
+                      "name": "DATABASE_URL",
+                      "value": "postgresql://${{ steps.rds_creds.outputs.rds_username }}:${{ steps.rds_creds.outputs.rds_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public"
+                    }
+                  ],
+                  "secrets": [
+                    {
+                      "name": "REDIS_URL",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-staging-redis-connection-cuiTEQ"
+                    },
+                    {
+                      "name": "COGNITO_CLIENT_USER_POOL_ID",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-staging-cognito-config-aVTNzm:COGNITO_CLIENT_USER_POOL_ID::"
+                    },
+                    {
+                      "name": "COGNITO_CLIENT_CLIENT_ID",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-staging-cognito-config-aVTNzm:COGNITO_CLIENT_CLIENT_ID::"
+                    },
+                    {
+                      "name": "COGNITO_ADMIN_USER_POOL_ID",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-staging-cognito-config-aVTNzm:COGNITO_ADMIN_USER_POOL_ID::"
+                    },
+                    {
+                      "name": "COGNITO_ADMIN_CLIENT_ID",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-staging-cognito-config-aVTNzm:COGNITO_ADMIN_CLIENT_ID::"
+                    }
+                  ],
+                  "logConfiguration": {
+                    "logDriver": "awslogs",
+                    "options": {
+                      "awslogs-group": "/finefinds/staging/app",
+                      "awslogs-region": "'"${{ env.AWS_REGION }}"'",
+                      "awslogs-stream-prefix": "finefinds"
+                    }
+                  }
+                }
+              ]
+            }' > task-definition.json
+            
+            echo "Registering new task definition..."
+            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
+            if [ -z "$NEW_TASK_DEF_ARN" ]; then
+              echo "::error::Failed to register new task definition"
+              exit 1
+            fi
+            echo "New task definition registered: $NEW_TASK_DEF_ARN"
+          else
+            echo "Found existing task definition. Updating with new image..."
+            # Get the latest revision
+            LATEST_REVISION=$(echo $TASK_DEF_ARN | rev | cut -d: -f1 | rev | tr -d 'None')
+            echo "Latest revision: $LATEST_REVISION"
+            
+            # Get the current task definition
+            echo "Fetching current task definition..."
+            TASK_DEF=$(aws ecs describe-task-definition --task-definition ${{ env.TASK_DEF_FAMILY_STAGING }}:$LATEST_REVISION --query 'taskDefinition' --output json || echo "{}")
+            
+            if [ "$TASK_DEF" = "{}" ]; then
+              echo "::error::Failed to get task definition"
+              exit 1
+            fi
+            
+            echo "Creating new task definition with updated image..."
+            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" --arg DB_URL "postgresql://${{ steps.rds_creds.outputs.rds_username }}:${{ steps.rds_creds.outputs.rds_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "staging"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}, {"name": "DATABASE_URL", "value": $DB_URL}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+            
+            echo "Registering updated task definition..."
+            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
+            if [ -z "$NEW_TASK_DEF_ARN" ]; then
+              echo "::error::Failed to register updated task definition"
+              exit 1
+            fi
+            echo "Updated task definition registered: $NEW_TASK_DEF_ARN"
+          fi
+          
+          echo "Updating ECS service..."
           aws ecs update-service \
-            --cluster finefinds-staging \
-            --service finefinds-backend \
-            --force-new-deployment \
-            --task-definition finefinds-backend:$VERSION
+            --cluster ${{ env.CLUSTER_NAME_STAGING }} \
+            --service ${{ env.SERVICE_NAME_STAGING }} \
+            --task-definition $NEW_TASK_DEF_ARN \
+            --force-new-deployment
+            
+          echo "Waiting for service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster ${{ env.CLUSTER_NAME_STAGING }} \
+            --services ${{ env.SERVICE_NAME_STAGING }}
+            
+          echo "Deployment completed successfully"
+          echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
 
   deploy-prod:
     needs: build-and-push
@@ -585,14 +916,203 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
           
+      - name: Get RDS endpoint
+        id: rds
+        run: |
+          echo "Fetching RDS endpoint for prod environment..."
+          RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier finefinds-prod-db --query 'DBInstances[0].Endpoint.Address' --output text)
+          if [ -z "$RDS_ENDPOINT" ]; then
+            echo "::error::Failed to get RDS endpoint"
+            exit 1
+          fi
+          echo "RDS endpoint: $RDS_ENDPOINT"
+          echo "rds_endpoint=$RDS_ENDPOINT" >> $GITHUB_OUTPUT
+
+      - name: Get RDS credentials
+        id: rds_creds
+        run: |
+          echo "Fetching RDS credentials from Secrets Manager..."
+          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id finefinds-prod-rds-credentials --query 'SecretString' --output text)
+          if [ -z "$RDS_SECRET" ]; then
+            echo "::error::Failed to get RDS credentials from Secrets Manager"
+            exit 1
+          fi
+          RDS_USERNAME=$(echo $RDS_SECRET | jq -r '.username')
+          RDS_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
+          if [ -z "$RDS_USERNAME" ] || [ -z "$RDS_PASSWORD" ]; then
+            echo "::error::Invalid RDS credentials format in Secrets Manager"
+            exit 1
+          fi
+          echo "RDS credentials retrieved successfully"
+          echo "rds_username=$RDS_USERNAME" >> $GITHUB_OUTPUT
+          echo "rds_password=$RDS_PASSWORD" >> $GITHUB_OUTPUT
+          
       - name: Deploy to ECS
         run: |
           VERSION=$(cat version.txt)
+          
+          # Check if task definition exists
+          echo "Checking for existing task definition..."
+          TASK_DEF_ARN=$(aws ecs list-task-definitions --family-prefix ${{ env.TASK_DEF_FAMILY_PROD }} --sort DESC --max-items 1 --query 'taskDefinitionArns[0]' --output text || echo "None")
+          
+          if [ "$TASK_DEF_ARN" = "None" ] || [ -z "$TASK_DEF_ARN" ]; then
+            echo "No existing task definition found. Creating new task definition..."
+            # Create new task definition from scratch
+            echo '{
+              "family": "'"${{ env.TASK_DEF_FAMILY_PROD }}"'",
+              "networkMode": "awsvpc",
+              "requiresCompatibilities": ["FARGATE"],
+              "cpu": "256",
+              "memory": "512",
+              "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-prod-ecs-execution-role",
+              "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-prod-ecs-task-role",
+              "runtimePlatform": {
+                "operatingSystemFamily": "LINUX",
+                "cpuArchitecture": "X86_64"
+              },
+              "proxyConfiguration": {
+                "type": "APPMESH",
+                "containerName": "envoy",
+                "properties": [
+                  {
+                    "name": "IgnoredUID",
+                    "value": "1337"
+                  },
+                  {
+                    "name": "ProxyIngressPort",
+                    "value": "15000"
+                  },
+                  {
+                    "name": "ProxyEgressPort",
+                    "value": "15001"
+                  },
+                  {
+                    "name": "AppPorts",
+                    "value": "3000,5432"
+                  },
+                  {
+                    "name": "EgressIgnoredIPs",
+                    "value": "169.254.170.2,169.254.169.254"
+                  }
+                ]
+              },
+              "containerDefinitions": [
+                {
+                  "name": "AppContainer",
+                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'"${{ env.ECR_REPOSITORY_BACKEND }}"':'"$VERSION"'",
+                  "essential": true,
+                  "workingDirectory": "/app",
+                  "command": ["node", "dist/src/main.js"],
+                  "portMappings": [
+                    {
+                      "containerPort": 3000,
+                      "protocol": "tcp"
+                    },
+                    {
+                      "containerPort": 5432,
+                      "protocol": "tcp"
+                    }
+                  ],
+                  "environment": [
+                    {
+                      "name": "PORT",
+                      "value": "3000"
+                    },
+                    {
+                      "name": "NODE_ENV",
+                      "value": "prod"
+                    },
+                    {
+                      "name": "AWS_REGION",
+                      "value": "'"${{ env.AWS_REGION }}"'"
+                    },
+                    {
+                      "name": "DATABASE_URL",
+                      "value": "postgresql://${{ steps.rds_creds.outputs.rds_username }}:${{ steps.rds_creds.outputs.rds_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public"
+                    }
+                  ],
+                  "secrets": [
+                    {
+                      "name": "REDIS_URL",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-prod-redis-connection-cuiTEQ"
+                    },
+                    {
+                      "name": "COGNITO_CLIENT_USER_POOL_ID",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-prod-cognito-config-aVTNzm:COGNITO_CLIENT_USER_POOL_ID::"
+                    },
+                    {
+                      "name": "COGNITO_CLIENT_CLIENT_ID",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-prod-cognito-config-aVTNzm:COGNITO_CLIENT_CLIENT_ID::"
+                    },
+                    {
+                      "name": "COGNITO_ADMIN_USER_POOL_ID",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-prod-cognito-config-aVTNzm:COGNITO_ADMIN_USER_POOL_ID::"
+                    },
+                    {
+                      "name": "COGNITO_ADMIN_CLIENT_ID",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-prod-cognito-config-aVTNzm:COGNITO_ADMIN_CLIENT_ID::"
+                    }
+                  ],
+                  "logConfiguration": {
+                    "logDriver": "awslogs",
+                    "options": {
+                      "awslogs-group": "/finefinds/prod/app",
+                      "awslogs-region": "'"${{ env.AWS_REGION }}"'",
+                      "awslogs-stream-prefix": "finefinds"
+                    }
+                  }
+                }
+              ]
+            }' > task-definition.json
+            
+            echo "Registering new task definition..."
+            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
+            if [ -z "$NEW_TASK_DEF_ARN" ]; then
+              echo "::error::Failed to register new task definition"
+              exit 1
+            fi
+            echo "New task definition registered: $NEW_TASK_DEF_ARN"
+          else
+            echo "Found existing task definition. Updating with new image..."
+            # Get the latest revision
+            LATEST_REVISION=$(echo $TASK_DEF_ARN | rev | cut -d: -f1 | rev | tr -d 'None')
+            echo "Latest revision: $LATEST_REVISION"
+            
+            # Get the current task definition
+            echo "Fetching current task definition..."
+            TASK_DEF=$(aws ecs describe-task-definition --task-definition ${{ env.TASK_DEF_FAMILY_PROD }}:$LATEST_REVISION --query 'taskDefinition' --output json || echo "{}")
+            
+            if [ "$TASK_DEF" = "{}" ]; then
+              echo "::error::Failed to get task definition"
+              exit 1
+            fi
+            
+            echo "Creating new task definition with updated image..."
+            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" --arg DB_URL "postgresql://${{ steps.rds_creds.outputs.rds_username }}:${{ steps.rds_creds.outputs.rds_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "prod"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}, {"name": "DATABASE_URL", "value": $DB_URL}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+            
+            echo "Registering updated task definition..."
+            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
+            if [ -z "$NEW_TASK_DEF_ARN" ]; then
+              echo "::error::Failed to register updated task definition"
+              exit 1
+            fi
+            echo "Updated task definition registered: $NEW_TASK_DEF_ARN"
+          fi
+          
+          echo "Updating ECS service..."
           aws ecs update-service \
-            --cluster finefinds-prod \
-            --service finefinds-backend \
-            --force-new-deployment \
-            --task-definition finefinds-backend:$VERSION
+            --cluster ${{ env.CLUSTER_NAME_PROD }} \
+            --service ${{ env.SERVICE_NAME_PROD }} \
+            --task-definition $NEW_TASK_DEF_ARN \
+            --force-new-deployment
+            
+          echo "Waiting for service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster ${{ env.CLUSTER_NAME_PROD }} \
+            --services ${{ env.SERVICE_NAME_PROD }}
+            
+          echo "Deployment completed successfully"
+          echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
 
   notify:
     needs: [deploy-sandbox, deploy-dev, deploy-qa, deploy-staging, deploy-prod]
@@ -616,7 +1136,8 @@ jobs:
                     { "title": "Environment", "value": "${{ env.SERVICES_ENV }}", "short": true },
                     { "title": "Branch", "value": "${{ github.ref_name }}", "short": true },
                     { "title": "Actor", "value": "${{ github.actor }}", "short": true },
-                    { "title": "Commit", "value": "${{ github.sha }}", "short": false }
+                    { "title": "Commit", "value": "${{ github.sha }}", "short": false },
+                    { "title": "Task Definition", "value": "${{ needs.deploy-dev.outputs.task_def_arn || 'N/A' }}", "short": false }
                   ],
                   "actions": [
                     {
@@ -646,7 +1167,8 @@ jobs:
                     { "title": "Environment", "value": "${{ env.SERVICES_ENV }}", "short": true },
                     { "title": "Branch", "value": "${{ github.ref_name }}", "short": true },
                     { "title": "Actor", "value": "${{ github.actor }}", "short": true },
-                    { "title": "Commit", "value": "${{ github.sha }}", "short": false }
+                    { "title": "Commit", "value": "${{ github.sha }}", "short": false },
+                    { "title": "Failed Job", "value": "${{ needs.*.result == 'failure' && needs.*.name || 'Unknown' }}", "short": false }
                   ],
                   "actions": [
                     {
@@ -657,4 +1179,4 @@ jobs:
                   ]
                 }
               ]
-            }
+            } 
