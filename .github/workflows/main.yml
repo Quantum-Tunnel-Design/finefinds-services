@@ -247,32 +247,56 @@ jobs:
         id: rds
         run: |
           echo "Fetching RDS endpoint for dev environment..."
-          RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier finefinds-dev-db --query 'DBInstances[0].Endpoint.Address' --output text)
+          # Add error handling and retry logic
+          max_attempts=3
+          attempt=1
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt of $max_attempts"
+            RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier finefinds-dev-db --query 'DBInstances[0].Endpoint.Address' --output text)
+            if [ $? -eq 0 ] && [ ! -z "$RDS_ENDPOINT" ]; then
+              echo "RDS endpoint: $RDS_ENDPOINT"
+              echo "rds_endpoint=$RDS_ENDPOINT" >> $GITHUB_OUTPUT
+              break
+            fi
+            echo "Failed to get RDS endpoint. Retrying..."
+            sleep 5
+            attempt=$((attempt + 1))
+          done
+          
           if [ -z "$RDS_ENDPOINT" ]; then
-            echo "::error::Failed to get RDS endpoint"
+            echo "::error::Failed to get RDS endpoint after $max_attempts attempts"
             exit 1
           fi
-          echo "RDS endpoint: $RDS_ENDPOINT"
-          echo "rds_endpoint=$RDS_ENDPOINT" >> $GITHUB_OUTPUT
 
       - name: Get RDS credentials
         id: rds_creds
         run: |
           echo "Fetching RDS credentials from Secrets Manager..."
-          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id finefinds-dev-rds-credentials --query 'SecretString' --output text)
-          if [ -z "$RDS_SECRET" ]; then
-            echo "::error::Failed to get RDS credentials from Secrets Manager"
-            exit 1
-          fi
-          RDS_USERNAME=$(echo $RDS_SECRET | jq -r '.username')
-          RDS_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
+          # Add error handling and retry logic
+          max_attempts=3
+          attempt=1
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt of $max_attempts"
+            RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id finefinds-dev-rds-credentials --query 'SecretString' --output text)
+            if [ $? -eq 0 ] && [ ! -z "$RDS_SECRET" ]; then
+              RDS_USERNAME=$(echo $RDS_SECRET | jq -r '.username')
+              RDS_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
+              if [ ! -z "$RDS_USERNAME" ] && [ ! -z "$RDS_PASSWORD" ]; then
+                echo "RDS credentials retrieved successfully"
+                echo "rds_username=$RDS_USERNAME" >> $GITHUB_OUTPUT
+                echo "rds_password=$RDS_PASSWORD" >> $GITHUB_OUTPUT
+                break
+              fi
+            fi
+            echo "Failed to get RDS credentials. Retrying..."
+            sleep 5
+            attempt=$((attempt + 1))
+          done
+          
           if [ -z "$RDS_USERNAME" ] || [ -z "$RDS_PASSWORD" ]; then
-            echo "::error::Invalid RDS credentials format in Secrets Manager"
+            echo "::error::Failed to get RDS credentials after $max_attempts attempts"
             exit 1
           fi
-          echo "RDS credentials retrieved successfully"
-          echo "rds_username=$RDS_USERNAME" >> $GITHUB_OUTPUT
-          echo "rds_password=$RDS_PASSWORD" >> $GITHUB_OUTPUT
           
       - name: Deploy to ECS
         id: deploy
@@ -318,7 +342,7 @@ jobs:
                   },
                   {
                     "name": "AppPorts",
-                    "value": "3000,5432"
+                    "value": "3000"
                   },
                   {
                     "name": "EgressIgnoredIPs",
@@ -336,10 +360,6 @@ jobs:
                   "portMappings": [
                     {
                       "containerPort": 3000,
-                      "protocol": "tcp"
-                    },
-                    {
-                      "containerPort": 5432,
                       "protocol": "tcp"
                     }
                   ],
@@ -412,10 +432,6 @@ jobs:
             echo "Fetching current task definition..."
             TASK_DEF=$(aws ecs describe-task-definition --task-definition ${{ env.TASK_DEF_FAMILY_DEV }}:$LATEST_REVISION --query 'taskDefinition' --output json || echo "{}")
             
-            # Debug: Print existing task definition container name
-            echo "Existing task definition container name:"
-            echo "$TASK_DEF" | jq '.containerDefinitions[0].name'
-                        
             if [ "$TASK_DEF" = "{}" ]; then
               echo "::error::Failed to get task definition"
               exit 1
