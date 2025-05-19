@@ -69,6 +69,10 @@ env:
   CLUSTER_NAME_QA: finefinds-qa-cluster
   CLUSTER_NAME_STAGING: finefinds-staging-cluster
   CLUSTER_NAME_PROD: finefinds-prod-cluster
+  RDS_INSTANCE_DEV: finefinds-dev-rdsdatabase74c89a2a-tgxwanklvozk
+  RDS_INSTANCE_QA: finefinds-qa-rdsdatabase74c89a2a-tgxwanklvozk
+  RDS_INSTANCE_STAGING: finefinds-staging-rdsdatabase74c89a2a-tgxwanklvozk
+  RDS_INSTANCE_PROD: finefinds-prod-rdsdatabase74c89a2a-tgxwanklvozk
 
 jobs:
   input_check:
@@ -246,13 +250,15 @@ jobs:
       - name: Get RDS endpoint
         id: rds
         run: |
-          echo "Fetching RDS endpoint for dev environment..."
+          echo "Fetching RDS endpoint for ${{ env.SERVICES_ENV }} environment..."
           # Add error handling and retry logic
           max_attempts=3
           attempt=1
           while [ $attempt -le $max_attempts ]; do
             echo "Attempt $attempt of $max_attempts"
-            RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier finefinds-dev-db --query 'DBInstances[0].Endpoint.Address' --output text)
+            RDS_INSTANCE="${{ env.SERVICES_ENV == 'dev' && env.RDS_INSTANCE_DEV || env.SERVICES_ENV == 'qa' && env.RDS_INSTANCE_QA || env.SERVICES_ENV == 'staging' && env.RDS_INSTANCE_STAGING || env.RDS_INSTANCE_PROD }}"
+            echo "Using RDS instance: $RDS_INSTANCE"
+            RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier $RDS_INSTANCE --query 'DBInstances[0].Endpoint.Address' --output text)
             if [ $? -eq 0 ] && [ ! -z "$RDS_ENDPOINT" ]; then
               echo "RDS endpoint: $RDS_ENDPOINT"
               echo "rds_endpoint=$RDS_ENDPOINT" >> $GITHUB_OUTPUT
@@ -277,7 +283,7 @@ jobs:
           attempt=1
           while [ $attempt -le $max_attempts ]; do
             echo "Attempt $attempt of $max_attempts"
-            RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id finefinds-dev-rds-credentials --query 'SecretString' --output text)
+            RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id finefinds-${{ env.SERVICES_ENV }}-rds-credentials --query 'SecretString' --output text)
             if [ $? -eq 0 ] && [ ! -z "$RDS_SECRET" ]; then
               RDS_USERNAME=$(echo $RDS_SECRET | jq -r '.username')
               RDS_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
@@ -491,8 +497,8 @@ jobs:
       - name: Get RDS endpoint
         id: rds
         run: |
-          echo "Fetching RDS endpoint for qa environment..."
-          RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier finefinds-qa-db --query 'DBInstances[0].Endpoint.Address' --output text)
+          echo "Fetching RDS endpoint for ${{ env.SERVICES_ENV }} environment..."
+          RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier ${{ env.RDS_INSTANCE_QA }} --query 'DBInstances[0].Endpoint.Address' --output text)
           if [ -z "$RDS_ENDPOINT" ]; then
             echo "::error::Failed to get RDS endpoint"
             exit 1
@@ -713,8 +719,8 @@ jobs:
       - name: Get RDS endpoint
         id: rds
         run: |
-          echo "Fetching RDS endpoint for staging environment..."
-          RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier finefinds-staging-db --query 'DBInstances[0].Endpoint.Address' --output text)
+          echo "Fetching RDS endpoint for ${{ env.SERVICES_ENV }} environment..."
+          RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier ${{ env.RDS_INSTANCE_STAGING }} --query 'DBInstances[0].Endpoint.Address' --output text)
           if [ -z "$RDS_ENDPOINT" ]; then
             echo "::error::Failed to get RDS endpoint"
             exit 1
@@ -935,8 +941,8 @@ jobs:
       - name: Get RDS endpoint
         id: rds
         run: |
-          echo "Fetching RDS endpoint for prod environment..."
-          RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier finefinds-prod-db --query 'DBInstances[0].Endpoint.Address' --output text)
+          echo "Fetching RDS endpoint for ${{ env.SERVICES_ENV }} environment..."
+          RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier ${{ env.RDS_INSTANCE_PROD }} --query 'DBInstances[0].Endpoint.Address' --output text)
           if [ -z "$RDS_ENDPOINT" ]; then
             echo "::error::Failed to get RDS endpoint"
             exit 1
