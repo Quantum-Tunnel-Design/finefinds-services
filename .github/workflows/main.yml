@@ -392,6 +392,10 @@ jobs:
                     {
                       "name": "AWS_REGION",
                       "value": "'"${{ env.AWS_REGION }}"'"
+                    },
+                    {
+                      "name": "DATABASE_URL",
+                      "value": "postgresql://'"${{ steps.rds_creds.outputs.db_user }}"':'"${{ steps.rds_creds.outputs.db_password }}"'@'"${{ steps.rds.outputs.rds_endpoint }}"':5432/'"${{ steps.rds_creds.outputs.db_name }}"'?schema=public"
                     }
                   ],
                   "secrets": [
@@ -637,6 +641,10 @@ jobs:
                     {
                       "name": "AWS_REGION",
                       "value": "'"${{ env.AWS_REGION }}"'"
+                    },
+                    {
+                      "name": "DATABASE_URL",
+                      "value": "postgresql://'"${{ steps.rds_creds.outputs.db_user }}"':'"${{ steps.rds_creds.outputs.db_password }}"'@'"${{ steps.rds.outputs.rds_endpoint }}"':5432/'"${{ steps.rds_creds.outputs.db_name }}"'?schema=public"
                     }
                   ],
                   "secrets": [
@@ -882,6 +890,10 @@ jobs:
                     {
                       "name": "AWS_REGION",
                       "value": "'"${{ env.AWS_REGION }}"'"
+                    },
+                    {
+                      "name": "DATABASE_URL",
+                      "value": "postgresql://'"${{ steps.rds_creds.outputs.db_user }}"':'"${{ steps.rds_creds.outputs.db_password }}"'@'"${{ steps.rds.outputs.rds_endpoint }}"':5432/'"${{ steps.rds_creds.outputs.db_name }}"'?schema=public"
                     }
                   ],
                   "secrets": [
@@ -1127,6 +1139,10 @@ jobs:
                     {
                       "name": "AWS_REGION",
                       "value": "'"${{ env.AWS_REGION }}"'"
+                    },
+                    {
+                      "name": "DATABASE_URL",
+                      "value": "postgresql://'"${{ steps.rds_creds.outputs.db_user }}"':'"${{ steps.rds_creds.outputs.db_password }}"'@'"${{ steps.rds.outputs.rds_endpoint }}"':5432/'"${{ steps.rds_creds.outputs.db_name }}"'?schema=public"
                     }
                   ],
                   "secrets": [
