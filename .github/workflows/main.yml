@@ -73,7 +73,10 @@ env:
   RDS_INSTANCE_QA: finefinds-qa-rdsdatabase74c89a2a-tgxwanklvozk
   RDS_INSTANCE_STAGING: finefinds-staging-rdsdatabase74c89a2a-tgxwanklvozk
   RDS_INSTANCE_PROD: finefinds-prod-rdsdatabase74c89a2a-tgxwanklvozk
-
+  RDS_DEV_SECRET_NAME: FineFindsdevRdsDatabaseSecr-0zIOqlcLlE2c
+  RDS_QA_SECRET_NAME: FineFindsqaRdsDatabaseSecr-0zIOqlcLlE2c
+  RDS_STAGING_SECRET_NAME: FineFindsstagingRdsDatabaseSecr-0zIOqlcLlE2c
+  RDS_PROD_SECRET_NAME: FineFindsprodRdsDatabaseSecr-0zIOqlcLlE2c
 jobs:
   input_check:
     runs-on: ubuntu-latest
@@ -283,7 +286,7 @@ jobs:
           attempt=1
           while [ $attempt -le $max_attempts ]; do
             echo "Attempt $attempt of $max_attempts"
-            RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id finefinds-${{ env.SERVICES_ENV }}-rds-credentials --query 'SecretString' --output text)
+            RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{env.RDS_DEV_SECRET_NAME}} --query 'SecretString' --output text)
             if [ $? -eq 0 ] && [ ! -z "$RDS_SECRET" ]; then
               RDS_USERNAME=$(echo $RDS_SECRET | jq -r '.username')
               RDS_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
@@ -510,7 +513,7 @@ jobs:
         id: rds_creds
         run: |
           echo "Fetching RDS credentials from Secrets Manager..."
-          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id finefinds-qa-rds-credentials --query 'SecretString' --output text)
+          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{env.RDS_QA_SECRET_NAME}} --query 'SecretString' --output text)
           if [ -z "$RDS_SECRET" ]; then
             echo "::error::Failed to get RDS credentials from Secrets Manager"
             exit 1
@@ -732,7 +735,7 @@ jobs:
         id: rds_creds
         run: |
           echo "Fetching RDS credentials from Secrets Manager..."
-          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id finefinds-staging-rds-credentials --query 'SecretString' --output text)
+          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{env.RDS_STAGING_SECRET_NAME}} --query 'SecretString' --output text)
           if [ -z "$RDS_SECRET" ]; then
             echo "::error::Failed to get RDS credentials from Secrets Manager"
             exit 1
@@ -954,7 +957,7 @@ jobs:
         id: rds_creds
         run: |
           echo "Fetching RDS credentials from Secrets Manager..."
-          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id finefinds-prod-rds-credentials --query 'SecretString' --output text)
+          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{env.RDS_PROD_SECRET_NAME}} --query 'SecretString' --output text)
           if [ -z "$RDS_SECRET" ]; then
             echo "::error::Failed to get RDS credentials from Secrets Manager"
             exit 1
