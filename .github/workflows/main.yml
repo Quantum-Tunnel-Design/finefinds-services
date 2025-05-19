@@ -61,7 +61,7 @@ env:
   TASK_DEF_FAMILY_QA: FineFindsqaEcsTaskDef290F30C7
   TASK_DEF_FAMILY_STAGING: FineFindsstagingEcsTaskDef290F30C7
   TASK_DEF_FAMILY_PROD: FineFindsprodEcsTaskDef290F30C7
-  SERVICE_NAME_DEV: FineFinds-dev-EcsService5196398A-gBUy7Nla9Poj
+  SERVICE_NAME_DEV: FineFinds-dev-EcsService5196398A-NE8PD74FF49F
   SERVICE_NAME_QA: FineFinds-qa-EcsService5196398A-gBUy7Nla9Poj
   SERVICE_NAME_STAGING: FineFinds-staging-EcsService5196398A-gBUy7Nla9Poj
   SERVICE_NAME_PROD: FineFinds-prod-EcsService5196398A-gBUy7Nla9Poj
