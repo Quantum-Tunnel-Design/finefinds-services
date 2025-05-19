@@ -475,7 +475,7 @@ jobs:
             fi
             
             echo "Creating new task definition with updated image..."
-            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "'"${{ env.SERVICES_ENV }}"'"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
             
             echo "Registering updated task definition..."
             NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
@@ -490,8 +490,7 @@ jobs:
           aws ecs update-service \
             --cluster ${{ env.CLUSTER_NAME_DEV }} \
             --service ${{ env.SERVICE_NAME_DEV }} \
-            --task-definition $NEW_TASK_DEF_ARN \
-            --force-new-deployment
+            --task-definition $NEW_TASK_DEF_ARN
             
           echo "Waiting for service to stabilize..."
           aws ecs wait services-stable \
@@ -724,7 +723,7 @@ jobs:
             fi
             
             echo "Creating new task definition with updated image..."
-            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "qa"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
             
             echo "Registering updated task definition..."
             NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
@@ -739,8 +738,7 @@ jobs:
           aws ecs update-service \
             --cluster ${{ env.CLUSTER_NAME_QA }} \
             --service ${{ env.SERVICE_NAME_QA }} \
-            --task-definition $NEW_TASK_DEF_ARN \
-            --force-new-deployment
+            --task-definition $NEW_TASK_DEF_ARN
             
           echo "Waiting for service to stabilize..."
           aws ecs wait services-stable \
@@ -973,7 +971,7 @@ jobs:
             fi
             
             echo "Creating new task definition with updated image..."
-            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "staging"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
             
             echo "Registering updated task definition..."
             NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
@@ -988,8 +986,7 @@ jobs:
           aws ecs update-service \
             --cluster ${{ env.CLUSTER_NAME_STAGING }} \
             --service ${{ env.SERVICE_NAME_STAGING }} \
-            --task-definition $NEW_TASK_DEF_ARN \
-            --force-new-deployment
+            --task-definition $NEW_TASK_DEF_ARN
             
           echo "Waiting for service to stabilize..."
           aws ecs wait services-stable \
@@ -1222,7 +1219,7 @@ jobs:
             fi
             
             echo "Creating new task definition with updated image..."
-            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "prod"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
             
             echo "Registering updated task definition..."
             NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
@@ -1237,8 +1234,7 @@ jobs:
           aws ecs update-service \
             --cluster ${{ env.CLUSTER_NAME_PROD }} \
             --service ${{ env.SERVICE_NAME_PROD }} \
-            --task-definition $NEW_TASK_DEF_ARN \
-            --force-new-deployment
+            --task-definition $NEW_TASK_DEF_ARN
             
           echo "Waiting for service to stabilize..."
           aws ecs wait services-stable \

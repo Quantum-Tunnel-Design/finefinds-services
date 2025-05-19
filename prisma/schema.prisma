@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,6 +5,143 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(uuid())
+  cognitoSub    String         @unique
+  firstName     String
+  lastName      String
+  email         String         @unique
+  phoneNumber   String?
+  role          UserRole
+  avatarUrl     String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  children      Child[]
+  courses       Course[]       @relation("VendorCourses")
+  enrollments   Enrollment[]
+  notifications Notification[]
+  payments      Payment[]
+  reviews       Review[]
+  vendorProfile VendorProfile?
+
+  @@map("users")
+}
+
+model VendorProfile {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  instituteName String
+  description   String
+  website       String?
+  phoneNumber   String?
+  approved      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@map("vendor_profiles")
+}
+
+model Course {
+  id          String       @id @default(uuid())
+  title       String
+  description String
+  category    String
+  price       Float
+  level       CourseLevel
+  status      CourseStatus @default(DRAFT)
+  isPublished Boolean      @default(false)
+  vendorId    String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  vendor      User         @relation("VendorCourses", fields: [vendorId], references: [id])
+  enrollments Enrollment[]
+  reviews     Review[]
+  schedules   Schedule[]
+
+  @@map("courses")
+}
+
+model Enrollment {
+  id        String   @id @default(uuid())
+  userId    String
+  courseId  String
+  status    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  course    Course   @relation(fields: [courseId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, courseId])
+  @@map("enrollments")
+}
+
+model Schedule {
+  id        String   @id @default(uuid())
+  courseId  String
+  startTime DateTime
+  endTime   DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  course    Course   @relation(fields: [courseId], references: [id])
+
+  @@map("schedules")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String
+  courseId  String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  course    Course   @relation(fields: [courseId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, courseId])
+  @@map("reviews")
+}
+
+model Payment {
+  id        String   @id @default(uuid())
+  userId    String
+  amount    Float
+  status    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("payments")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+model Child {
+  id          String   @id @default(uuid())
+  firstName   String
+  lastName    String
+  gender      String
+  dateOfBirth DateTime
+  parentId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  parent      User     @relation(fields: [parentId], references: [id])
+
+  @@map("children")
 }
 
 enum UserRole {
@@ -42,140 +176,3 @@ enum CourseLevel {
   INTERMEDIATE
   ADVANCED
 }
-
-model User {
-  id            String         @id @default(uuid())
-  cognitoSub    String         @unique
-  firstName     String
-  lastName      String
-  email         String         @unique
-  phoneNumber   String?
-  role          UserRole
-  avatarUrl     String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  vendorProfile VendorProfile?
-  children      Child[]
-  courses       Course[]       @relation("VendorCourses")
-  enrollments   Enrollment[]
-  reviews       Review[]
-  payments      Payment[]
-  notifications Notification[]
-
-  @@map("users")
-}
-
-model VendorProfile {
-  id            String   @id @default(uuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id])
-  instituteName String
-  description   String   @db.Text
-  website       String?
-  phoneNumber   String?
-  approved      Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@map("vendor_profiles")
-}
-
-model Course {
-  id          String       @id @default(uuid())
-  title       String
-  description String       @db.Text
-  category    String
-  price       Float
-  level       CourseLevel
-  status      CourseStatus @default(DRAFT)
-  isPublished Boolean      @default(false)
-  vendorId    String
-  vendor      User         @relation("VendorCourses", fields: [vendorId], references: [id])
-  enrollments Enrollment[]
-  schedules   Schedule[]
-  reviews     Review[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  @@map("courses")
-}
-
-model Enrollment {
-  id        String   @id @default(uuid())
-  userId    String
-  courseId  String
-  user      User     @relation(fields: [userId], references: [id])
-  course    Course   @relation(fields: [courseId], references: [id])
-  status    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([userId, courseId])
-  @@map("enrollments")
-}
-
-model Schedule {
-  id        String   @id @default(uuid())
-  courseId  String
-  course    Course   @relation(fields: [courseId], references: [id])
-  startTime DateTime
-  endTime   DateTime
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("schedules")
-}
-
-model Review {
-  id        String   @id @default(uuid())
-  userId    String
-  courseId  String
-  user      User     @relation(fields: [userId], references: [id])
-  course    Course   @relation(fields: [courseId], references: [id])
-  rating    Int
-  comment   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([userId, courseId])
-  @@map("reviews")
-}
-
-model Payment {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  amount    Float
-  status    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("payments")
-}
-
-model Notification {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  type      String
-  message   String
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("notifications")
-}
-
-model Child {
-  id          String   @id @default(uuid())
-  firstName   String
-  lastName    String
-  gender      String
-  dateOfBirth DateTime
-  parentId    String
-  parent      User     @relation(fields: [parentId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@map("children")
-} 

@@ -25,7 +25,7 @@ FROM --platform=$TARGETPLATFORM node:18-alpine
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files and Prisma schema
 COPY package*.json ./
 COPY prisma ./prisma/
 
@@ -36,11 +36,16 @@ RUN npm ci --only=production
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 
+# Generate Prisma Client
+RUN npx prisma generate
+
 # Debug: Verify files are copied correctly
 RUN echo "Contents of /app directory:" && \
     ls -la /app && \
     echo "Contents of /app/dist directory:" && \
     ls -la /app/dist && \
+    echo "Contents of /app/prisma directory:" && \
+    ls -la /app/prisma && \
     echo "Contents of /app/dist directory (recursive):" && \
     find /app/dist -type f
 
