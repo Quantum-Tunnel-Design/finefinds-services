@@ -372,7 +372,8 @@ jobs:
                   "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'"${{ env.ECR_REPOSITORY_BACKEND }}"':'"$VERSION"'",
                   "essential": true,
                   "workingDirectory": "/app",
-                  "command": ["node", "dist/src/main.js"],
+                  "entryPoint": ["node"],
+                  "command": ["dist/src/main.js"],
                   "portMappings": [
                     {
                       "containerPort": 3000,
@@ -612,7 +613,8 @@ jobs:
                   "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'"${{ env.ECR_REPOSITORY_BACKEND }}"':'"$VERSION"'",
                   "essential": true,
                   "workingDirectory": "/app",
-                  "command": ["node", "dist/src/main.js"],
+                  "entryPoint": ["node"],
+                  "command": ["dist/src/main.js"],
                   "portMappings": [
                     {
                       "containerPort": 3000,
@@ -856,7 +858,8 @@ jobs:
                   "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'"${{ env.ECR_REPOSITORY_BACKEND }}"':'"$VERSION"'",
                   "essential": true,
                   "workingDirectory": "/app",
-                  "command": ["node", "dist/src/main.js"],
+                  "entryPoint": ["node"],
+                  "command": ["dist/src/main.js"],
                   "portMappings": [
                     {
                       "containerPort": 3000,
@@ -1100,7 +1103,8 @@ jobs:
                   "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'"${{ env.ECR_REPOSITORY_BACKEND }}"':'"$VERSION"'",
                   "essential": true,
                   "workingDirectory": "/app",
-                  "command": ["node", "dist/src/main.js"],
+                  "entryPoint": ["node"],
+                  "command": ["dist/src/main.js"],
                   "portMappings": [
                     {
                       "containerPort": 3000,
