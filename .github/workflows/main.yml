@@ -491,8 +491,7 @@ jobs:
           echo "Waiting for service to stabilize..."
           aws ecs wait services-stable \
             --cluster ${{ env.CLUSTER_NAME_DEV }} \
-            --services ${{ env.SERVICE_NAME_DEV }} \
-            --timeout-seconds 300
+            --services ${{ env.SERVICE_NAME_DEV }}
             
           echo "Deployment completed successfully"
           echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
