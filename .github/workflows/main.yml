@@ -288,12 +288,19 @@ jobs:
             echo "Attempt $attempt of $max_attempts"
             RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{env.RDS_DEV_SECRET_NAME}} --query 'SecretString' --output text)
             if [ $? -eq 0 ] && [ ! -z "$RDS_SECRET" ]; then
-              RDS_USERNAME=$(echo $RDS_SECRET | jq -r '.username')
-              RDS_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
-              if [ ! -z "$RDS_USERNAME" ] && [ ! -z "$RDS_PASSWORD" ]; then
+              DB_HOST=$(echo $RDS_SECRET | jq -r '.host')
+              DB_PORT=$(echo $RDS_SECRET | jq -r '.port')
+              DB_NAME=$(echo $RDS_SECRET | jq -r '.dbname')
+              DB_USER=$(echo $RDS_SECRET | jq -r '.username')
+              DB_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
+              
+              if [ ! -z "$DB_HOST" ] && [ ! -z "$DB_PORT" ] && [ ! -z "$DB_NAME" ] && [ ! -z "$DB_USER" ] && [ ! -z "$DB_PASSWORD" ]; then
                 echo "RDS credentials retrieved successfully"
-                echo "rds_username=$RDS_USERNAME" >> $GITHUB_OUTPUT
-                echo "rds_password=$RDS_PASSWORD" >> $GITHUB_OUTPUT
+                echo "db_host=$DB_HOST" >> $GITHUB_OUTPUT
+                echo "db_port=$DB_PORT" >> $GITHUB_OUTPUT
+                echo "db_name=$DB_NAME" >> $GITHUB_OUTPUT
+                echo "db_user=$DB_USER" >> $GITHUB_OUTPUT
+                echo "db_password=$DB_PASSWORD" >> $GITHUB_OUTPUT
                 break
               fi
             fi
@@ -302,7 +309,7 @@ jobs:
             attempt=$((attempt + 1))
           done
           
-          if [ -z "$RDS_USERNAME" ] || [ -z "$RDS_PASSWORD" ]; then
+          if [ -z "$DB_HOST" ] || [ -z "$DB_PORT" ] || [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ]; then
             echo "::error::Failed to get RDS credentials after $max_attempts attempts"
             exit 1
           fi
@@ -379,43 +386,59 @@ jobs:
                     },
                     {
                       "name": "NODE_ENV",
-                      "value": "dev"
+                      "value": "'"${{ env.SERVICES_ENV }}"'"
                     },
                     {
                       "name": "AWS_REGION",
                       "value": "'"${{ env.AWS_REGION }}"'"
-                    },
-                    {
-                      "name": "DATABASE_URL",
-                      "value": "postgresql://${{ steps.rds_creds.outputs.rds_username }}:${{ steps.rds_creds.outputs.rds_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public"
                     }
                   ],
                   "secrets": [
                     {
+                      "name": "DB_HOST",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_DEV_SECRET_NAME}}:host::"
+                    },
+                    {
+                      "name": "DB_PORT",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_DEV_SECRET_NAME}}:port::"
+                    },
+                    {
+                      "name": "DB_NAME",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_DEV_SECRET_NAME}}:dbname::"
+                    },
+                    {
+                      "name": "DB_USER",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_DEV_SECRET_NAME}}:username::"
+                    },
+                    {
+                      "name": "DB_PASSWORD",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_DEV_SECRET_NAME}}:password::"
+                    },
+                    {
                       "name": "REDIS_URL",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-redis-connection-cuiTEQ"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ env.SERVICES_ENV }}-redis-connection-cuiTEQ"
                     },
                     {
                       "name": "COGNITO_CLIENT_USER_POOL_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_CLIENT_USER_POOL_ID::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ env.SERVICES_ENV }}-cognito-config-aVTNzm:COGNITO_CLIENT_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_CLIENT_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_CLIENT_CLIENT_ID::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ env.SERVICES_ENV }}-cognito-config-aVTNzm:COGNITO_CLIENT_CLIENT_ID::"
                     },
                     {
                       "name": "COGNITO_ADMIN_USER_POOL_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_ADMIN_USER_POOL_ID::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ env.SERVICES_ENV }}-cognito-config-aVTNzm:COGNITO_ADMIN_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_ADMIN_CLIENT_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-dev-cognito-config-aVTNzm:COGNITO_ADMIN_CLIENT_ID::"
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ env.SERVICES_ENV }}-cognito-config-aVTNzm:COGNITO_ADMIN_CLIENT_ID::"
                     }
                   ],
                   "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                      "awslogs-group": "/finefinds/dev/app",
+                      "awslogs-group": "/finefinds/${{ env.SERVICES_ENV }}/app",
                       "awslogs-region": "'"${{ env.AWS_REGION }}"'",
                       "awslogs-stream-prefix": "finefinds"
                     }
@@ -447,7 +470,7 @@ jobs:
             fi
             
             echo "Creating new task definition with updated image..."
-            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" --arg DB_URL "postgresql://${{ steps.rds_creds.outputs.rds_username }}:${{ steps.rds_creds.outputs.rds_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "dev"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}, {"name": "DATABASE_URL", "value": $DB_URL}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" --arg DB_URL "postgresql://${{ steps.rds_creds.outputs.db_user }}:${{ steps.rds_creds.outputs.db_password }}@${{ steps.rds.outputs.rds_endpoint }}:${{ steps.rds_creds.outputs.db_port }}/finefinds?schema=public" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "'"${{ env.SERVICES_ENV }}"'"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}, {"name": "DATABASE_URL", "value": $DB_URL}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
             
             echo "Registering updated task definition..."
             NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
@@ -468,7 +491,8 @@ jobs:
           echo "Waiting for service to stabilize..."
           aws ecs wait services-stable \
             --cluster ${{ env.CLUSTER_NAME_DEV }} \
-            --services ${{ env.SERVICE_NAME_DEV }}
+            --services ${{ env.SERVICE_NAME_DEV }} \
+            --timeout-seconds 300
             
           echo "Deployment completed successfully"
           echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
@@ -518,15 +542,21 @@ jobs:
             echo "::error::Failed to get RDS credentials from Secrets Manager"
             exit 1
           fi
-          RDS_USERNAME=$(echo $RDS_SECRET | jq -r '.username')
-          RDS_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
-          if [ -z "$RDS_USERNAME" ] || [ -z "$RDS_PASSWORD" ]; then
+          DB_HOST=$(echo $RDS_SECRET | jq -r '.host')
+          DB_PORT=$(echo $RDS_SECRET | jq -r '.port')
+          DB_NAME=$(echo $RDS_SECRET | jq -r '.dbname')
+          DB_USER=$(echo $RDS_SECRET | jq -r '.username')
+          DB_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
+          if [ -z "$DB_HOST" ] || [ -z "$DB_PORT" ] || [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ]; then
             echo "::error::Invalid RDS credentials format in Secrets Manager"
             exit 1
           fi
           echo "RDS credentials retrieved successfully"
-          echo "rds_username=$RDS_USERNAME" >> $GITHUB_OUTPUT
-          echo "rds_password=$RDS_PASSWORD" >> $GITHUB_OUTPUT
+          echo "db_host=$DB_HOST" >> $GITHUB_OUTPUT
+          echo "db_port=$DB_PORT" >> $GITHUB_OUTPUT
+          echo "db_name=$DB_NAME" >> $GITHUB_OUTPUT
+          echo "db_user=$DB_USER" >> $GITHUB_OUTPUT
+          echo "db_password=$DB_PASSWORD" >> $GITHUB_OUTPUT
           
       - name: Deploy to ECS
         run: |
@@ -606,13 +636,29 @@ jobs:
                     {
                       "name": "AWS_REGION",
                       "value": "'"${{ env.AWS_REGION }}"'"
-                    },
-                    {
-                      "name": "DATABASE_URL",
-                      "value": "postgresql://${{ steps.rds_creds.outputs.rds_username }}:${{ steps.rds_creds.outputs.rds_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public"
                     }
                   ],
                   "secrets": [
+                    {
+                      "name": "DB_HOST",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_QA_SECRET_NAME}}:host::"
+                    },
+                    {
+                      "name": "DB_PORT",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_QA_SECRET_NAME}}:port::"
+                    },
+                    {
+                      "name": "DB_NAME",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_QA_SECRET_NAME}}:dbname::"
+                    },
+                    {
+                      "name": "DB_USER",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_QA_SECRET_NAME}}:username::"
+                    },
+                    {
+                      "name": "DB_PASSWORD",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_QA_SECRET_NAME}}:password::"
+                    },
                     {
                       "name": "REDIS_URL",
                       "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-qa-redis-connection-cuiTEQ"
@@ -669,7 +715,7 @@ jobs:
             fi
             
             echo "Creating new task definition with updated image..."
-            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" --arg DB_URL "postgresql://${{ steps.rds_creds.outputs.rds_username }}:${{ steps.rds_creds.outputs.rds_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "qa"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}, {"name": "DATABASE_URL", "value": $DB_URL}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" --arg DB_URL "postgresql://${{ steps.rds_creds.outputs.db_user }}:${{ steps.rds_creds.outputs.db_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "qa"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}, {"name": "DATABASE_URL", "value": $DB_URL}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
             
             echo "Registering updated task definition..."
             NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
@@ -740,15 +786,21 @@ jobs:
             echo "::error::Failed to get RDS credentials from Secrets Manager"
             exit 1
           fi
-          RDS_USERNAME=$(echo $RDS_SECRET | jq -r '.username')
-          RDS_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
-          if [ -z "$RDS_USERNAME" ] || [ -z "$RDS_PASSWORD" ]; then
+          DB_HOST=$(echo $RDS_SECRET | jq -r '.host')
+          DB_PORT=$(echo $RDS_SECRET | jq -r '.port')
+          DB_NAME=$(echo $RDS_SECRET | jq -r '.dbname')
+          DB_USER=$(echo $RDS_SECRET | jq -r '.username')
+          DB_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
+          if [ -z "$DB_HOST" ] || [ -z "$DB_PORT" ] || [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ]; then
             echo "::error::Invalid RDS credentials format in Secrets Manager"
             exit 1
           fi
           echo "RDS credentials retrieved successfully"
-          echo "rds_username=$RDS_USERNAME" >> $GITHUB_OUTPUT
-          echo "rds_password=$RDS_PASSWORD" >> $GITHUB_OUTPUT
+          echo "db_host=$DB_HOST" >> $GITHUB_OUTPUT
+          echo "db_port=$DB_PORT" >> $GITHUB_OUTPUT
+          echo "db_name=$DB_NAME" >> $GITHUB_OUTPUT
+          echo "db_user=$DB_USER" >> $GITHUB_OUTPUT
+          echo "db_password=$DB_PASSWORD" >> $GITHUB_OUTPUT
           
       - name: Deploy to ECS
         run: |
@@ -828,13 +880,29 @@ jobs:
                     {
                       "name": "AWS_REGION",
                       "value": "'"${{ env.AWS_REGION }}"'"
-                    },
-                    {
-                      "name": "DATABASE_URL",
-                      "value": "postgresql://${{ steps.rds_creds.outputs.rds_username }}:${{ steps.rds_creds.outputs.rds_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public"
                     }
                   ],
                   "secrets": [
+                    {
+                      "name": "DB_HOST",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_STAGING_SECRET_NAME}}:host::"
+                    },
+                    {
+                      "name": "DB_PORT",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_STAGING_SECRET_NAME}}:port::"
+                    },
+                    {
+                      "name": "DB_NAME",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_STAGING_SECRET_NAME}}:dbname::"
+                    },
+                    {
+                      "name": "DB_USER",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_STAGING_SECRET_NAME}}:username::"
+                    },
+                    {
+                      "name": "DB_PASSWORD",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_STAGING_SECRET_NAME}}:password::"
+                    },
                     {
                       "name": "REDIS_URL",
                       "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-staging-redis-connection-cuiTEQ"
@@ -891,7 +959,7 @@ jobs:
             fi
             
             echo "Creating new task definition with updated image..."
-            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" --arg DB_URL "postgresql://${{ steps.rds_creds.outputs.rds_username }}:${{ steps.rds_creds.outputs.rds_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "staging"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}, {"name": "DATABASE_URL", "value": $DB_URL}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" --arg DB_URL "postgresql://${{ steps.rds_creds.outputs.db_user }}:${{ steps.rds_creds.outputs.db_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "staging"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}, {"name": "DATABASE_URL", "value": $DB_URL}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
             
             echo "Registering updated task definition..."
             NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
@@ -962,15 +1030,21 @@ jobs:
             echo "::error::Failed to get RDS credentials from Secrets Manager"
             exit 1
           fi
-          RDS_USERNAME=$(echo $RDS_SECRET | jq -r '.username')
-          RDS_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
-          if [ -z "$RDS_USERNAME" ] || [ -z "$RDS_PASSWORD" ]; then
+          DB_HOST=$(echo $RDS_SECRET | jq -r '.host')
+          DB_PORT=$(echo $RDS_SECRET | jq -r '.port')
+          DB_NAME=$(echo $RDS_SECRET | jq -r '.dbname')
+          DB_USER=$(echo $RDS_SECRET | jq -r '.username')
+          DB_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
+          if [ -z "$DB_HOST" ] || [ -z "$DB_PORT" ] || [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ]; then
             echo "::error::Invalid RDS credentials format in Secrets Manager"
             exit 1
           fi
           echo "RDS credentials retrieved successfully"
-          echo "rds_username=$RDS_USERNAME" >> $GITHUB_OUTPUT
-          echo "rds_password=$RDS_PASSWORD" >> $GITHUB_OUTPUT
+          echo "db_host=$DB_HOST" >> $GITHUB_OUTPUT
+          echo "db_port=$DB_PORT" >> $GITHUB_OUTPUT
+          echo "db_name=$DB_NAME" >> $GITHUB_OUTPUT
+          echo "db_user=$DB_USER" >> $GITHUB_OUTPUT
+          echo "db_password=$DB_PASSWORD" >> $GITHUB_OUTPUT
           
       - name: Deploy to ECS
         run: |
@@ -1050,13 +1124,29 @@ jobs:
                     {
                       "name": "AWS_REGION",
                       "value": "'"${{ env.AWS_REGION }}"'"
-                    },
-                    {
-                      "name": "DATABASE_URL",
-                      "value": "postgresql://${{ steps.rds_creds.outputs.rds_username }}:${{ steps.rds_creds.outputs.rds_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public"
                     }
                   ],
                   "secrets": [
+                    {
+                      "name": "DB_HOST",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_PROD_SECRET_NAME}}:host::"
+                    },
+                    {
+                      "name": "DB_PORT",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_PROD_SECRET_NAME}}:port::"
+                    },
+                    {
+                      "name": "DB_NAME",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_PROD_SECRET_NAME}}:dbname::"
+                    },
+                    {
+                      "name": "DB_USER",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_PROD_SECRET_NAME}}:username::"
+                    },
+                    {
+                      "name": "DB_PASSWORD",
+                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_PROD_SECRET_NAME}}:password::"
+                    },
                     {
                       "name": "REDIS_URL",
                       "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-prod-redis-connection-cuiTEQ"
@@ -1113,7 +1203,7 @@ jobs:
             fi
             
             echo "Creating new task definition with updated image..."
-            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" --arg DB_URL "postgresql://${{ steps.rds_creds.outputs.rds_username }}:${{ steps.rds_creds.outputs.rds_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "prod"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}, {"name": "DATABASE_URL", "value": $DB_URL}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" --arg DB_URL "postgresql://${{ steps.rds_creds.outputs.db_user }}:${{ steps.rds_creds.outputs.db_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "prod"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}, {"name": "DATABASE_URL", "value": $DB_URL}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
             
             echo "Registering updated task definition..."
             NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
