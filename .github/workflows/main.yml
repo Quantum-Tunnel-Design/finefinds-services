@@ -470,7 +470,7 @@ jobs:
             fi
             
             echo "Creating new task definition with updated image..."
-            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" --arg DB_URL "postgresql://${{ steps.rds_creds.outputs.db_user }}:${{ steps.rds_creds.outputs.db_password }}@${{ steps.rds.outputs.rds_endpoint }}:${{ steps.rds_creds.outputs.db_port }}/finefinds?schema=public" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "'"${{ env.SERVICES_ENV }}"'"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}, {"name": "DATABASE_URL", "value": $DB_URL}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "'"${{ env.SERVICES_ENV }}"'"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
             
             echo "Registering updated task definition..."
             NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
@@ -715,7 +715,7 @@ jobs:
             fi
             
             echo "Creating new task definition with updated image..."
-            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" --arg DB_URL "postgresql://${{ steps.rds_creds.outputs.db_user }}:${{ steps.rds_creds.outputs.db_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "qa"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}, {"name": "DATABASE_URL", "value": $DB_URL}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "qa"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
             
             echo "Registering updated task definition..."
             NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
@@ -959,7 +959,7 @@ jobs:
             fi
             
             echo "Creating new task definition with updated image..."
-            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" --arg DB_URL "postgresql://${{ steps.rds_creds.outputs.db_user }}:${{ steps.rds_creds.outputs.db_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "staging"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}, {"name": "DATABASE_URL", "value": $DB_URL}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "staging"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
             
             echo "Registering updated task definition..."
             NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
@@ -1203,7 +1203,7 @@ jobs:
             fi
             
             echo "Creating new task definition with updated image..."
-            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" --arg DB_URL "postgresql://${{ steps.rds_creds.outputs.db_user }}:${{ steps.rds_creds.outputs.db_password }}@${{ steps.rds.outputs.rds_endpoint }}:5432/finefinds?schema=public" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "prod"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}, {"name": "DATABASE_URL", "value": $DB_URL}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | .containerDefinitions[0].environment = [{"name": "NODE_ENV", "value": "prod"}, {"name": "AWS_REGION", "value": "'"${{ env.AWS_REGION }}"'"}] | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
             
             echo "Registering updated task definition..."
             NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
