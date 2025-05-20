@@ -326,7 +326,7 @@ jobs:
               secret_arn=$(aws secretsmanager get-secret-value --secret-id "$secret_name" --query 'ARN' --output text)
               
               if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
-                echo "Successfully got ARN for $secret_name: $secret_arn"
+                echo "Successfully got ARN for $secret_name"
                 echo "$secret_arn"
                 return 0
               fi
@@ -366,7 +366,9 @@ jobs:
           echo "Getting DB Connection Secret ARN..."
           DB_CONNECTION_ARN=$(get_secret_arn "finefinds-dev-db-connection")
           if [ $? -ne 0 ]; then exit 1; fi
-          echo "db_connection_arn=$DB_CONNECTION_ARN" >> $GITHUB_OUTPUT
+          echo "db_connection_arn<<EOF" >> $GITHUB_OUTPUT
+          echo "$DB_CONNECTION_ARN" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           
           echo "Verifying DB Connection Secret access..."
           if ! verify_secret_access "finefinds-dev-db-connection"; then exit 1; fi
@@ -375,7 +377,9 @@ jobs:
           echo "Getting Redis Connection Secret ARN..."
           REDIS_CONNECTION_ARN=$(get_secret_arn "finefinds-dev-redis-connection")
           if [ $? -ne 0 ]; then exit 1; fi
-          echo "redis_connection_arn=$REDIS_CONNECTION_ARN" >> $GITHUB_OUTPUT
+          echo "redis_connection_arn<<EOF" >> $GITHUB_OUTPUT
+          echo "$REDIS_CONNECTION_ARN" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           
           echo "Verifying Redis Connection Secret access..."
           if ! verify_secret_access "finefinds-dev-redis-connection"; then exit 1; fi
@@ -384,7 +388,9 @@ jobs:
           echo "Getting Cognito Config Secret ARN..."
           COGNITO_CONFIG_ARN=$(get_secret_arn "finefinds-dev-cognito-config")
           if [ $? -ne 0 ]; then exit 1; fi
-          echo "cognito_config_arn=$COGNITO_CONFIG_ARN" >> $GITHUB_OUTPUT
+          echo "cognito_config_arn<<EOF" >> $GITHUB_OUTPUT
+          echo "$COGNITO_CONFIG_ARN" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           
           echo "Verifying Cognito Config Secret access..."
           if ! verify_secret_access "finefinds-dev-cognito-config"; then exit 1; fi
@@ -393,7 +399,9 @@ jobs:
           echo "Getting JWT Secret ARN..."
           JWT_SECRET_ARN=$(get_secret_arn "finefinds-dev-jwt")
           if [ $? -ne 0 ]; then exit 1; fi
-          echo "jwt_secret_arn=$JWT_SECRET_ARN" >> $GITHUB_OUTPUT
+          echo "jwt_secret_arn<<EOF" >> $GITHUB_OUTPUT
+          echo "$JWT_SECRET_ARN" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           
           echo "Verifying JWT Secret access..."
           if ! verify_secret_access "finefinds-dev-jwt"; then exit 1; fi
@@ -599,7 +607,7 @@ jobs:
               secret_arn=$(aws secretsmanager get-secret-value --secret-id "$secret_name" --query 'ARN' --output text)
               
               if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
-                echo "Successfully got ARN for $secret_name: $secret_arn"
+                echo "Successfully got ARN for $secret_name"
                 echo "$secret_arn"
                 return 0
               fi
@@ -888,7 +896,7 @@ jobs:
               secret_arn=$(aws secretsmanager get-secret-value --secret-id "$secret_name" --query 'ARN' --output text)
               
               if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
-                echo "Successfully got ARN for $secret_name: $secret_arn"
+                echo "Successfully got ARN for $secret_name"
                 echo "$secret_arn"
                 return 0
               fi
@@ -1153,7 +1161,7 @@ jobs:
               secret_arn=$(aws secretsmanager get-secret-value --secret-id "$secret_name" --query 'ARN' --output text)
               
               if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
-                echo "Successfully got ARN for $secret_name: $secret_arn"
+                echo "Successfully got ARN for $secret_name"
                 echo "$secret_arn"
                 return 0
               fi
