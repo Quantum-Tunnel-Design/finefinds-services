@@ -322,7 +322,7 @@ jobs:
             exit 1
           fi
           # Create PostgreSQL connection URL
-          DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}"
+          DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@$localhost:${DB_PORT}/${DB_NAME}"
           
           echo "RDS credentials retrieved successfully"
           echo "db_host=$DB_HOST" >> $GITHUB_OUTPUT
@@ -584,6 +584,13 @@ jobs:
               "runtimePlatform": {
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
+              },
+              "networkConfiguration": {
+                "awsvpcConfiguration": {
+                  "subnets": ["subnet-0a1b2c3d4", "subnet-5e6f7g8h"],
+                  "securityGroups": ["sg-0a1b2c3d4"],
+                  "assignPublicIp": "DISABLED"
+                }
               },
               "proxyConfiguration": {
                 "type": "APPMESH",
