@@ -54,6 +54,8 @@ env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY || 'finefindslk/base/node-services' }}
   ECR_REPOSITORY_BACKEND: ${{ secrets.ECR_REPOSITORY_BACKEND || format('finefinds-services-{0}', github.event_name == 'workflow_dispatch' && inputs.environment || github.ref == 'refs/heads/main' && 'prod' || github.ref == 'refs/heads/staging' && 'staging' || github.ref == 'refs/heads/qa' && 'qa' || github.ref == 'refs/heads/dev' && 'dev' || 'sandbox') }}
+  ECR_REPOSITORY_ENVOY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/finefinds-services-envoy
+  ECR_ENVOY_IMAGE_TAG: envoy-v1.29.12.1-prod
   SERVICES_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || github.ref == 'refs/heads/main' && 'prod' || github.ref == 'refs/heads/staging' && 'staging' || github.ref == 'refs/heads/qa' && 'qa' || github.ref == 'refs/heads/dev' && 'dev' || 'sandbox' }}
   # Task definition and service names for each environment
   TASK_DEF_FAMILY_DEV: ${{ secrets.TASK_DEF_FAMILY_DEV || 'FineFindsdevEcsTaskDef290F30C7' }}
@@ -160,7 +162,7 @@ jobs:
         run: |
           aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY_BACKEND }} || \
           aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY_BACKEND }} --image-scanning-configuration scanOnPush=true
-        
+          
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         
@@ -593,11 +595,11 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "envoy",
-                  "image": "public.ecr.aws/appmesh/aws-appmesh-envoy:v1.29.12.1-prod-fips",
+                  "image": "${{ env.ECR_REPOSITORY_ENVOY }}:${{ env.ECR_ENVOY_IMAGE_TAG }}",
                   "essential": true,
                   "user": "1337",
                   "environment": [
-                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/finefinds-mesh/virtualNode/finefinds-'$env'-vn"},
+                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/finefinds-mesh/virtualNode/finefinds-${{ env.SERVICES_ENV }}-vn"},
                     {"name": "ENABLE_ENVOY_STATS_TAGS", "value": "1"},
                     {"name": "ENABLE_ENVOY_XRAY_TRACING", "value": "1"}
                   ],
@@ -619,7 +621,7 @@ jobs:
                 },
                 {
                   "name": "AppContainer",
-                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'$ECR_REPOSITORY_BACKEND':'$VERSION'",
+                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:${{ steps.version.outputs.version }}",
                   "essential": true,
                   "workingDirectory": "/app",
                   "entryPoint": ["node"],
@@ -804,6 +806,19 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
+          
+      - name: Validate Envoy Image
+        run: |
+          echo "Validating Envoy image accessibility..."
+          # Authenticate to ECR Public
+          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
+          
+          # Try to pull the image
+          if ! docker pull public.ecr.aws/appmesh/aws-appmesh-envoy:v1.29.12.1-prod; then
+            echo "::error::Failed to pull Envoy image. Please check if the image exists and is accessible."
+            exit 1
+          fi
+          echo "Successfully validated Envoy image"
           
       - name: Get Secret ARNs
         id: secrets
@@ -1007,11 +1022,11 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "envoy",
-                  "image": "public.ecr.aws/appmesh/aws-appmesh-envoy:v1.29.12.1-prod-fips",
+                  "image": "${{ env.ECR_REPOSITORY_ENVOY }}:${{ env.ECR_ENVOY_IMAGE_TAG }}",
                   "essential": true,
                   "user": "1337",
                   "environment": [
-                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/finefinds-mesh/virtualNode/finefinds-'$env'-vn"},
+                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/finefinds-mesh/virtualNode/finefinds-${{ env.SERVICES_ENV }}-vn"},
                     {"name": "ENABLE_ENVOY_STATS_TAGS", "value": "1"},
                     {"name": "ENABLE_ENVOY_XRAY_TRACING", "value": "1"}
                   ],
@@ -1033,7 +1048,7 @@ jobs:
                 },
                 {
                   "name": "AppContainer",
-                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'$ECR_REPOSITORY_BACKEND':'$VERSION'",
+                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:${{ steps.version.outputs.version }}",
                   "essential": true,
                   "workingDirectory": "/app",
                   "entryPoint": ["node"],
@@ -1140,6 +1155,19 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
+          
+      - name: Validate Envoy Image
+        run: |
+          echo "Validating Envoy image accessibility..."
+          # Authenticate to ECR Public
+          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
+          
+          # Try to pull the image
+          if ! docker pull public.ecr.aws/appmesh/aws-appmesh-envoy:v1.29.12.1-prod; then
+            echo "::error::Failed to pull Envoy image. Please check if the image exists and is accessible."
+            exit 1
+          fi
+          echo "Successfully validated Envoy image"
           
       - name: Get Secret ARNs
         id: secrets
@@ -1335,11 +1363,11 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "envoy",
-                  "image": "public.ecr.aws/appmesh/aws-appmesh-envoy:v1.29.12.1-prod-fips",
+                  "image": "${{ env.ECR_REPOSITORY_ENVOY }}:${{ env.ECR_ENVOY_IMAGE_TAG }}",
                   "essential": true,
                   "user": "1337",
                   "environment": [
-                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/finefinds-mesh/virtualNode/finefinds-'$env'-vn"},
+                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/finefinds-mesh/virtualNode/finefinds-${{ env.SERVICES_ENV }}-vn"},
                     {"name": "ENABLE_ENVOY_STATS_TAGS", "value": "1"},
                     {"name": "ENABLE_ENVOY_XRAY_TRACING", "value": "1"}
                   ],
@@ -1361,7 +1389,7 @@ jobs:
                 },
                 {
                   "name": "AppContainer",
-                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'$ECR_REPOSITORY_BACKEND':'$VERSION'",
+                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:${{ steps.version.outputs.version }}",
                   "essential": true,
                   "workingDirectory": "/app",
                   "entryPoint": ["node"],
@@ -1468,6 +1496,19 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
+          
+      - name: Validate Envoy Image
+        run: |
+          echo "Validating Envoy image accessibility..."
+          # Authenticate to ECR Public
+          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
+          
+          # Try to pull the image
+          if ! docker pull public.ecr.aws/appmesh/aws-appmesh-envoy:v1.29.12.1-prod; then
+            echo "::error::Failed to pull Envoy image. Please check if the image exists and is accessible."
+            exit 1
+          fi
+          echo "Successfully validated Envoy image"
           
       - name: Get Secret ARNs
         id: secrets
@@ -1663,11 +1704,11 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "envoy",
-                  "image": "public.ecr.aws/appmesh/aws-appmesh-envoy:v1.29.12.1-prod-fips",
+                  "image": "${{ env.ECR_REPOSITORY_ENVOY }}:${{ env.ECR_ENVOY_IMAGE_TAG }}",
                   "essential": true,
                   "user": "1337",
                   "environment": [
-                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/finefinds-mesh/virtualNode/finefinds-'$env'-vn"},
+                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/finefinds-mesh/virtualNode/finefinds-${{ env.SERVICES_ENV }}-vn"},
                     {"name": "ENABLE_ENVOY_STATS_TAGS", "value": "1"},
                     {"name": "ENABLE_ENVOY_XRAY_TRACING", "value": "1"}
                   ],
@@ -1689,7 +1730,7 @@ jobs:
                 },
                 {
                   "name": "AppContainer",
-                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'$ECR_REPOSITORY_BACKEND':'$VERSION'",
+                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:${{ steps.version.outputs.version }}",
                   "essential": true,
                   "workingDirectory": "/app",
                   "entryPoint": ["node"],
