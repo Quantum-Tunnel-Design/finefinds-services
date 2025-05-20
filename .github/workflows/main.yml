@@ -326,7 +326,7 @@ jobs:
               secret_arn=$(aws secretsmanager get-secret-value --secret-id "$secret_name" --query 'ARN' --output text)
               
               if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
-                echo "Successfully got ARN for $secret_name"
+                echo "Successfully got ARN for $secret_name: $secret_arn"
                 echo "$secret_arn"
                 return 0
               fi
@@ -337,6 +337,28 @@ jobs:
             done
             
             echo "::error::Failed to get ARN for $secret_name after $max_attempts attempts"
+            return 1
+          }
+          
+          # Function to verify secret access
+          verify_secret_access() {
+            local secret_arn=$1
+            local max_attempts=3
+            local attempt=1
+            
+            while [ $attempt -le $max_attempts ]; do
+              echo "Attempt $attempt of $max_attempts to verify access to secret: $secret_arn"
+              if aws secretsmanager describe-secret --secret-id "$secret_arn" > /dev/null; then
+                echo "Successfully verified access to secret: $secret_arn"
+                return 0
+              fi
+              
+              echo "Failed to verify access to secret: $secret_arn. Retrying..."
+              sleep 5
+              attempt=$((attempt + 1))
+            done
+            
+            echo "::error::Failed to verify access to secret: $secret_arn after $max_attempts attempts"
             return 1
           }
           
@@ -363,8 +385,7 @@ jobs:
           # Verify all secrets exist and are accessible
           echo "Verifying secret access..."
           for secret_arn in "$DB_CONNECTION_ARN" "$REDIS_CONNECTION_ARN" "$COGNITO_CONFIG_ARN" "$JWT_SECRET_ARN"; do
-            if ! aws secretsmanager describe-secret --secret-id "$secret_arn" > /dev/null; then
-              echo "::error::Failed to verify access to secret: $secret_arn"
+            if ! verify_secret_access "$secret_arn"; then
               exit 1
             fi
           done
@@ -570,7 +591,7 @@ jobs:
               secret_arn=$(aws secretsmanager get-secret-value --secret-id "$secret_name" --query 'ARN' --output text)
               
               if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
-                echo "Successfully got ARN for $secret_name"
+                echo "Successfully got ARN for $secret_name: $secret_arn"
                 echo "$secret_arn"
                 return 0
               fi
@@ -581,6 +602,28 @@ jobs:
             done
             
             echo "::error::Failed to get ARN for $secret_name after $max_attempts attempts"
+            return 1
+          }
+          
+          # Function to verify secret access
+          verify_secret_access() {
+            local secret_arn=$1
+            local max_attempts=3
+            local attempt=1
+            
+            while [ $attempt -le $max_attempts ]; do
+              echo "Attempt $attempt of $max_attempts to verify access to secret: $secret_arn"
+              if aws secretsmanager describe-secret --secret-id "$secret_arn" > /dev/null; then
+                echo "Successfully verified access to secret: $secret_arn"
+                return 0
+              fi
+              
+              echo "Failed to verify access to secret: $secret_arn. Retrying..."
+              sleep 5
+              attempt=$((attempt + 1))
+            done
+            
+            echo "::error::Failed to verify access to secret: $secret_arn after $max_attempts attempts"
             return 1
           }
           
@@ -607,8 +650,7 @@ jobs:
           # Verify all secrets exist and are accessible
           echo "Verifying secret access..."
           for secret_arn in "$DB_CONNECTION_ARN" "$REDIS_CONNECTION_ARN" "$COGNITO_CONFIG_ARN" "$JWT_SECRET_ARN"; do
-            if ! aws secretsmanager describe-secret --secret-id "$secret_arn" > /dev/null; then
-              echo "::error::Failed to verify access to secret: $secret_arn"
+            if ! verify_secret_access "$secret_arn"; then
               exit 1
             fi
           done
@@ -838,7 +880,7 @@ jobs:
               secret_arn=$(aws secretsmanager get-secret-value --secret-id "$secret_name" --query 'ARN' --output text)
               
               if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
-                echo "Successfully got ARN for $secret_name"
+                echo "Successfully got ARN for $secret_name: $secret_arn"
                 echo "$secret_arn"
                 return 0
               fi
@@ -849,6 +891,28 @@ jobs:
             done
             
             echo "::error::Failed to get ARN for $secret_name after $max_attempts attempts"
+            return 1
+          }
+          
+          # Function to verify secret access
+          verify_secret_access() {
+            local secret_arn=$1
+            local max_attempts=3
+            local attempt=1
+            
+            while [ $attempt -le $max_attempts ]; do
+              echo "Attempt $attempt of $max_attempts to verify access to secret: $secret_arn"
+              if aws secretsmanager describe-secret --secret-id "$secret_arn" > /dev/null; then
+                echo "Successfully verified access to secret: $secret_arn"
+                return 0
+              fi
+              
+              echo "Failed to verify access to secret: $secret_arn. Retrying..."
+              sleep 5
+              attempt=$((attempt + 1))
+            done
+            
+            echo "::error::Failed to verify access to secret: $secret_arn after $max_attempts attempts"
             return 1
           }
           
@@ -875,8 +939,7 @@ jobs:
           # Verify all secrets exist and are accessible
           echo "Verifying secret access..."
           for secret_arn in "$DB_CONNECTION_ARN" "$REDIS_CONNECTION_ARN" "$COGNITO_CONFIG_ARN" "$JWT_SECRET_ARN"; do
-            if ! aws secretsmanager describe-secret --secret-id "$secret_arn" > /dev/null; then
-              echo "::error::Failed to verify access to secret: $secret_arn"
+            if ! verify_secret_access "$secret_arn"; then
               exit 1
             fi
           done
@@ -1082,7 +1145,7 @@ jobs:
               secret_arn=$(aws secretsmanager get-secret-value --secret-id "$secret_name" --query 'ARN' --output text)
               
               if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
-                echo "Successfully got ARN for $secret_name"
+                echo "Successfully got ARN for $secret_name: $secret_arn"
                 echo "$secret_arn"
                 return 0
               fi
@@ -1093,6 +1156,28 @@ jobs:
             done
             
             echo "::error::Failed to get ARN for $secret_name after $max_attempts attempts"
+            return 1
+          }
+          
+          # Function to verify secret access
+          verify_secret_access() {
+            local secret_arn=$1
+            local max_attempts=3
+            local attempt=1
+            
+            while [ $attempt -le $max_attempts ]; do
+              echo "Attempt $attempt of $max_attempts to verify access to secret: $secret_arn"
+              if aws secretsmanager describe-secret --secret-id "$secret_arn" > /dev/null; then
+                echo "Successfully verified access to secret: $secret_arn"
+                return 0
+              fi
+              
+              echo "Failed to verify access to secret: $secret_arn. Retrying..."
+              sleep 5
+              attempt=$((attempt + 1))
+            done
+            
+            echo "::error::Failed to verify access to secret: $secret_arn after $max_attempts attempts"
             return 1
           }
           
@@ -1119,8 +1204,7 @@ jobs:
           # Verify all secrets exist and are accessible
           echo "Verifying secret access..."
           for secret_arn in "$DB_CONNECTION_ARN" "$REDIS_CONNECTION_ARN" "$COGNITO_CONFIG_ARN" "$JWT_SECRET_ARN"; do
-            if ! aws secretsmanager describe-secret --secret-id "$secret_arn" > /dev/null; then
-              echo "::error::Failed to verify access to secret: $secret_arn"
+            if ! verify_secret_access "$secret_arn"; then
               exit 1
             fi
           done
