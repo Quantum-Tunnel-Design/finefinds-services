@@ -638,7 +638,7 @@ jobs:
                     {"name": "AWS_REGION", "value": "'$AWS_REGION'"}
                   ],
                   "secrets": [
-                    {"name": "DATABASE_URL", "valueFrom": "'$DB_CONNECTION_ARN'"},
+                    {"name": "DATABASE_URL", "valueFrom": "'$DATABASE_URL'"},
                     {"name": "REDIS_URL", "valueFrom": "'$REDIS_CONNECTION_ARN'"},
                     {"name": "JWT_SECRET", "valueFrom": "'$JWT_SECRET_ARN'"},
                     {"name": "COGNITO_CLIENT_USER_POOL_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_USER_POOL_ID::"},
@@ -1065,7 +1065,7 @@ jobs:
                     {"name": "AWS_REGION", "value": "'$AWS_REGION'"}
                   ],
                   "secrets": [
-                    {"name": "DATABASE_URL", "valueFrom": "'$DB_CONNECTION_ARN'"},
+                    {"name": "DATABASE_URL","valueFrom": "'$DATABASE_URL'"},
                     {"name": "REDIS_URL", "valueFrom": "'$REDIS_CONNECTION_ARN'"},
                     {"name": "JWT_SECRET", "valueFrom": "'$JWT_SECRET_ARN'"},
                     {"name": "COGNITO_CLIENT_USER_POOL_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_USER_POOL_ID::"},
@@ -1406,7 +1406,7 @@ jobs:
                     {"name": "AWS_REGION", "value": "'$AWS_REGION'"}
                   ],
                   "secrets": [
-                    {"name": "DATABASE_URL", "valueFrom": "'$DB_CONNECTION_ARN'"},
+                    {"name": "DATABASE_URL","valueFrom": "'$DATABASE_URL'"},
                     {"name": "REDIS_URL", "valueFrom": "'$REDIS_CONNECTION_ARN'"},
                     {"name": "JWT_SECRET", "valueFrom": "'$JWT_SECRET_ARN'"},
                     {"name": "COGNITO_CLIENT_USER_POOL_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_USER_POOL_ID::"},
@@ -1747,7 +1747,7 @@ jobs:
                     {"name": "AWS_REGION", "value": "'$AWS_REGION'"}
                   ],
                   "secrets": [
-                    {"name": "DATABASE_URL", "valueFrom": "'$DB_CONNECTION_ARN'"},
+                    {"name": "DATABASE_URL","valueFrom": "'$DATABASE_URL'"},
                     {"name": "REDIS_URL", "valueFrom": "'$REDIS_CONNECTION_ARN'"},
                     {"name": "JWT_SECRET", "valueFrom": "'$JWT_SECRET_ARN'"},
                     {"name": "COGNITO_CLIENT_USER_POOL_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_USER_POOL_ID::"},
