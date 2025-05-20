@@ -452,19 +452,35 @@ jobs:
             local family=$1
             local keep_count=5
             echo "Cleaning up old task definitions for family: $family"
-            aws ecs list-task-definitions --family-prefix $family --sort DESC --query 'taskDefinitionArns[0:'$keep_count']' --output text | \
-            while read -r task_def; do
-              if [ ! -z "$task_def" ]; then
-                echo "Keeping task definition: $task_def"
-              fi
+            
+            # Get all task definitions for the family
+            local task_defs=($(aws ecs list-task-definitions \
+              --family-prefix "$family" \
+              --sort DESC \
+              --query 'taskDefinitionArns[]' \
+              --output text))
+            
+            # Keep the most recent ones
+            local keep_defs=("${task_defs[@]:0:$keep_count}")
+            echo "Keeping task definitions:"
+            for def in "${keep_defs[@]}"; do
+              echo "  $def"
             done
-            aws ecs list-task-definitions --family-prefix $family --sort DESC --query 'taskDefinitionArns['$keep_count':]' --output text | \
-            while read -r task_def; do
-              if [ ! -z "$task_def" ]; then
-                echo "Deregistering old task definition: $task_def"
-                aws ecs deregister-task-definition --task-definition $task_def
-              fi
-            done
+            
+            # Deregister the rest
+            local deregister_defs=("${task_defs[@]:$keep_count}")
+            if [ ${#deregister_defs[@]} -gt 0 ]; then
+              echo "Deregistering old task definitions:"
+              for def in "${deregister_defs[@]}"; do
+                echo "  Deregistering: $def"
+                aws ecs deregister-task-definition --task-definition "$def" || {
+                  echo "::warning::Failed to deregister task definition: $def"
+                  continue
+                }
+              done
+            else
+              echo "No old task definitions to deregister"
+            fi
           }
           
           # Store current task definition for rollback
