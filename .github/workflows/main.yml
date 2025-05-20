@@ -650,6 +650,10 @@ jobs:
           check_aws_permissions() {
             log "INFO" "Checking AWS permissions..."
             
+            # Get the role ARN
+            local role_arn="arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}"
+            log "INFO" "Checking permissions for role: $role_arn"
+            
             # Define required permissions
             local required_permissions=(
               "ecs:UpdateService"
@@ -662,16 +666,29 @@ jobs:
             )
             
             # Check each permission
+            local missing_permissions=()
             for permission in "${required_permissions[@]}"; do
               log "INFO" "Checking permission: $permission"
               if ! aws iam simulate-principal-policy \
-                --policy-source-arn "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}" \
+                --policy-source-arn "$role_arn" \
                 --action-names "$permission" \
                 --resource-arns "*" | grep -q "allowed"; then
-                log "ERROR" "Missing required permission: $permission"
-                return 1
+                log "WARNING" "Missing permission: $permission"
+                missing_permissions+=("$permission")
+              else
+                log "INFO" "Permission granted: $permission"
               fi
             done
+            
+            # If any permissions are missing, show detailed error
+            if [ ${#missing_permissions[@]} -gt 0 ]; then
+              log "ERROR" "The following permissions are missing:"
+              for perm in "${missing_permissions[@]}"; do
+                log "ERROR" "  - $perm"
+              done
+              log "ERROR" "Please ensure the role $role_arn has these permissions"
+              return 1
+            fi
             
             log "INFO" "All required permissions are present"
             
@@ -684,20 +701,36 @@ jobs:
               "finefinds-${{ env.SERVICES_ENV }}-cognito-config"
             )
             
+            local missing_secrets=()
             for secret in "${secrets[@]}"; do
               log "INFO" "Checking access to secret: $secret"
               if ! aws secretsmanager describe-secret --secret-id "$secret" > /dev/null 2>&1; then
-                log "ERROR" "Cannot access secret: $secret"
-                return 1
+                log "WARNING" "Cannot access secret: $secret"
+                missing_secrets+=("$secret")
+              else
+                log "INFO" "Access granted to secret: $secret"
               fi
             done
+            
+            # If any secrets are inaccessible, show detailed error
+            if [ ${#missing_secrets[@]} -gt 0 ]; then
+              log "ERROR" "The following secrets are inaccessible:"
+              for secret in "${missing_secrets[@]}"; do
+                log "ERROR" "  - $secret"
+              done
+              log "ERROR" "Please ensure the role $role_arn has access to these secrets"
+              return 1
+            fi
             
             log "INFO" "All secret access permissions verified"
             return 0
           }
           
           # Run the permission check
-          check_aws_permissions
+          if ! check_aws_permissions; then
+            log "ERROR" "Permission check failed. Please review the errors above."
+            exit 1
+          fi
 
       - name: Deploy to ECS
         id: deploy
