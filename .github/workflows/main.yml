@@ -420,132 +420,34 @@ jobs:
             local execution_role="finefinds-$env-ecs-execution-role"
             local task_role="finefinds-$env-ecs-task-role"
             
+            # Get secret ARNs first
+            echo "Getting secret ARNs..."
+            DB_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-db-connection" --query 'ARN' --output text)
+            REDIS_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-redis-connection" --query 'ARN' --output text)
+            JWT_SECRET_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-jwt" --query 'ARN' --output text)
+            COGNITO_CONFIG_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-cognito-config" --query 'ARN' --output text)
+            
             # Create task definition JSON
-            echo '{
-              "family": "'$task_def_family'",
-              "networkMode": "awsvpc",
-              "requiresCompatibilities": ["FARGATE"],
-              "cpu": "256",
-              "memory": "512",
-              "executionRoleArn": "arn:aws:iam::'${{ secrets.AWS_ACCOUNT_ID }}':role/'$execution_role'",
-              "taskRoleArn": "arn:aws:iam::'${{ secrets.AWS_ACCOUNT_ID }}':role/'$task_role'",
-              "runtimePlatform": {
-                "operatingSystemFamily": "LINUX",
-                "cpuArchitecture": "X86_64"
-              },
-              "proxyConfiguration": {
-                "type": "APPMESH",
-                "containerName": "envoy",
-                "properties": [
-                  {
-                    "name": "IgnoredUID",
-                    "value": "1337"
-                  },
-                  {
-                    "name": "ProxyIngressPort",
-                    "value": "15000"
-                  },
-                  {
-                    "name": "ProxyEgressPort",
-                    "value": "15001"
-                  },
-                  {
-                    "name": "AppPorts",
-                    "value": "3000"
-                  },
-                  {
-                    "name": "EgressIgnoredIPs",
-                    "value": "169.254.170.2,169.254.169.254"
-                  }
-                ]
-              },
-              "containerDefinitions": [
-                {
-                  "name": "AppContainer",
-                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'${{ env.ECR_REPOSITORY_BACKEND }}':'$VERSION'",
-                  "essential": true,
-                  "workingDirectory": "/app",
-                  "entryPoint": ["node"],
-                  "command": ["dist/src/main.js"],
-                  "portMappings": [
-                    {
-                      "containerPort": 3000,
-                      "protocol": "tcp"
-                    }
-                  ],
-                  "environment": [
-                    {
-                      "name": "PORT",
-                      "value": "3000"
-                    },
-                    {
-                      "name": "NODE_ENV",
-                      "value": "'$env'"
-                    },
-                    {
-                      "name": "AWS_REGION",
-                      "value": "'${{ env.AWS_REGION }}'"
-                    }
-                  ],
-                  "secrets": [
-                    {
-                      "name": "DATABASE_URL",
-                      "valueFrom": "'${{ steps.secrets.outputs.db_connection_arn }}'"
-                    },
-                    {
-                      "name": "REDIS_URL",
-                      "valueFrom": "'${{ steps.secrets.outputs.redis_connection_arn }}'"
-                    },
-                    {
-                      "name": "JWT_SECRET",
-                      "valueFrom": "'${{ steps.secrets.outputs.jwt_secret_arn }}'"
-                    },
-                    {
-                      "name": "COGNITO_USER_POOL_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_USER_POOL_ID::"
-                    },
-                    {
-                      "name": "COGNITO_CLIENT_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_CLIENT_ID::"
-                    },
-                    {
-                      "name": "COGNITO_CLIENT_USER_POOL_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_CLIENT_USER_POOL_ID::"
-                    },
-                    {
-                      "name": "COGNITO_CLIENT_CLIENT_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_CLIENT_CLIENT_ID::"
-                    },
-                    {
-                      "name": "COGNITO_ADMIN_USER_POOL_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_ADMIN_USER_POOL_ID::"
-                    },
-                    {
-                      "name": "COGNITO_ADMIN_CLIENT_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_ADMIN_CLIENT_ID::"
-                    }
-                  ],
-                  "logConfiguration": {
-                    "logDriver": "awslogs",
-                    "options": {
-                      "awslogs-group": "/finefinds/'$env'/app",
-                      "awslogs-region": "'${{ env.AWS_REGION }}'",
-                      "awslogs-stream-prefix": "finefinds"
-                    }
-                  }
-                }
-              ]
-            }' > task-definition.json
+            echo '{"family":"'$task_def_family'","networkMode":"awsvpc","requiresCompatibilities":["FARGATE"],"cpu":"256","memory":"512","executionRoleArn":"arn:aws:iam::'${{ secrets.AWS_ACCOUNT_ID }}':role/'$execution_role'","taskRoleArn":"arn:aws:iam::'${{ secrets.AWS_ACCOUNT_ID }}':role/'$task_role'","runtimePlatform":{"operatingSystemFamily":"LINUX","cpuArchitecture":"X86_64"},"proxyConfiguration":{"type":"APPMESH","containerName":"envoy","properties":[{"name":"IgnoredUID","value":"1337"},{"name":"ProxyIngressPort","value":"15000"},{"name":"ProxyEgressPort","value":"15001"},{"name":"AppPorts","value":"3000"},{"name":"EgressIgnoredIPs","value":"169.254.170.2,169.254.169.254"}]},"containerDefinitions":[{"name":"AppContainer","image":"891076991993.dkr.ecr.us-east-1.amazonaws.com/'${{ env.ECR_REPOSITORY_BACKEND }}':'$VERSION'","essential":true,"workingDirectory":"/app","entryPoint":["node"],"command":["dist/src/main.js"],"portMappings":[{"containerPort":3000,"protocol":"tcp"}],"environment":[{"name":"PORT","value":"3000"},{"name":"NODE_ENV","value":"'$env'"},{"name":"AWS_REGION","value":"'${{ env.AWS_REGION }}'"}],"secrets":[{"name":"DATABASE_URL","valueFrom":"'$DB_CONNECTION_ARN'"},{"name":"REDIS_URL","valueFrom":"'$REDIS_CONNECTION_ARN'"},{"name":"JWT_SECRET","valueFrom":"'$JWT_SECRET_ARN'"},{"name":"COGNITO_USER_POOL_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_USER_POOL_ID::"},{"name":"COGNITO_CLIENT_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_ID::"},{"name":"COGNITO_CLIENT_USER_POOL_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_USER_POOL_ID::"},{"name":"COGNITO_CLIENT_CLIENT_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_CLIENT_ID::"},{"name":"COGNITO_ADMIN_USER_POOL_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_ADMIN_USER_POOL_ID::"},{"name":"COGNITO_ADMIN_CLIENT_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_ADMIN_CLIENT_ID::"}],"logConfiguration":{"logDriver":"awslogs","options":{"awslogs-group":"/finefinds/'$env'/app","awslogs-region":"'${{ env.AWS_REGION }}'","awslogs-stream-prefix":"finefinds"}}}]}' > task-definition.json
           }
           
           # Create task definition based on environment
           create_task_definition "${{ env.SERVICES_ENV }}" "${{ env.TASK_DEF_FAMILY_DEV }}"
           
+          # Validate task definition JSON
+          if ! jq . task-definition.json > /dev/null 2>&1; then
+            echo "::error::Invalid JSON in task definition"
+            cat task-definition.json
+            exit 1
+          fi
+          
           # Register task definition
           echo "Registering task definition..."
           NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
-          if [ -z "$NEW_TASK_DEF_ARN" ]; then
+          if [ $? -ne 0 ] || [ -z "$NEW_TASK_DEF_ARN" ]; then
             echo "::error::Failed to register task definition"
+            echo "Task definition JSON:"
+            cat task-definition.json
             exit 1
           fi
           echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
@@ -563,6 +465,30 @@ jobs:
             --cluster ${{ env.CLUSTER_NAME_DEV }} \
             --services ${{ env.SERVICE_NAME_DEV }}
             
+          # Add health check after deployment
+          echo "Performing health check..."
+          max_attempts=30
+          attempt=1
+          while [ $attempt -le $max_attempts ]; do
+            echo "Health check attempt $attempt of $max_attempts"
+            if aws ecs describe-services \
+              --cluster ${{ env.CLUSTER_NAME_DEV }} \
+              --services ${{ env.SERVICE_NAME_DEV }} \
+              --query 'services[0].runningCount' \
+              --output text | grep -q "1"; then
+              echo "Service is healthy"
+              break
+            fi
+            echo "Service not healthy yet. Waiting..."
+            sleep 10
+            attempt=$((attempt + 1))
+          done
+          
+          if [ $attempt -gt $max_attempts ]; then
+            echo "::error::Service failed to become healthy after $max_attempts attempts"
+            exit 1
+          fi
+          
           echo "Deployment completed successfully"
 
   deploy-qa:
@@ -645,22 +571,30 @@ jobs:
           # Get DB Connection Secret ARN
           DB_CONNECTION_ARN=$(get_secret_arn "finefinds-qa-db-connection")
           if [ $? -ne 0 ]; then exit 1; fi
-          echo "db_connection_arn=$DB_CONNECTION_ARN" >> $GITHUB_OUTPUT
+          echo "db_connection_arn<<EOF" >> $GITHUB_OUTPUT
+          echo "$DB_CONNECTION_ARN" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           
           # Get Redis Connection Secret ARN
           REDIS_CONNECTION_ARN=$(get_secret_arn "finefinds-qa-redis-connection")
           if [ $? -ne 0 ]; then exit 1; fi
-          echo "redis_connection_arn=$REDIS_CONNECTION_ARN" >> $GITHUB_OUTPUT
+          echo "redis_connection_arn<<EOF" >> $GITHUB_OUTPUT
+          echo "$REDIS_CONNECTION_ARN" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           
           # Get Cognito Config Secret ARN
           COGNITO_CONFIG_ARN=$(get_secret_arn "finefinds-qa-cognito-config")
           if [ $? -ne 0 ]; then exit 1; fi
-          echo "cognito_config_arn=$COGNITO_CONFIG_ARN" >> $GITHUB_OUTPUT
+          echo "cognito_config_arn<<EOF" >> $GITHUB_OUTPUT
+          echo "$COGNITO_CONFIG_ARN" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           
           # Get JWT Secret ARN
           JWT_SECRET_ARN=$(get_secret_arn "finefinds-qa-jwt")
           if [ $? -ne 0 ]; then exit 1; fi
-          echo "jwt_secret_arn=$JWT_SECRET_ARN" >> $GITHUB_OUTPUT
+          echo "jwt_secret_arn<<EOF" >> $GITHUB_OUTPUT
+          echo "$JWT_SECRET_ARN" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           
           # Verify all secrets exist and are accessible
           echo "Verifying secret access..."
@@ -684,122 +618,15 @@ jobs:
             local execution_role="finefinds-$env-ecs-execution-role"
             local task_role="finefinds-$env-ecs-task-role"
             
+            # Get secret ARNs first
+            echo "Getting secret ARNs..."
+            DB_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-db-connection" --query 'ARN' --output text)
+            REDIS_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-redis-connection" --query 'ARN' --output text)
+            JWT_SECRET_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-jwt" --query 'ARN' --output text)
+            COGNITO_CONFIG_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-cognito-config" --query 'ARN' --output text)
+            
             # Create task definition JSON
-            echo '{
-              "family": "'$task_def_family'",
-              "networkMode": "awsvpc",
-              "requiresCompatibilities": ["FARGATE"],
-              "cpu": "256",
-              "memory": "512",
-              "executionRoleArn": "arn:aws:iam::'${{ secrets.AWS_ACCOUNT_ID }}':role/'$execution_role'",
-              "taskRoleArn": "arn:aws:iam::'${{ secrets.AWS_ACCOUNT_ID }}':role/'$task_role'",
-              "runtimePlatform": {
-                "operatingSystemFamily": "LINUX",
-                "cpuArchitecture": "X86_64"
-              },
-              "proxyConfiguration": {
-                "type": "APPMESH",
-                "containerName": "envoy",
-                "properties": [
-                  {
-                    "name": "IgnoredUID",
-                    "value": "1337"
-                  },
-                  {
-                    "name": "ProxyIngressPort",
-                    "value": "15000"
-                  },
-                  {
-                    "name": "ProxyEgressPort",
-                    "value": "15001"
-                  },
-                  {
-                    "name": "AppPorts",
-                    "value": "3000"
-                  },
-                  {
-                    "name": "EgressIgnoredIPs",
-                    "value": "169.254.170.2,169.254.169.254"
-                  }
-                ]
-              },
-              "containerDefinitions": [
-                {
-                  "name": "AppContainer",
-                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'${{ env.ECR_REPOSITORY_BACKEND }}':'$VERSION'",
-                  "essential": true,
-                  "workingDirectory": "/app",
-                  "entryPoint": ["node"],
-                  "command": ["dist/src/main.js"],
-                  "portMappings": [
-                    {
-                      "containerPort": 3000,
-                      "protocol": "tcp"
-                    }
-                  ],
-                  "environment": [
-                    {
-                      "name": "PORT",
-                      "value": "3000"
-                    },
-                    {
-                      "name": "NODE_ENV",
-                      "value": "'$env'"
-                    },
-                    {
-                      "name": "AWS_REGION",
-                      "value": "'${{ env.AWS_REGION }}'"
-                    }
-                  ],
-                  "secrets": [
-                    {
-                      "name": "DATABASE_URL",
-                      "valueFrom": "'${{ steps.secrets.outputs.db_connection_arn }}'"
-                    },
-                    {
-                      "name": "REDIS_URL",
-                      "valueFrom": "'${{ steps.secrets.outputs.redis_connection_arn }}'"
-                    },
-                    {
-                      "name": "JWT_SECRET",
-                      "valueFrom": "'${{ steps.secrets.outputs.jwt_secret_arn }}'"
-                    },
-                    {
-                      "name": "COGNITO_USER_POOL_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_USER_POOL_ID::"
-                    },
-                    {
-                      "name": "COGNITO_CLIENT_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_CLIENT_ID::"
-                    },
-                    {
-                      "name": "COGNITO_CLIENT_USER_POOL_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_CLIENT_USER_POOL_ID::"
-                    },
-                    {
-                      "name": "COGNITO_CLIENT_CLIENT_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_CLIENT_CLIENT_ID::"
-                    },
-                    {
-                      "name": "COGNITO_ADMIN_USER_POOL_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_ADMIN_USER_POOL_ID::"
-                    },
-                    {
-                      "name": "COGNITO_ADMIN_CLIENT_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_ADMIN_CLIENT_ID::"
-                    }
-                  ],
-                  "logConfiguration": {
-                    "logDriver": "awslogs",
-                    "options": {
-                      "awslogs-group": "/finefinds/'$env'/app",
-                      "awslogs-region": "'${{ env.AWS_REGION }}'",
-                      "awslogs-stream-prefix": "finefinds"
-                    }
-                  }
-                }
-              ]
-            }' > task-definition.json
+            echo '{"family":"'$task_def_family'","networkMode":"awsvpc","requiresCompatibilities":["FARGATE"],"cpu":"256","memory":"512","executionRoleArn":"arn:aws:iam::'${{ secrets.AWS_ACCOUNT_ID }}':role/'$execution_role'","taskRoleArn":"arn:aws:iam::'${{ secrets.AWS_ACCOUNT_ID }}':role/'$task_role'","runtimePlatform":{"operatingSystemFamily":"LINUX","cpuArchitecture":"X86_64"},"proxyConfiguration":{"type":"APPMESH","containerName":"envoy","properties":[{"name":"IgnoredUID","value":"1337"},{"name":"ProxyIngressPort","value":"15000"},{"name":"ProxyEgressPort","value":"15001"},{"name":"AppPorts","value":"3000"},{"name":"EgressIgnoredIPs","value":"169.254.170.2,169.254.169.254"}]},"containerDefinitions":[{"name":"AppContainer","image":"891076991993.dkr.ecr.us-east-1.amazonaws.com/'${{ env.ECR_REPOSITORY_BACKEND }}':'$VERSION'","essential":true,"workingDirectory":"/app","entryPoint":["node"],"command":["dist/src/main.js"],"portMappings":[{"containerPort":3000,"protocol":"tcp"}],"environment":[{"name":"PORT","value":"3000"},{"name":"NODE_ENV","value":"'$env'"},{"name":"AWS_REGION","value":"'${{ env.AWS_REGION }}'"}],"secrets":[{"name":"DATABASE_URL","valueFrom":"'$DB_CONNECTION_ARN'"},{"name":"REDIS_URL","valueFrom":"'$REDIS_CONNECTION_ARN'"},{"name":"JWT_SECRET","valueFrom":"'$JWT_SECRET_ARN'"},{"name":"COGNITO_USER_POOL_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_USER_POOL_ID::"},{"name":"COGNITO_CLIENT_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_ID::"},{"name":"COGNITO_CLIENT_USER_POOL_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_USER_POOL_ID::"},{"name":"COGNITO_CLIENT_CLIENT_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_CLIENT_ID::"},{"name":"COGNITO_ADMIN_USER_POOL_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_ADMIN_USER_POOL_ID::"},{"name":"COGNITO_ADMIN_CLIENT_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_ADMIN_CLIENT_ID::"}],"logConfiguration":{"logDriver":"awslogs","options":{"awslogs-group":"/finefinds/'$env'/app","awslogs-region":"'${{ env.AWS_REGION }}'","awslogs-stream-prefix":"finefinds"}}}]}' > task-definition.json
           }
           
           # Create task definition based on environment
@@ -972,122 +799,15 @@ jobs:
             local execution_role="finefinds-$env-ecs-execution-role"
             local task_role="finefinds-$env-ecs-task-role"
             
+            # Get secret ARNs first
+            echo "Getting secret ARNs..."
+            DB_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-db-connection" --query 'ARN' --output text)
+            REDIS_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-redis-connection" --query 'ARN' --output text)
+            JWT_SECRET_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-jwt" --query 'ARN' --output text)
+            COGNITO_CONFIG_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-cognito-config" --query 'ARN' --output text)
+            
             # Create task definition JSON
-            echo '{
-              "family": "'$task_def_family'",
-              "networkMode": "awsvpc",
-              "requiresCompatibilities": ["FARGATE"],
-              "cpu": "256",
-              "memory": "512",
-              "executionRoleArn": "arn:aws:iam::'${{ secrets.AWS_ACCOUNT_ID }}':role/'$execution_role'",
-              "taskRoleArn": "arn:aws:iam::'${{ secrets.AWS_ACCOUNT_ID }}':role/'$task_role'",
-              "runtimePlatform": {
-                "operatingSystemFamily": "LINUX",
-                "cpuArchitecture": "X86_64"
-              },
-              "proxyConfiguration": {
-                "type": "APPMESH",
-                "containerName": "envoy",
-                "properties": [
-                  {
-                    "name": "IgnoredUID",
-                    "value": "1337"
-                  },
-                  {
-                    "name": "ProxyIngressPort",
-                    "value": "15000"
-                  },
-                  {
-                    "name": "ProxyEgressPort",
-                    "value": "15001"
-                  },
-                  {
-                    "name": "AppPorts",
-                    "value": "3000"
-                  },
-                  {
-                    "name": "EgressIgnoredIPs",
-                    "value": "169.254.170.2,169.254.169.254"
-                  }
-                ]
-              },
-              "containerDefinitions": [
-                {
-                  "name": "AppContainer",
-                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'${{ env.ECR_REPOSITORY_BACKEND }}':'$VERSION'",
-                  "essential": true,
-                  "workingDirectory": "/app",
-                  "entryPoint": ["node"],
-                  "command": ["dist/src/main.js"],
-                  "portMappings": [
-                    {
-                      "containerPort": 3000,
-                      "protocol": "tcp"
-                    }
-                  ],
-                  "environment": [
-                    {
-                      "name": "PORT",
-                      "value": "3000"
-                    },
-                    {
-                      "name": "NODE_ENV",
-                      "value": "'$env'"
-                    },
-                    {
-                      "name": "AWS_REGION",
-                      "value": "'${{ env.AWS_REGION }}'"
-                    }
-                  ],
-                  "secrets": [
-                    {
-                      "name": "DATABASE_URL",
-                      "valueFrom": "'${{ steps.secrets.outputs.db_connection_arn }}'"
-                    },
-                    {
-                      "name": "REDIS_URL",
-                      "valueFrom": "'${{ steps.secrets.outputs.redis_connection_arn }}'"
-                    },
-                    {
-                      "name": "JWT_SECRET",
-                      "valueFrom": "'${{ steps.secrets.outputs.jwt_secret_arn }}'"
-                    },
-                    {
-                      "name": "COGNITO_USER_POOL_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_USER_POOL_ID::"
-                    },
-                    {
-                      "name": "COGNITO_CLIENT_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_CLIENT_ID::"
-                    },
-                    {
-                      "name": "COGNITO_CLIENT_USER_POOL_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_CLIENT_USER_POOL_ID::"
-                    },
-                    {
-                      "name": "COGNITO_CLIENT_CLIENT_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_CLIENT_CLIENT_ID::"
-                    },
-                    {
-                      "name": "COGNITO_ADMIN_USER_POOL_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_ADMIN_USER_POOL_ID::"
-                    },
-                    {
-                      "name": "COGNITO_ADMIN_CLIENT_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_ADMIN_CLIENT_ID::"
-                    }
-                  ],
-                  "logConfiguration": {
-                    "logDriver": "awslogs",
-                    "options": {
-                      "awslogs-group": "/finefinds/'$env'/app",
-                      "awslogs-region": "'${{ env.AWS_REGION }}'",
-                      "awslogs-stream-prefix": "finefinds"
-                    }
-                  }
-                }
-              ]
-            }' > task-definition.json
+            echo '{"family":"'$task_def_family'","networkMode":"awsvpc","requiresCompatibilities":["FARGATE"],"cpu":"256","memory":"512","executionRoleArn":"arn:aws:iam::'${{ secrets.AWS_ACCOUNT_ID }}':role/'$execution_role'","taskRoleArn":"arn:aws:iam::'${{ secrets.AWS_ACCOUNT_ID }}':role/'$task_role'","runtimePlatform":{"operatingSystemFamily":"LINUX","cpuArchitecture":"X86_64"},"proxyConfiguration":{"type":"APPMESH","containerName":"envoy","properties":[{"name":"IgnoredUID","value":"1337"},{"name":"ProxyIngressPort","value":"15000"},{"name":"ProxyEgressPort","value":"15001"},{"name":"AppPorts","value":"3000"},{"name":"EgressIgnoredIPs","value":"169.254.170.2,169.254.169.254"}]},"containerDefinitions":[{"name":"AppContainer","image":"891076991993.dkr.ecr.us-east-1.amazonaws.com/'${{ env.ECR_REPOSITORY_BACKEND }}':'$VERSION'","essential":true,"workingDirectory":"/app","entryPoint":["node"],"command":["dist/src/main.js"],"portMappings":[{"containerPort":3000,"protocol":"tcp"}],"environment":[{"name":"PORT","value":"3000"},{"name":"NODE_ENV","value":"'$env'"},{"name":"AWS_REGION","value":"'${{ env.AWS_REGION }}'"}],"secrets":[{"name":"DATABASE_URL","valueFrom":"'$DB_CONNECTION_ARN'"},{"name":"REDIS_URL","valueFrom":"'$REDIS_CONNECTION_ARN'"},{"name":"JWT_SECRET","valueFrom":"'$JWT_SECRET_ARN'"},{"name":"COGNITO_USER_POOL_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_USER_POOL_ID::"},{"name":"COGNITO_CLIENT_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_ID::"},{"name":"COGNITO_CLIENT_USER_POOL_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_USER_POOL_ID::"},{"name":"COGNITO_CLIENT_CLIENT_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_CLIENT_ID::"},{"name":"COGNITO_ADMIN_USER_POOL_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_ADMIN_USER_POOL_ID::"},{"name":"COGNITO_ADMIN_CLIENT_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_ADMIN_CLIENT_ID::"}],"logConfiguration":{"logDriver":"awslogs","options":{"awslogs-group":"/finefinds/'$env'/app","awslogs-region":"'${{ env.AWS_REGION }}'","awslogs-stream-prefix":"finefinds"}}}]}' > task-definition.json
           }
           
           # Create task definition based on environment
@@ -1115,6 +835,30 @@ jobs:
             --cluster ${{ env.CLUSTER_NAME_STAGING }} \
             --services ${{ env.SERVICE_NAME_STAGING }}
             
+          # Add health check after deployment
+          echo "Performing health check..."
+          max_attempts=30
+          attempt=1
+          while [ $attempt -le $max_attempts ]; do
+            echo "Health check attempt $attempt of $max_attempts"
+            if aws ecs describe-services \
+              --cluster ${{ env.CLUSTER_NAME_STAGING }} \
+              --services ${{ env.SERVICE_NAME_STAGING }} \
+              --query 'services[0].runningCount' \
+              --output text | grep -q "1"; then
+              echo "Service is healthy"
+              break
+            fi
+            echo "Service not healthy yet. Waiting..."
+            sleep 10
+            attempt=$((attempt + 1))
+          done
+          
+          if [ $attempt -gt $max_attempts ]; then
+            echo "::error::Service failed to become healthy after $max_attempts attempts"
+            exit 1
+          fi
+          
           echo "Deployment completed successfully"
 
   deploy-prod:
@@ -1236,122 +980,15 @@ jobs:
             local execution_role="finefinds-$env-ecs-execution-role"
             local task_role="finefinds-$env-ecs-task-role"
             
+            # Get secret ARNs first
+            echo "Getting secret ARNs..."
+            DB_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-db-connection" --query 'ARN' --output text)
+            REDIS_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-redis-connection" --query 'ARN' --output text)
+            JWT_SECRET_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-jwt" --query 'ARN' --output text)
+            COGNITO_CONFIG_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-cognito-config" --query 'ARN' --output text)
+            
             # Create task definition JSON
-            echo '{
-              "family": "'$task_def_family'",
-              "networkMode": "awsvpc",
-              "requiresCompatibilities": ["FARGATE"],
-              "cpu": "256",
-              "memory": "512",
-              "executionRoleArn": "arn:aws:iam::'${{ secrets.AWS_ACCOUNT_ID }}':role/'$execution_role'",
-              "taskRoleArn": "arn:aws:iam::'${{ secrets.AWS_ACCOUNT_ID }}':role/'$task_role'",
-              "runtimePlatform": {
-                "operatingSystemFamily": "LINUX",
-                "cpuArchitecture": "X86_64"
-              },
-              "proxyConfiguration": {
-                "type": "APPMESH",
-                "containerName": "envoy",
-                "properties": [
-                  {
-                    "name": "IgnoredUID",
-                    "value": "1337"
-                  },
-                  {
-                    "name": "ProxyIngressPort",
-                    "value": "15000"
-                  },
-                  {
-                    "name": "ProxyEgressPort",
-                    "value": "15001"
-                  },
-                  {
-                    "name": "AppPorts",
-                    "value": "3000"
-                  },
-                  {
-                    "name": "EgressIgnoredIPs",
-                    "value": "169.254.170.2,169.254.169.254"
-                  }
-                ]
-              },
-              "containerDefinitions": [
-                {
-                  "name": "AppContainer",
-                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'${{ env.ECR_REPOSITORY_BACKEND }}':'$VERSION'",
-                  "essential": true,
-                  "workingDirectory": "/app",
-                  "entryPoint": ["node"],
-                  "command": ["dist/src/main.js"],
-                  "portMappings": [
-                    {
-                      "containerPort": 3000,
-                      "protocol": "tcp"
-                    }
-                  ],
-                  "environment": [
-                    {
-                      "name": "PORT",
-                      "value": "3000"
-                    },
-                    {
-                      "name": "NODE_ENV",
-                      "value": "'$env'"
-                    },
-                    {
-                      "name": "AWS_REGION",
-                      "value": "'${{ env.AWS_REGION }}'"
-                    }
-                  ],
-                  "secrets": [
-                    {
-                      "name": "DATABASE_URL",
-                      "valueFrom": "'${{ steps.secrets.outputs.db_connection_arn }}'"
-                    },
-                    {
-                      "name": "REDIS_URL",
-                      "valueFrom": "'${{ steps.secrets.outputs.redis_connection_arn }}'"
-                    },
-                    {
-                      "name": "JWT_SECRET",
-                      "valueFrom": "'${{ steps.secrets.outputs.jwt_secret_arn }}'"
-                    },
-                    {
-                      "name": "COGNITO_USER_POOL_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_USER_POOL_ID::"
-                    },
-                    {
-                      "name": "COGNITO_CLIENT_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_CLIENT_ID::"
-                    },
-                    {
-                      "name": "COGNITO_CLIENT_USER_POOL_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_CLIENT_USER_POOL_ID::"
-                    },
-                    {
-                      "name": "COGNITO_CLIENT_CLIENT_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_CLIENT_CLIENT_ID::"
-                    },
-                    {
-                      "name": "COGNITO_ADMIN_USER_POOL_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_ADMIN_USER_POOL_ID::"
-                    },
-                    {
-                      "name": "COGNITO_ADMIN_CLIENT_ID",
-                      "valueFrom": "'${{ steps.secrets.outputs.cognito_config_arn }}':COGNITO_ADMIN_CLIENT_ID::"
-                    }
-                  ],
-                  "logConfiguration": {
-                    "logDriver": "awslogs",
-                    "options": {
-                      "awslogs-group": "/finefinds/'$env'/app",
-                      "awslogs-region": "'${{ env.AWS_REGION }}'",
-                      "awslogs-stream-prefix": "finefinds"
-                    }
-                  }
-                }
-              ]
-            }' > task-definition.json
+            echo '{"family":"'$task_def_family'","networkMode":"awsvpc","requiresCompatibilities":["FARGATE"],"cpu":"256","memory":"512","executionRoleArn":"arn:aws:iam::'${{ secrets.AWS_ACCOUNT_ID }}':role/'$execution_role'","taskRoleArn":"arn:aws:iam::'${{ secrets.AWS_ACCOUNT_ID }}':role/'$task_role'","runtimePlatform":{"operatingSystemFamily":"LINUX","cpuArchitecture":"X86_64"},"proxyConfiguration":{"type":"APPMESH","containerName":"envoy","properties":[{"name":"IgnoredUID","value":"1337"},{"name":"ProxyIngressPort","value":"15000"},{"name":"ProxyEgressPort","value":"15001"},{"name":"AppPorts","value":"3000"},{"name":"EgressIgnoredIPs","value":"169.254.170.2,169.254.169.254"}]},"containerDefinitions":[{"name":"AppContainer","image":"891076991993.dkr.ecr.us-east-1.amazonaws.com/'${{ env.ECR_REPOSITORY_BACKEND }}':'$VERSION'","essential":true,"workingDirectory":"/app","entryPoint":["node"],"command":["dist/src/main.js"],"portMappings":[{"containerPort":3000,"protocol":"tcp"}],"environment":[{"name":"PORT","value":"3000"},{"name":"NODE_ENV","value":"'$env'"},{"name":"AWS_REGION","value":"'${{ env.AWS_REGION }}'"}],"secrets":[{"name":"DATABASE_URL","valueFrom":"'$DB_CONNECTION_ARN'"},{"name":"REDIS_URL","valueFrom":"'$REDIS_CONNECTION_ARN'"},{"name":"JWT_SECRET","valueFrom":"'$JWT_SECRET_ARN'"},{"name":"COGNITO_USER_POOL_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_USER_POOL_ID::"},{"name":"COGNITO_CLIENT_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_ID::"},{"name":"COGNITO_CLIENT_USER_POOL_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_USER_POOL_ID::"},{"name":"COGNITO_CLIENT_CLIENT_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_CLIENT_ID::"},{"name":"COGNITO_ADMIN_USER_POOL_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_ADMIN_USER_POOL_ID::"},{"name":"COGNITO_ADMIN_CLIENT_ID","valueFrom":"'$COGNITO_CONFIG_ARN':COGNITO_ADMIN_CLIENT_ID::"}],"logConfiguration":{"logDriver":"awslogs","options":{"awslogs-group":"/finefinds/'$env'/app","awslogs-region":"'${{ env.AWS_REGION }}'","awslogs-stream-prefix":"finefinds"}}}]}' > task-definition.json
           }
           
           # Create task definition based on environment
@@ -1379,6 +1016,30 @@ jobs:
             --cluster ${{ env.CLUSTER_NAME_PROD }} \
             --services ${{ env.SERVICE_NAME_PROD }}
             
+          # Add health check after deployment
+          echo "Performing health check..."
+          max_attempts=30
+          attempt=1
+          while [ $attempt -le $max_attempts ]; do
+            echo "Health check attempt $attempt of $max_attempts"
+            if aws ecs describe-services \
+              --cluster ${{ env.CLUSTER_NAME_PROD }} \
+              --services ${{ env.SERVICE_NAME_PROD }} \
+              --query 'services[0].runningCount' \
+              --output text | grep -q "1"; then
+              echo "Service is healthy"
+              break
+            fi
+            echo "Service not healthy yet. Waiting..."
+            sleep 10
+            attempt=$((attempt + 1))
+          done
+          
+          if [ $attempt -gt $max_attempts ]; then
+            echo "::error::Service failed to become healthy after $max_attempts attempts"
+            exit 1
+          fi
+          
           echo "Deployment completed successfully"
 
   notify:
