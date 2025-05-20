@@ -42,6 +42,10 @@ COPY prisma ./prisma/
 # Copy config directory for environment variables
 COPY config ./config/
 
+# Copy our entrypoint script
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
 # Install production dependencies only
 RUN npm ci --only=production
 
@@ -65,22 +69,6 @@ ENV COGNITO_ADMIN_USER_POOL_ID=${COGNITO_ADMIN_USER_POOL_ID}
 ENV COGNITO_ADMIN_CLIENT_ID=${COGNITO_ADMIN_CLIENT_ID}
 ENV JWT_SECRET=${JWT_SECRET}
 
-# Create startup script that logs environment variables
-RUN echo '#!/bin/sh \n\
-echo "=== Environment Variables ===" \n\
-echo "NODE_ENV: $NODE_ENV" \n\
-echo "AWS_REGION: $AWS_REGION" \n\
-echo "COGNITO_USER_POOL_ID: $COGNITO_USER_POOL_ID" \n\
-echo "COGNITO_CLIENT_ID: $COGNITO_CLIENT_ID" \n\
-echo "COGNITO_CLIENT_USER_POOL_ID: $COGNITO_CLIENT_USER_POOL_ID" \n\
-echo "COGNITO_CLIENT_CLIENT_ID: $COGNITO_CLIENT_CLIENT_ID" \n\
-echo "COGNITO_ADMIN_USER_POOL_ID: $COGNITO_ADMIN_USER_POOL_ID" \n\
-echo "COGNITO_ADMIN_CLIENT_ID: $COGNITO_ADMIN_CLIENT_ID" \n\
-echo "JWT_SECRET set: $(if [ -z "$JWT_SECRET" ]; then echo "No"; else echo "Yes"; fi)" \n\
-echo "=============================" \n\
-node dist/src/main.js \
-' > /app/start.sh && chmod +x /app/start.sh
-
 # Expose port
 EXPOSE 3000
 
@@ -88,5 +76,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
 
-# Start the application with our logging script
-CMD ["/app/start.sh"] 
+# Start the application with our entrypoint script
+CMD ["/app/docker-entrypoint.sh"] 
