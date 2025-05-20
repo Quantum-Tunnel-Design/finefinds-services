@@ -420,15 +420,15 @@ jobs:
             local execution_role="finefinds-$env-ecs-execution-role"
             local task_role="finefinds-$env-ecs-task-role"
             
-            cat << EOF > task-definition.json
+            cat > task-definition.json << 'EOF'
             {
-              "family": "$task_def_family",
+              "family": "${task_def_family}",
               "networkMode": "awsvpc",
               "requiresCompatibilities": ["FARGATE"],
               "cpu": "256",
               "memory": "512",
-              "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/$execution_role",
-              "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/$task_role",
+              "executionRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${execution_role}",
+              "taskRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${task_role}",
               "runtimePlatform": {
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
@@ -462,7 +462,7 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "AppContainer",
-                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'"${{ env.ECR_REPOSITORY_BACKEND }}"':'"$VERSION"'",
+                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/${ECR_REPOSITORY_BACKEND}:${VERSION}",
                   "essential": true,
                   "workingDirectory": "/app",
                   "entryPoint": ["node"],
@@ -480,56 +480,56 @@ jobs:
                     },
                     {
                       "name": "NODE_ENV",
-                      "value": "$env"
+                      "value": "${env}"
                     },
                     {
                       "name": "AWS_REGION",
-                      "value": "'"${{ env.AWS_REGION }}"'"
+                      "value": "${AWS_REGION}"
                     }
                   ],
                   "secrets": [
                     {
                       "name": "DATABASE_URL",
-                      "valueFrom": "'"${{ steps.secrets.outputs.db_connection_arn }}"'"
+                      "valueFrom": "${DB_CONNECTION_ARN}"
                     },
                     {
                       "name": "REDIS_URL",
-                      "valueFrom": "'"${{ steps.secrets.outputs.redis_connection_arn }}"'"
+                      "valueFrom": "${REDIS_CONNECTION_ARN}"
                     },
                     {
                       "name": "JWT_SECRET",
-                      "valueFrom": "'"${{ steps.secrets.outputs.jwt_secret_arn }}"'"
+                      "valueFrom": "${JWT_SECRET_ARN}"
                     },
                     {
                       "name": "COGNITO_USER_POOL_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_USER_POOL_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_CLIENT_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_USER_POOL_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_USER_POOL_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_CLIENT_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_CLIENT_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_CLIENT_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_CLIENT_CLIENT_ID::"
                     },
                     {
                       "name": "COGNITO_ADMIN_USER_POOL_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_ADMIN_USER_POOL_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_ADMIN_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_ADMIN_CLIENT_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_ADMIN_CLIENT_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_ADMIN_CLIENT_ID::"
                     }
                   ],
                   "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                      "awslogs-group": "/finefinds/$env/app",
-                      "awslogs-region": "'"${{ env.AWS_REGION }}"'",
+                      "awslogs-group": "/finefinds/${env}/app",
+                      "awslogs-region": "${AWS_REGION}",
                       "awslogs-stream-prefix": "finefinds"
                     }
                   }
@@ -537,6 +537,20 @@ jobs:
               ]
             }
             EOF
+            
+            # Replace variables in the task definition
+            sed -i "s/\${task_def_family}/$task_def_family/g" task-definition.json
+            sed -i "s/\${AWS_ACCOUNT_ID}/${{ secrets.AWS_ACCOUNT_ID }}/g" task-definition.json
+            sed -i "s/\${execution_role}/$execution_role/g" task-definition.json
+            sed -i "s/\${task_role}/$task_role/g" task-definition.json
+            sed -i "s/\${ECR_REPOSITORY_BACKEND}/${{ env.ECR_REPOSITORY_BACKEND }}/g" task-definition.json
+            sed -i "s/\${VERSION}/$VERSION/g" task-definition.json
+            sed -i "s/\${env}/$env/g" task-definition.json
+            sed -i "s/\${AWS_REGION}/${{ env.AWS_REGION }}/g" task-definition.json
+            sed -i "s|\${DB_CONNECTION_ARN}|${{ steps.secrets.outputs.db_connection_arn }}|g" task-definition.json
+            sed -i "s|\${REDIS_CONNECTION_ARN}|${{ steps.secrets.outputs.redis_connection_arn }}|g" task-definition.json
+            sed -i "s|\${JWT_SECRET_ARN}|${{ steps.secrets.outputs.jwt_secret_arn }}|g" task-definition.json
+            sed -i "s|\${COGNITO_CONFIG_ARN}|${{ steps.secrets.outputs.cognito_config_arn }}|g" task-definition.json
           }
           
           # Create task definition based on environment
@@ -685,15 +699,15 @@ jobs:
             local execution_role="finefinds-$env-ecs-execution-role"
             local task_role="finefinds-$env-ecs-task-role"
             
-            cat << EOF > task-definition.json
+            cat > task-definition.json << 'EOF'
             {
-              "family": "$task_def_family",
+              "family": "${task_def_family}",
               "networkMode": "awsvpc",
               "requiresCompatibilities": ["FARGATE"],
               "cpu": "256",
               "memory": "512",
-              "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/$execution_role",
-              "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/$task_role",
+              "executionRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${execution_role}",
+              "taskRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${task_role}",
               "runtimePlatform": {
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
@@ -727,7 +741,7 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "AppContainer",
-                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'"${{ env.ECR_REPOSITORY_BACKEND }}"':'"$VERSION"'",
+                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/${ECR_REPOSITORY_BACKEND}:${VERSION}",
                   "essential": true,
                   "workingDirectory": "/app",
                   "entryPoint": ["node"],
@@ -745,56 +759,56 @@ jobs:
                     },
                     {
                       "name": "NODE_ENV",
-                      "value": "$env"
+                      "value": "${env}"
                     },
                     {
                       "name": "AWS_REGION",
-                      "value": "'"${{ env.AWS_REGION }}"'"
+                      "value": "${AWS_REGION}"
                     }
                   ],
                   "secrets": [
                     {
                       "name": "DATABASE_URL",
-                      "valueFrom": "'"${{ steps.secrets.outputs.db_connection_arn }}"'"
+                      "valueFrom": "${DB_CONNECTION_ARN}"
                     },
                     {
                       "name": "REDIS_URL",
-                      "valueFrom": "'"${{ steps.secrets.outputs.redis_connection_arn }}"'"
+                      "valueFrom": "${REDIS_CONNECTION_ARN}"
                     },
                     {
                       "name": "JWT_SECRET",
-                      "valueFrom": "'"${{ steps.secrets.outputs.jwt_secret_arn }}"'"
+                      "valueFrom": "${JWT_SECRET_ARN}"
                     },
                     {
                       "name": "COGNITO_USER_POOL_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_USER_POOL_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_CLIENT_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_USER_POOL_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_USER_POOL_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_CLIENT_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_CLIENT_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_CLIENT_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_CLIENT_CLIENT_ID::"
                     },
                     {
                       "name": "COGNITO_ADMIN_USER_POOL_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_ADMIN_USER_POOL_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_ADMIN_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_ADMIN_CLIENT_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_ADMIN_CLIENT_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_ADMIN_CLIENT_ID::"
                     }
                   ],
                   "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                      "awslogs-group": "/finefinds/$env/app",
-                      "awslogs-region": "'"${{ env.AWS_REGION }}"'",
+                      "awslogs-group": "/finefinds/${env}/app",
+                      "awslogs-region": "${AWS_REGION}",
                       "awslogs-stream-prefix": "finefinds"
                     }
                   }
@@ -802,6 +816,20 @@ jobs:
               ]
             }
             EOF
+            
+            # Replace variables in the task definition
+            sed -i "s/\${task_def_family}/$task_def_family/g" task-definition.json
+            sed -i "s/\${AWS_ACCOUNT_ID}/${{ secrets.AWS_ACCOUNT_ID }}/g" task-definition.json
+            sed -i "s/\${execution_role}/$execution_role/g" task-definition.json
+            sed -i "s/\${task_role}/$task_role/g" task-definition.json
+            sed -i "s/\${ECR_REPOSITORY_BACKEND}/${{ env.ECR_REPOSITORY_BACKEND }}/g" task-definition.json
+            sed -i "s/\${VERSION}/$VERSION/g" task-definition.json
+            sed -i "s/\${env}/$env/g" task-definition.json
+            sed -i "s/\${AWS_REGION}/${{ env.AWS_REGION }}/g" task-definition.json
+            sed -i "s|\${DB_CONNECTION_ARN}|${{ steps.secrets.outputs.db_connection_arn }}|g" task-definition.json
+            sed -i "s|\${REDIS_CONNECTION_ARN}|${{ steps.secrets.outputs.redis_connection_arn }}|g" task-definition.json
+            sed -i "s|\${JWT_SECRET_ARN}|${{ steps.secrets.outputs.jwt_secret_arn }}|g" task-definition.json
+            sed -i "s|\${COGNITO_CONFIG_ARN}|${{ steps.secrets.outputs.cognito_config_arn }}|g" task-definition.json
           }
           
           # Create task definition based on environment
@@ -974,15 +1002,15 @@ jobs:
             local execution_role="finefinds-$env-ecs-execution-role"
             local task_role="finefinds-$env-ecs-task-role"
             
-            cat << EOF > task-definition.json
+            cat > task-definition.json << 'EOF'
             {
-              "family": "$task_def_family",
+              "family": "${task_def_family}",
               "networkMode": "awsvpc",
               "requiresCompatibilities": ["FARGATE"],
               "cpu": "256",
               "memory": "512",
-              "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/$execution_role",
-              "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/$task_role",
+              "executionRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${execution_role}",
+              "taskRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${task_role}",
               "runtimePlatform": {
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
@@ -1016,7 +1044,7 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "AppContainer",
-                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'"${{ env.ECR_REPOSITORY_BACKEND }}"':'"$VERSION"'",
+                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/${ECR_REPOSITORY_BACKEND}:${VERSION}",
                   "essential": true,
                   "workingDirectory": "/app",
                   "entryPoint": ["node"],
@@ -1034,56 +1062,56 @@ jobs:
                     },
                     {
                       "name": "NODE_ENV",
-                      "value": "$env"
+                      "value": "${env}"
                     },
                     {
                       "name": "AWS_REGION",
-                      "value": "'"${{ env.AWS_REGION }}"'"
+                      "value": "${AWS_REGION}"
                     }
                   ],
                   "secrets": [
                     {
                       "name": "DATABASE_URL",
-                      "valueFrom": "'"${{ steps.secrets.outputs.db_connection_arn }}"'"
+                      "valueFrom": "${DB_CONNECTION_ARN}"
                     },
                     {
                       "name": "REDIS_URL",
-                      "valueFrom": "'"${{ steps.secrets.outputs.redis_connection_arn }}"'"
+                      "valueFrom": "${REDIS_CONNECTION_ARN}"
                     },
                     {
                       "name": "JWT_SECRET",
-                      "valueFrom": "'"${{ steps.secrets.outputs.jwt_secret_arn }}"'"
+                      "valueFrom": "${JWT_SECRET_ARN}"
                     },
                     {
                       "name": "COGNITO_USER_POOL_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_USER_POOL_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_CLIENT_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_USER_POOL_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_USER_POOL_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_CLIENT_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_CLIENT_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_CLIENT_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_CLIENT_CLIENT_ID::"
                     },
                     {
                       "name": "COGNITO_ADMIN_USER_POOL_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_ADMIN_USER_POOL_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_ADMIN_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_ADMIN_CLIENT_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_ADMIN_CLIENT_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_ADMIN_CLIENT_ID::"
                     }
                   ],
                   "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                      "awslogs-group": "/finefinds/$env/app",
-                      "awslogs-region": "'"${{ env.AWS_REGION }}"'",
+                      "awslogs-group": "/finefinds/${env}/app",
+                      "awslogs-region": "${AWS_REGION}",
                       "awslogs-stream-prefix": "finefinds"
                     }
                   }
@@ -1091,6 +1119,20 @@ jobs:
               ]
             }
             EOF
+            
+            # Replace variables in the task definition
+            sed -i "s/\${task_def_family}/$task_def_family/g" task-definition.json
+            sed -i "s/\${AWS_ACCOUNT_ID}/${{ secrets.AWS_ACCOUNT_ID }}/g" task-definition.json
+            sed -i "s/\${execution_role}/$execution_role/g" task-definition.json
+            sed -i "s/\${task_role}/$task_role/g" task-definition.json
+            sed -i "s/\${ECR_REPOSITORY_BACKEND}/${{ env.ECR_REPOSITORY_BACKEND }}/g" task-definition.json
+            sed -i "s/\${VERSION}/$VERSION/g" task-definition.json
+            sed -i "s/\${env}/$env/g" task-definition.json
+            sed -i "s/\${AWS_REGION}/${{ env.AWS_REGION }}/g" task-definition.json
+            sed -i "s|\${DB_CONNECTION_ARN}|${{ steps.secrets.outputs.db_connection_arn }}|g" task-definition.json
+            sed -i "s|\${REDIS_CONNECTION_ARN}|${{ steps.secrets.outputs.redis_connection_arn }}|g" task-definition.json
+            sed -i "s|\${JWT_SECRET_ARN}|${{ steps.secrets.outputs.jwt_secret_arn }}|g" task-definition.json
+            sed -i "s|\${COGNITO_CONFIG_ARN}|${{ steps.secrets.outputs.cognito_config_arn }}|g" task-definition.json
           }
           
           # Create task definition based on environment
@@ -1239,15 +1281,15 @@ jobs:
             local execution_role="finefinds-$env-ecs-execution-role"
             local task_role="finefinds-$env-ecs-task-role"
             
-            cat << EOF > task-definition.json
+            cat > task-definition.json << 'EOF'
             {
-              "family": "$task_def_family",
+              "family": "${task_def_family}",
               "networkMode": "awsvpc",
               "requiresCompatibilities": ["FARGATE"],
               "cpu": "256",
               "memory": "512",
-              "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/$execution_role",
-              "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/$task_role",
+              "executionRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${execution_role}",
+              "taskRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${task_role}",
               "runtimePlatform": {
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
@@ -1281,7 +1323,7 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "AppContainer",
-                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/'"${{ env.ECR_REPOSITORY_BACKEND }}"':'"$VERSION"'",
+                  "image": "891076991993.dkr.ecr.us-east-1.amazonaws.com/${ECR_REPOSITORY_BACKEND}:${VERSION}",
                   "essential": true,
                   "workingDirectory": "/app",
                   "entryPoint": ["node"],
@@ -1299,56 +1341,56 @@ jobs:
                     },
                     {
                       "name": "NODE_ENV",
-                      "value": "$env"
+                      "value": "${env}"
                     },
                     {
                       "name": "AWS_REGION",
-                      "value": "'"${{ env.AWS_REGION }}"'"
+                      "value": "${AWS_REGION}"
                     }
                   ],
                   "secrets": [
                     {
                       "name": "DATABASE_URL",
-                      "valueFrom": "'"${{ steps.secrets.outputs.db_connection_arn }}"'"
+                      "valueFrom": "${DB_CONNECTION_ARN}"
                     },
                     {
                       "name": "REDIS_URL",
-                      "valueFrom": "'"${{ steps.secrets.outputs.redis_connection_arn }}"'"
+                      "valueFrom": "${REDIS_CONNECTION_ARN}"
                     },
                     {
                       "name": "JWT_SECRET",
-                      "valueFrom": "'"${{ steps.secrets.outputs.jwt_secret_arn }}"'"
+                      "valueFrom": "${JWT_SECRET_ARN}"
                     },
                     {
                       "name": "COGNITO_USER_POOL_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_USER_POOL_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_CLIENT_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_USER_POOL_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_USER_POOL_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_CLIENT_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_CLIENT_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_CLIENT_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_CLIENT_CLIENT_ID::"
                     },
                     {
                       "name": "COGNITO_ADMIN_USER_POOL_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_ADMIN_USER_POOL_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_ADMIN_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_ADMIN_CLIENT_ID",
-                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_ADMIN_CLIENT_ID::"
+                      "valueFrom": "${COGNITO_CONFIG_ARN}:COGNITO_ADMIN_CLIENT_ID::"
                     }
                   ],
                   "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                      "awslogs-group": "/finefinds/$env/app",
-                      "awslogs-region": "'"${{ env.AWS_REGION }}"'",
+                      "awslogs-group": "/finefinds/${env}/app",
+                      "awslogs-region": "${AWS_REGION}",
                       "awslogs-stream-prefix": "finefinds"
                     }
                   }
@@ -1356,6 +1398,20 @@ jobs:
               ]
             }
             EOF
+            
+            # Replace variables in the task definition
+            sed -i "s/\${task_def_family}/$task_def_family/g" task-definition.json
+            sed -i "s/\${AWS_ACCOUNT_ID}/${{ secrets.AWS_ACCOUNT_ID }}/g" task-definition.json
+            sed -i "s/\${execution_role}/$execution_role/g" task-definition.json
+            sed -i "s/\${task_role}/$task_role/g" task-definition.json
+            sed -i "s/\${ECR_REPOSITORY_BACKEND}/${{ env.ECR_REPOSITORY_BACKEND }}/g" task-definition.json
+            sed -i "s/\${VERSION}/$VERSION/g" task-definition.json
+            sed -i "s/\${env}/$env/g" task-definition.json
+            sed -i "s/\${AWS_REGION}/${{ env.AWS_REGION }}/g" task-definition.json
+            sed -i "s|\${DB_CONNECTION_ARN}|${{ steps.secrets.outputs.db_connection_arn }}|g" task-definition.json
+            sed -i "s|\${REDIS_CONNECTION_ARN}|${{ steps.secrets.outputs.redis_connection_arn }}|g" task-definition.json
+            sed -i "s|\${JWT_SECRET_ARN}|${{ steps.secrets.outputs.jwt_secret_arn }}|g" task-definition.json
+            sed -i "s|\${COGNITO_CONFIG_ARN}|${{ steps.secrets.outputs.cognito_config_arn }}|g" task-definition.json
           }
           
           # Create task definition based on environment
