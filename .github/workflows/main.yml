@@ -54,6 +54,7 @@ env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY || 'finefindslk/base/node-services' }}
   ECR_REPOSITORY_BACKEND: ${{ secrets.ECR_REPOSITORY_BACKEND || format('finefinds-services-{0}', github.event_name == 'workflow_dispatch' && inputs.environment || github.ref == 'refs/heads/main' && 'prod' || github.ref == 'refs/heads/staging' && 'staging' || github.ref == 'refs/heads/qa' && 'qa' || github.ref == 'refs/heads/dev' && 'dev' || 'sandbox') }}
+  SERVICES_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || github.ref == 'refs/heads/main' && 'prod' || github.ref == 'refs/heads/staging' && 'staging' || github.ref == 'refs/heads/qa' && 'qa' || github.ref == 'refs/heads/dev' && 'dev' || 'sandbox' }}
   # Task definition and service names for each environment
   TASK_DEF_FAMILY_DEV: ${{ secrets.TASK_DEF_FAMILY_DEV || 'FineFindsdevEcsTaskDef290F30C7' }}
   TASK_DEF_FAMILY_QA: ${{ secrets.TASK_DEF_FAMILY_QA || 'FineFindsqaEcsTaskDef290F30C7' }}
