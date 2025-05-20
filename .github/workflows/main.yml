@@ -356,7 +356,7 @@ jobs:
           echo "cognito_config_arn=$COGNITO_CONFIG_ARN" >> $GITHUB_OUTPUT
           
           # Get JWT Secret ARN
-          JWT_SECRET_ARN=$(get_secret_arn "finefinds-dev-jwt-secret")
+          JWT_SECRET_ARN=$(get_secret_arn "finefinds-dev-jwt")
           if [ $? -ne 0 ]; then exit 1; fi
           echo "jwt_secret_arn=$JWT_SECRET_ARN" >> $GITHUB_OUTPUT
           
@@ -600,7 +600,7 @@ jobs:
           echo "cognito_config_arn=$COGNITO_CONFIG_ARN" >> $GITHUB_OUTPUT
           
           # Get JWT Secret ARN
-          JWT_SECRET_ARN=$(get_secret_arn "finefinds-qa-jwt-secret")
+          JWT_SECRET_ARN=$(get_secret_arn "finefinds-qa-jwt")
           if [ $? -ne 0 ]; then exit 1; fi
           echo "jwt_secret_arn=$JWT_SECRET_ARN" >> $GITHUB_OUTPUT
           
@@ -868,7 +868,7 @@ jobs:
           echo "cognito_config_arn=$COGNITO_CONFIG_ARN" >> $GITHUB_OUTPUT
           
           # Get JWT Secret ARN
-          JWT_SECRET_ARN=$(get_secret_arn "finefinds-staging-jwt-secret")
+          JWT_SECRET_ARN=$(get_secret_arn "finefinds-staging-jwt")
           if [ $? -ne 0 ]; then exit 1; fi
           echo "jwt_secret_arn=$JWT_SECRET_ARN" >> $GITHUB_OUTPUT
           
@@ -1112,7 +1112,7 @@ jobs:
           echo "cognito_config_arn=$COGNITO_CONFIG_ARN" >> $GITHUB_OUTPUT
           
           # Get JWT Secret ARN
-          JWT_SECRET_ARN=$(get_secret_arn "finefinds-prod-jwt-secret")
+          JWT_SECRET_ARN=$(get_secret_arn "finefinds-prod-jwt")
           if [ $? -ne 0 ]; then exit 1; fi
           echo "jwt_secret_arn=$JWT_SECRET_ARN" >> $GITHUB_OUTPUT
           
