@@ -69,14 +69,6 @@ env:
   CLUSTER_NAME_QA: finefinds-qa-cluster
   CLUSTER_NAME_STAGING: finefinds-staging-cluster
   CLUSTER_NAME_PROD: finefinds-prod-cluster
-  RDS_INSTANCE_DEV: finefinds-dev-rdsdatabase74c89a2a-tgxwanklvozk
-  RDS_INSTANCE_QA: finefinds-qa-rdsdatabase74c89a2a-tgxwanklvozk
-  RDS_INSTANCE_STAGING: finefinds-staging-rdsdatabase74c89a2a-tgxwanklvozk
-  RDS_INSTANCE_PROD: finefinds-prod-rdsdatabase74c89a2a-tgxwanklvozk
-  RDS_DEV_SECRET_NAME: FineFindsdevRdsDatabaseSecr-0zIOqlcLlE2c
-  RDS_QA_SECRET_NAME: FineFindsqaRdsDatabaseSecr-0zIOqlcLlE2c
-  RDS_STAGING_SECRET_NAME: FineFindsstagingRdsDatabaseSecr-0zIOqlcLlE2c
-  RDS_PROD_SECRET_NAME: FineFindsprodRdsDatabaseSecr-0zIOqlcLlE2c
 jobs:
   input_check:
     runs-on: ubuntu-latest
@@ -261,9 +253,8 @@ jobs:
           attempt=1
           while [ $attempt -le $max_attempts ]; do
             echo "Attempt $attempt of $max_attempts"
-            RDS_INSTANCE="${{ env.SERVICES_ENV == 'dev' && env.RDS_INSTANCE_DEV || env.SERVICES_ENV == 'qa' && env.RDS_INSTANCE_QA || env.SERVICES_ENV == 'staging' && env.RDS_INSTANCE_STAGING || env.RDS_INSTANCE_PROD }}"
-            echo "Using RDS instance: $RDS_INSTANCE"
-            RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier $RDS_INSTANCE --query 'DBInstances[0].Endpoint.Address' --output text)
+            # Get RDS endpoint from Secrets Manager
+            RDS_ENDPOINT=$(aws secretsmanager get-secret-value --secret-id "finefinds-${{ env.SERVICES_ENV }}-db-connection" --query 'SecretString' --output text | jq -r '.host')
             if [ $? -eq 0 ] && [ ! -z "$RDS_ENDPOINT" ]; then
               echo "RDS endpoint: $RDS_ENDPOINT"
               echo "rds_endpoint=$RDS_ENDPOINT" >> $GITHUB_OUTPUT
@@ -283,7 +274,7 @@ jobs:
         id: rds_creds
         run: |
           echo "Fetching RDS credentials from Secrets Manager..."
-          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{env.RDS_DEV_SECRET_NAME}} --query 'SecretString' --output text)
+          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id "finefinds-${{ env.SERVICES_ENV }}-db-connection" --query 'SecretString' --output text)
           if [ -z "$RDS_SECRET" ]; then
             echo "::error::Failed to get RDS credentials from Secrets Manager"
             exit 1
@@ -318,7 +309,7 @@ jobs:
             
             while [ $attempt -le $max_attempts ]; do
               echo "Attempt $attempt of $max_attempts to get ARN for $secret_name"
-              secret_arn=$(aws secretsmanager describe-secret --name "$secret_name" --query 'ARN' --output text)
+              secret_arn=$(aws secretsmanager get-secret-value --secret-id "$secret_name" --query 'ARN' --output text)
               
               if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
                 echo "Successfully got ARN for $secret_name"
@@ -562,7 +553,7 @@ jobs:
             
             while [ $attempt -le $max_attempts ]; do
               echo "Attempt $attempt of $max_attempts to get ARN for $secret_name"
-              secret_arn=$(aws secretsmanager describe-secret --name "$secret_name" --query 'ARN' --output text)
+              secret_arn=$(aws secretsmanager get-secret-value --secret-id "$secret_name" --query 'ARN' --output text)
               
               if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
                 echo "Successfully got ARN for $secret_name"
@@ -766,6 +757,30 @@ jobs:
             --cluster ${{ env.CLUSTER_NAME_QA }} \
             --services ${{ env.SERVICE_NAME_QA }}
             
+          # Add health check after deployment
+          echo "Performing health check..."
+          max_attempts=30
+          attempt=1
+          while [ $attempt -le $max_attempts ]; do
+            echo "Health check attempt $attempt of $max_attempts"
+            if aws ecs describe-services \
+              --cluster ${{ env.CLUSTER_NAME_QA }} \
+              --services ${{ env.SERVICE_NAME_QA }} \
+              --query 'services[0].runningCount' \
+              --output text | grep -q "1"; then
+              echo "Service is healthy"
+              break
+            fi
+            echo "Service not healthy yet. Waiting..."
+            sleep 10
+            attempt=$((attempt + 1))
+          done
+          
+          if [ $attempt -gt $max_attempts ]; then
+            echo "::error::Service failed to become healthy after $max_attempts attempts"
+            exit 1
+          fi
+          
           echo "Deployment completed successfully"
 
   deploy-staging:
@@ -806,7 +821,7 @@ jobs:
             
             while [ $attempt -le $max_attempts ]; do
               echo "Attempt $attempt of $max_attempts to get ARN for $secret_name"
-              secret_arn=$(aws secretsmanager describe-secret --name "$secret_name" --query 'ARN' --output text)
+              secret_arn=$(aws secretsmanager get-secret-value --secret-id "$secret_name" --query 'ARN' --output text)
               
               if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
                 echo "Successfully got ARN for $secret_name"
@@ -1050,7 +1065,7 @@ jobs:
             
             while [ $attempt -le $max_attempts ]; do
               echo "Attempt $attempt of $max_attempts to get ARN for $secret_name"
-              secret_arn=$(aws secretsmanager describe-secret --name "$secret_name" --query 'ARN' --output text)
+              secret_arn=$(aws secretsmanager get-secret-value --secret-id "$secret_name" --query 'ARN' --output text)
               
               if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
                 echo "Successfully got ARN for $secret_name"
@@ -1279,7 +1294,7 @@ jobs:
                     { "title": "Branch", "value": "${{ github.ref_name }}", "short": true },
                     { "title": "Actor", "value": "${{ github.actor }}", "short": true },
                     { "title": "Commit", "value": "${{ github.sha }}", "short": false },
-                    { "title": "Task Definition", "value": "${{ needs.deploy-dev.outputs.task_def_arn || 'N/A' }}", "short": false }
+                    { "title": "Task Definition", "value": "${{ needs.deploy-dev.outputs.task_def_arn || needs.deploy-qa.outputs.task_def_arn || needs.deploy-staging.outputs.task_def_arn || needs.deploy-prod.outputs.task_def_arn || 'N/A' }}", "short": false }
                   ],
                   "actions": [
                     {
@@ -1310,7 +1325,7 @@ jobs:
                     { "title": "Branch", "value": "${{ github.ref_name }}", "short": true },
                     { "title": "Actor", "value": "${{ github.actor }}", "short": true },
                     { "title": "Commit", "value": "${{ github.sha }}", "short": false },
-                    { "title": "Failed Job", "value": "${{ needs.*.result == 'failure' && needs.*.name || 'Unknown' }}", "short": false }
+                    { "title": "Failed Job", "value": "${{ needs.deploy-sandbox.result == 'failure' && 'deploy-sandbox' || needs.deploy-dev.result == 'failure' && 'deploy-dev' || needs.deploy-qa.result == 'failure' && 'deploy-qa' || needs.deploy-staging.result == 'failure' && 'deploy-staging' || needs.deploy-prod.result == 'failure' && 'deploy-prod' || 'None' }}", "short": false }
                   ],
                   "actions": [
                     {
