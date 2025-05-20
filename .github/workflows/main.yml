@@ -585,13 +585,6 @@ jobs:
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
               },
-              "networkConfiguration": {
-                "awsvpcConfiguration": {
-                  "subnets": ["subnet-0a1b2c3d4", "subnet-5e6f7g8h"],
-                  "securityGroups": ["sg-0a1b2c3d4"],
-                  "assignPublicIp": "DISABLED"
-                }
-              },
               "proxyConfiguration": {
                 "type": "APPMESH",
                 "containerName": "envoy",
