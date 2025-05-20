@@ -342,23 +342,23 @@ jobs:
           
           # Function to verify secret access
           verify_secret_access() {
-            local secret_arn=$1
+            local secret_name=$1
             local max_attempts=3
             local attempt=1
             
             while [ $attempt -le $max_attempts ]; do
-              echo "Attempt $attempt of $max_attempts to verify access to secret: $secret_arn"
-              if aws secretsmanager describe-secret --secret-id "$secret_arn" > /dev/null; then
-                echo "Successfully verified access to secret: $secret_arn"
+              echo "Attempt $attempt of $max_attempts to verify access to secret: $secret_name"
+              if aws secretsmanager describe-secret --secret-id "$secret_name" > /dev/null; then
+                echo "Successfully verified access to secret: $secret_name"
                 return 0
               fi
               
-              echo "Failed to verify access to secret: $secret_arn. Retrying..."
+              echo "Failed to verify access to secret: $secret_name. Retrying..."
               sleep 5
               attempt=$((attempt + 1))
             done
             
-            echo "::error::Failed to verify access to secret: $secret_arn after $max_attempts attempts"
+            echo "::error::Failed to verify access to secret: $secret_name after $max_attempts attempts"
             return 1
           }
           
@@ -367,28 +367,36 @@ jobs:
           DB_CONNECTION_ARN=$(get_secret_arn "finefinds-dev-db-connection")
           if [ $? -ne 0 ]; then exit 1; fi
           echo "db_connection_arn=$DB_CONNECTION_ARN" >> $GITHUB_OUTPUT
-          if ! verify_secret_access "$DB_CONNECTION_ARN"; then exit 1; fi
+          
+          echo "Verifying DB Connection Secret access..."
+          if ! verify_secret_access "finefinds-dev-db-connection"; then exit 1; fi
           
           # Get and verify Redis Connection Secret
           echo "Getting Redis Connection Secret ARN..."
           REDIS_CONNECTION_ARN=$(get_secret_arn "finefinds-dev-redis-connection")
           if [ $? -ne 0 ]; then exit 1; fi
           echo "redis_connection_arn=$REDIS_CONNECTION_ARN" >> $GITHUB_OUTPUT
-          if ! verify_secret_access "$REDIS_CONNECTION_ARN"; then exit 1; fi
+          
+          echo "Verifying Redis Connection Secret access..."
+          if ! verify_secret_access "finefinds-dev-redis-connection"; then exit 1; fi
           
           # Get and verify Cognito Config Secret
           echo "Getting Cognito Config Secret ARN..."
           COGNITO_CONFIG_ARN=$(get_secret_arn "finefinds-dev-cognito-config")
           if [ $? -ne 0 ]; then exit 1; fi
           echo "cognito_config_arn=$COGNITO_CONFIG_ARN" >> $GITHUB_OUTPUT
-          if ! verify_secret_access "$COGNITO_CONFIG_ARN"; then exit 1; fi
+          
+          echo "Verifying Cognito Config Secret access..."
+          if ! verify_secret_access "finefinds-dev-cognito-config"; then exit 1; fi
           
           # Get and verify JWT Secret
           echo "Getting JWT Secret ARN..."
           JWT_SECRET_ARN=$(get_secret_arn "finefinds-dev-jwt")
           if [ $? -ne 0 ]; then exit 1; fi
           echo "jwt_secret_arn=$JWT_SECRET_ARN" >> $GITHUB_OUTPUT
-          if ! verify_secret_access "$JWT_SECRET_ARN"; then exit 1; fi
+          
+          echo "Verifying JWT Secret access..."
+          if ! verify_secret_access "finefinds-dev-jwt"; then exit 1; fi
           
           echo "All secrets verified successfully"
 
@@ -607,23 +615,23 @@ jobs:
           
           # Function to verify secret access
           verify_secret_access() {
-            local secret_arn=$1
+            local secret_name=$1
             local max_attempts=3
             local attempt=1
             
             while [ $attempt -le $max_attempts ]; do
-              echo "Attempt $attempt of $max_attempts to verify access to secret: $secret_arn"
-              if aws secretsmanager describe-secret --secret-id "$secret_arn" > /dev/null; then
-                echo "Successfully verified access to secret: $secret_arn"
+              echo "Attempt $attempt of $max_attempts to verify access to secret: $secret_name"
+              if aws secretsmanager describe-secret --secret-id "$secret_name" > /dev/null; then
+                echo "Successfully verified access to secret: $secret_name"
                 return 0
               fi
               
-              echo "Failed to verify access to secret: $secret_arn. Retrying..."
+              echo "Failed to verify access to secret: $secret_name. Retrying..."
               sleep 5
               attempt=$((attempt + 1))
             done
             
-            echo "::error::Failed to verify access to secret: $secret_arn after $max_attempts attempts"
+            echo "::error::Failed to verify access to secret: $secret_name after $max_attempts attempts"
             return 1
           }
           
@@ -896,23 +904,23 @@ jobs:
           
           # Function to verify secret access
           verify_secret_access() {
-            local secret_arn=$1
+            local secret_name=$1
             local max_attempts=3
             local attempt=1
             
             while [ $attempt -le $max_attempts ]; do
-              echo "Attempt $attempt of $max_attempts to verify access to secret: $secret_arn"
-              if aws secretsmanager describe-secret --secret-id "$secret_arn" > /dev/null; then
-                echo "Successfully verified access to secret: $secret_arn"
+              echo "Attempt $attempt of $max_attempts to verify access to secret: $secret_name"
+              if aws secretsmanager describe-secret --secret-id "$secret_name" > /dev/null; then
+                echo "Successfully verified access to secret: $secret_name"
                 return 0
               fi
               
-              echo "Failed to verify access to secret: $secret_arn. Retrying..."
+              echo "Failed to verify access to secret: $secret_name. Retrying..."
               sleep 5
               attempt=$((attempt + 1))
             done
             
-            echo "::error::Failed to verify access to secret: $secret_arn after $max_attempts attempts"
+            echo "::error::Failed to verify access to secret: $secret_name after $max_attempts attempts"
             return 1
           }
           
@@ -1161,23 +1169,23 @@ jobs:
           
           # Function to verify secret access
           verify_secret_access() {
-            local secret_arn=$1
+            local secret_name=$1
             local max_attempts=3
             local attempt=1
             
             while [ $attempt -le $max_attempts ]; do
-              echo "Attempt $attempt of $max_attempts to verify access to secret: $secret_arn"
-              if aws secretsmanager describe-secret --secret-id "$secret_arn" > /dev/null; then
-                echo "Successfully verified access to secret: $secret_arn"
+              echo "Attempt $attempt of $max_attempts to verify access to secret: $secret_name"
+              if aws secretsmanager describe-secret --secret-id "$secret_name" > /dev/null; then
+                echo "Successfully verified access to secret: $secret_name"
                 return 0
               fi
               
-              echo "Failed to verify access to secret: $secret_arn. Retrying..."
+              echo "Failed to verify access to secret: $secret_name. Retrying..."
               sleep 5
               attempt=$((attempt + 1))
             done
             
-            echo "::error::Failed to verify access to secret: $secret_arn after $max_attempts attempts"
+            echo "::error::Failed to verify access to secret: $secret_name after $max_attempts attempts"
             return 1
           }
           
