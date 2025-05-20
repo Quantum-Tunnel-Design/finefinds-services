@@ -283,61 +283,110 @@ jobs:
         id: rds_creds
         run: |
           echo "Fetching RDS credentials from Secrets Manager..."
-          # Add error handling and retry logic
-          max_attempts=3
-          attempt=1
-          while [ $attempt -le $max_attempts ]; do
-            echo "Attempt $attempt of $max_attempts"
-            RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{env.RDS_DEV_SECRET_NAME}} --query 'SecretString' --output text)
-            if [ $? -eq 0 ] && [ ! -z "$RDS_SECRET" ]; then
-              DB_HOST=$(echo $RDS_SECRET | jq -r '.host')
-              DB_PORT=$(echo $RDS_SECRET | jq -r '.port')
-              DB_NAME=$(echo $RDS_SECRET | jq -r '.dbname')
-              DB_USER=$(echo $RDS_SECRET | jq -r '.username')
-              DB_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
-              
-              if [ ! -z "$DB_HOST" ] && [ ! -z "$DB_PORT" ] && [ ! -z "$DB_NAME" ] && [ ! -z "$DB_USER" ] && [ ! -z "$DB_PASSWORD" ]; then
-                echo "RDS credentials retrieved successfully"
-                echo "db_host=$DB_HOST" >> $GITHUB_OUTPUT
-                echo "db_port=$DB_PORT" >> $GITHUB_OUTPUT
-                echo "db_name=$DB_NAME" >> $GITHUB_OUTPUT
-                echo "db_user=$DB_USER" >> $GITHUB_OUTPUT
-                echo "db_password=$DB_PASSWORD" >> $GITHUB_OUTPUT
-                break
-              fi
-            fi
-            echo "Failed to get RDS credentials. Retrying..."
-            sleep 5
-            attempt=$((attempt + 1))
-          done
-          
-          if [ -z "$DB_HOST" ] || [ -z "$DB_PORT" ] || [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ]; then
-            echo "::error::Failed to get RDS credentials after $max_attempts attempts"
+          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{env.RDS_DEV_SECRET_NAME}} --query 'SecretString' --output text)
+          if [ -z "$RDS_SECRET" ]; then
+            echo "::error::Failed to get RDS credentials from Secrets Manager"
             exit 1
           fi
+          DB_HOST=$(echo $RDS_SECRET | jq -r '.host')
+          DB_PORT=$(echo $RDS_SECRET | jq -r '.port')
+          DB_NAME=$(echo $RDS_SECRET | jq -r '.dbname')
+          DB_USER=$(echo $RDS_SECRET | jq -r '.username')
+          DB_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
+          if [ -z "$DB_HOST" ] || [ -z "$DB_PORT" ] || [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ]; then
+            echo "::error::Invalid RDS credentials format in Secrets Manager"
+            exit 1
+          fi
+          echo "RDS credentials retrieved successfully"
+          echo "db_host=$DB_HOST" >> $GITHUB_OUTPUT
+          echo "db_port=$DB_PORT" >> $GITHUB_OUTPUT
+          echo "db_name=$DB_NAME" >> $GITHUB_OUTPUT
+          echo "db_user=$DB_USER" >> $GITHUB_OUTPUT
+          echo "db_password=$DB_PASSWORD" >> $GITHUB_OUTPUT
           
-      - name: Deploy to ECS
-        id: deploy
+      - name: Get Secret ARNs
+        id: secrets
         run: |
-          set -e
+          echo "Fetching Secret ARNs..."
+          
+          # Function to get secret ARN with retry
+          get_secret_arn() {
+            local secret_name=$1
+            local max_attempts=3
+            local attempt=1
+            local secret_arn=""
+            
+            while [ $attempt -le $max_attempts ]; do
+              echo "Attempt $attempt of $max_attempts to get ARN for $secret_name"
+              secret_arn=$(aws secretsmanager describe-secret --name "$secret_name" --query 'ARN' --output text)
+              
+              if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
+                echo "Successfully got ARN for $secret_name"
+                echo "$secret_arn"
+                return 0
+              fi
+              
+              echo "Failed to get ARN for $secret_name. Retrying..."
+              sleep 5
+              attempt=$((attempt + 1))
+            done
+            
+            echo "::error::Failed to get ARN for $secret_name after $max_attempts attempts"
+            return 1
+          }
+          
+          # Get DB Connection Secret ARN
+          DB_CONNECTION_ARN=$(get_secret_arn "finefinds-dev-db-connection")
+          if [ $? -ne 0 ]; then exit 1; fi
+          echo "db_connection_arn=$DB_CONNECTION_ARN" >> $GITHUB_OUTPUT
+          
+          # Get Redis Connection Secret ARN
+          REDIS_CONNECTION_ARN=$(get_secret_arn "finefinds-dev-redis-connection")
+          if [ $? -ne 0 ]; then exit 1; fi
+          echo "redis_connection_arn=$REDIS_CONNECTION_ARN" >> $GITHUB_OUTPUT
+          
+          # Get Cognito Config Secret ARN
+          COGNITO_CONFIG_ARN=$(get_secret_arn "finefinds-dev-cognito-config")
+          if [ $? -ne 0 ]; then exit 1; fi
+          echo "cognito_config_arn=$COGNITO_CONFIG_ARN" >> $GITHUB_OUTPUT
+          
+          # Get JWT Secret ARN
+          JWT_SECRET_ARN=$(get_secret_arn "finefinds-dev-jwt-secret")
+          if [ $? -ne 0 ]; then exit 1; fi
+          echo "jwt_secret_arn=$JWT_SECRET_ARN" >> $GITHUB_OUTPUT
+          
+          # Verify all secrets exist and are accessible
+          echo "Verifying secret access..."
+          for secret_arn in "$DB_CONNECTION_ARN" "$REDIS_CONNECTION_ARN" "$COGNITO_CONFIG_ARN" "$JWT_SECRET_ARN"; do
+            if ! aws secretsmanager describe-secret --secret-id "$secret_arn" > /dev/null; then
+              echo "::error::Failed to verify access to secret: $secret_arn"
+              exit 1
+            fi
+          done
+          
+          echo "All secrets verified successfully"
+
+      - name: Create Task Definition
+        id: task_def
+        run: |
           VERSION=$(cat version.txt)
-          echo "Deploying version: $VERSION"
           
-          # Check if task definition exists
-          echo "Checking for existing task definition..."
-          TASK_DEF_ARN=$(aws ecs list-task-definitions --family-prefix ${{ env.TASK_DEF_FAMILY_DEV }} --sort DESC --max-items 1 --query 'taskDefinitionArns[0]' --output text || echo "None")
-          
-          if [ "$TASK_DEF_ARN" = "None" ] || [ -z "$TASK_DEF_ARN" ]; then
-            echo "No existing task definition found. Creating new task definition..."
-            # Create new task definition from scratch
-            echo '{
-              "family": "'"${{ env.TASK_DEF_FAMILY_DEV }}"'",
+          # Function to create task definition JSON
+          create_task_definition() {
+            local env=$1
+            local task_def_family=$2
+            local execution_role="finefinds-$env-ecs-execution-role"
+            local task_role="finefinds-$env-ecs-task-role"
+            
+            cat << EOF > task-definition.json
+            {
+              "family": "$task_def_family",
               "networkMode": "awsvpc",
               "requiresCompatibilities": ["FARGATE"],
               "cpu": "256",
               "memory": "512",
-              "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-dev-ecs-execution-role",
-              "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-dev-ecs-task-role",
+              "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/$execution_role",
+              "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/$task_role",
               "runtimePlatform": {
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
@@ -389,122 +438,84 @@ jobs:
                     },
                     {
                       "name": "NODE_ENV",
-                      "value": "'"${{ env.SERVICES_ENV }}"'"
+                      "value": "$env"
                     },
                     {
                       "name": "AWS_REGION",
                       "value": "'"${{ env.AWS_REGION }}"'"
-                    },
-                    {
-                      "name": "DATABASE_URL",
-                      "value": "postgresql://'"${{ steps.rds_creds.outputs.db_user }}"':'"${{ steps.rds_creds.outputs.db_password }}"'@'"${{ steps.rds.outputs.rds_endpoint }}"':5432/'"${{ steps.rds_creds.outputs.db_name }}"'?schema=public"
                     }
                   ],
                   "secrets": [
                     {
-                      "name": "DB_HOST",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_DEV_SECRET_NAME}}:host::"
-                    },
-                    {
-                      "name": "DB_PORT",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_DEV_SECRET_NAME}}:port::"
-                    },
-                    {
-                      "name": "DB_NAME",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_DEV_SECRET_NAME}}:dbname::"
-                    },
-                    {
-                      "name": "DB_USER",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_DEV_SECRET_NAME}}:username::"
-                    },
-                    {
-                      "name": "DB_PASSWORD",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_DEV_SECRET_NAME}}:password::"
+                      "name": "DATABASE_URL",
+                      "valueFrom": "'"${{ steps.secrets.outputs.db_connection_arn }}"'"
                     },
                     {
                       "name": "REDIS_URL",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ env.SERVICES_ENV }}-redis-connection-cuiTEQ"
+                      "valueFrom": "'"${{ steps.secrets.outputs.redis_connection_arn }}"'"
                     },
                     {
                       "name": "JWT_SECRET",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ env.SERVICES_ENV }}-jwt-secret"
+                      "valueFrom": "'"${{ steps.secrets.outputs.jwt_secret_arn }}"'"
                     },
                     {
                       "name": "COGNITO_USER_POOL_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ env.SERVICES_ENV }}-cognito-config:COGNITO_USER_POOL_ID::"
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ env.SERVICES_ENV }}-cognito-config:COGNITO_CLIENT_ID::"
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_USER_POOL_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ env.SERVICES_ENV }}-cognito-config:COGNITO_CLIENT_USER_POOL_ID::"
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_CLIENT_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ env.SERVICES_ENV }}-cognito-config:COGNITO_CLIENT_CLIENT_ID::"
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_CLIENT_ID::"
                     },
                     {
                       "name": "COGNITO_ADMIN_USER_POOL_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ env.SERVICES_ENV }}-cognito-config:COGNITO_ADMIN_USER_POOL_ID::"
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_ADMIN_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_ADMIN_CLIENT_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-${{ env.SERVICES_ENV }}-cognito-config:COGNITO_ADMIN_CLIENT_ID::"
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_ADMIN_CLIENT_ID::"
                     }
                   ],
                   "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                      "awslogs-group": "/finefinds/${{ env.SERVICES_ENV }}/app",
+                      "awslogs-group": "/finefinds/$env/app",
                       "awslogs-region": "'"${{ env.AWS_REGION }}"'",
                       "awslogs-stream-prefix": "finefinds"
                     }
                   }
                 }
               ]
-            }' > task-definition.json
-            
-            echo "Registering new task definition..."
-            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
-            if [ -z "$NEW_TASK_DEF_ARN" ]; then
-              echo "::error::Failed to register new task definition"
-              exit 1
-            fi
-            echo "New task definition registered: $NEW_TASK_DEF_ARN"
-          else
-            echo "Found existing task definition. Updating with new image..."
-            # Get the latest revision
-            LATEST_REVISION=$(echo $TASK_DEF_ARN | rev | cut -d: -f1 | rev | tr -d 'None')
-            echo "Latest revision: $LATEST_REVISION"
-            
-            # Get the current task definition
-            echo "Fetching current task definition..."
-            TASK_DEF=$(aws ecs describe-task-definition --task-definition ${{ env.TASK_DEF_FAMILY_DEV }}:$LATEST_REVISION --query 'taskDefinition' --output json || echo "{}")
-            
-            if [ "$TASK_DEF" = "{}" ]; then
-              echo "::error::Failed to get task definition"
-              exit 1
-            fi
-            
-            echo "Creating new task definition with updated image..."
-            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
-            
-            echo "Registering updated task definition..."
-            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
-            if [ -z "$NEW_TASK_DEF_ARN" ]; then
-              echo "::error::Failed to register updated task definition"
-              exit 1
-            fi
-            echo "Updated task definition registered: $NEW_TASK_DEF_ARN"
-          fi
+            }
+            EOF
+          }
           
+          # Create task definition based on environment
+          create_task_definition "${{ env.SERVICES_ENV }}" "${{ env.TASK_DEF_FAMILY_DEV }}"
+          
+          # Register task definition
+          echo "Registering task definition..."
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          if [ -z "$NEW_TASK_DEF_ARN" ]; then
+            echo "::error::Failed to register task definition"
+            exit 1
+          fi
+          echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
+
+      - name: Deploy to ECS
+        run: |
           echo "Updating ECS service..."
           aws ecs update-service \
             --cluster ${{ env.CLUSTER_NAME_DEV }} \
             --service ${{ env.SERVICE_NAME_DEV }} \
-            --task-definition $NEW_TASK_DEF_ARN
+            --task-definition ${{ steps.task_def.outputs.task_def_arn }}
             
           echo "Waiting for service to stabilize..."
           aws ecs wait services-stable \
@@ -512,7 +523,6 @@ jobs:
             --services ${{ env.SERVICE_NAME_DEV }}
             
           echo "Deployment completed successfully"
-          echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
 
   deploy-qa:
     needs: build-and-push
@@ -538,62 +548,89 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
           
-      - name: Get RDS endpoint
-        id: rds
+      - name: Get Secret ARNs
+        id: secrets
         run: |
-          echo "Fetching RDS endpoint for ${{ env.SERVICES_ENV }} environment..."
-          RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier ${{ env.RDS_INSTANCE_QA }} --query 'DBInstances[0].Endpoint.Address' --output text)
-          if [ -z "$RDS_ENDPOINT" ]; then
-            echo "::error::Failed to get RDS endpoint"
-            exit 1
-          fi
-          echo "RDS endpoint: $RDS_ENDPOINT"
-          echo "rds_endpoint=$RDS_ENDPOINT" >> $GITHUB_OUTPUT
-
-      - name: Get RDS credentials
-        id: rds_creds
-        run: |
-          echo "Fetching RDS credentials from Secrets Manager..."
-          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{env.RDS_QA_SECRET_NAME}} --query 'SecretString' --output text)
-          if [ -z "$RDS_SECRET" ]; then
-            echo "::error::Failed to get RDS credentials from Secrets Manager"
-            exit 1
-          fi
-          DB_HOST=$(echo $RDS_SECRET | jq -r '.host')
-          DB_PORT=$(echo $RDS_SECRET | jq -r '.port')
-          DB_NAME=$(echo $RDS_SECRET | jq -r '.dbname')
-          DB_USER=$(echo $RDS_SECRET | jq -r '.username')
-          DB_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
-          if [ -z "$DB_HOST" ] || [ -z "$DB_PORT" ] || [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ]; then
-            echo "::error::Invalid RDS credentials format in Secrets Manager"
-            exit 1
-          fi
-          echo "RDS credentials retrieved successfully"
-          echo "db_host=$DB_HOST" >> $GITHUB_OUTPUT
-          echo "db_port=$DB_PORT" >> $GITHUB_OUTPUT
-          echo "db_name=$DB_NAME" >> $GITHUB_OUTPUT
-          echo "db_user=$DB_USER" >> $GITHUB_OUTPUT
-          echo "db_password=$DB_PASSWORD" >> $GITHUB_OUTPUT
+          echo "Fetching Secret ARNs..."
           
-      - name: Deploy to ECS
+          # Function to get secret ARN with retry
+          get_secret_arn() {
+            local secret_name=$1
+            local max_attempts=3
+            local attempt=1
+            local secret_arn=""
+            
+            while [ $attempt -le $max_attempts ]; do
+              echo "Attempt $attempt of $max_attempts to get ARN for $secret_name"
+              secret_arn=$(aws secretsmanager describe-secret --name "$secret_name" --query 'ARN' --output text)
+              
+              if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
+                echo "Successfully got ARN for $secret_name"
+                echo "$secret_arn"
+                return 0
+              fi
+              
+              echo "Failed to get ARN for $secret_name. Retrying..."
+              sleep 5
+              attempt=$((attempt + 1))
+            done
+            
+            echo "::error::Failed to get ARN for $secret_name after $max_attempts attempts"
+            return 1
+          }
+          
+          # Get DB Connection Secret ARN
+          DB_CONNECTION_ARN=$(get_secret_arn "finefinds-qa-db-connection")
+          if [ $? -ne 0 ]; then exit 1; fi
+          echo "db_connection_arn=$DB_CONNECTION_ARN" >> $GITHUB_OUTPUT
+          
+          # Get Redis Connection Secret ARN
+          REDIS_CONNECTION_ARN=$(get_secret_arn "finefinds-qa-redis-connection")
+          if [ $? -ne 0 ]; then exit 1; fi
+          echo "redis_connection_arn=$REDIS_CONNECTION_ARN" >> $GITHUB_OUTPUT
+          
+          # Get Cognito Config Secret ARN
+          COGNITO_CONFIG_ARN=$(get_secret_arn "finefinds-qa-cognito-config")
+          if [ $? -ne 0 ]; then exit 1; fi
+          echo "cognito_config_arn=$COGNITO_CONFIG_ARN" >> $GITHUB_OUTPUT
+          
+          # Get JWT Secret ARN
+          JWT_SECRET_ARN=$(get_secret_arn "finefinds-qa-jwt-secret")
+          if [ $? -ne 0 ]; then exit 1; fi
+          echo "jwt_secret_arn=$JWT_SECRET_ARN" >> $GITHUB_OUTPUT
+          
+          # Verify all secrets exist and are accessible
+          echo "Verifying secret access..."
+          for secret_arn in "$DB_CONNECTION_ARN" "$REDIS_CONNECTION_ARN" "$COGNITO_CONFIG_ARN" "$JWT_SECRET_ARN"; do
+            if ! aws secretsmanager describe-secret --secret-id "$secret_arn" > /dev/null; then
+              echo "::error::Failed to verify access to secret: $secret_arn"
+              exit 1
+            fi
+          done
+          
+          echo "All secrets verified successfully"
+
+      - name: Create Task Definition
+        id: task_def
         run: |
           VERSION=$(cat version.txt)
           
-          # Check if task definition exists
-          echo "Checking for existing task definition..."
-          TASK_DEF_ARN=$(aws ecs list-task-definitions --family-prefix ${{ env.TASK_DEF_FAMILY_QA }} --sort DESC --max-items 1 --query 'taskDefinitionArns[0]' --output text || echo "None")
-          
-          if [ "$TASK_DEF_ARN" = "None" ] || [ -z "$TASK_DEF_ARN" ]; then
-            echo "No existing task definition found. Creating new task definition..."
-            # Create new task definition from scratch
-            echo '{
-              "family": "'"${{ env.TASK_DEF_FAMILY_QA }}"'",
+          # Function to create task definition JSON
+          create_task_definition() {
+            local env=$1
+            local task_def_family=$2
+            local execution_role="finefinds-$env-ecs-execution-role"
+            local task_role="finefinds-$env-ecs-task-role"
+            
+            cat << EOF > task-definition.json
+            {
+              "family": "$task_def_family",
               "networkMode": "awsvpc",
               "requiresCompatibilities": ["FARGATE"],
               "cpu": "256",
               "memory": "512",
-              "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-qa-ecs-execution-role",
-              "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-qa-ecs-task-role",
+              "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/$execution_role",
+              "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/$task_role",
               "runtimePlatform": {
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
@@ -616,7 +653,7 @@ jobs:
                   },
                   {
                     "name": "AppPorts",
-                    "value": "3000,5432"
+                    "value": "3000"
                   },
                   {
                     "name": "EgressIgnoredIPs",
@@ -636,10 +673,6 @@ jobs:
                     {
                       "containerPort": 3000,
                       "protocol": "tcp"
-                    },
-                    {
-                      "containerPort": 5432,
-                      "protocol": "tcp"
                     }
                   ],
                   "environment": [
@@ -649,110 +682,84 @@ jobs:
                     },
                     {
                       "name": "NODE_ENV",
-                      "value": "qa"
+                      "value": "$env"
                     },
                     {
                       "name": "AWS_REGION",
                       "value": "'"${{ env.AWS_REGION }}"'"
-                    },
-                    {
-                      "name": "DATABASE_URL",
-                      "value": "postgresql://'"${{ steps.rds_creds.outputs.db_user }}"':'"${{ steps.rds_creds.outputs.db_password }}"'@'"${{ steps.rds.outputs.rds_endpoint }}"':5432/'"${{ steps.rds_creds.outputs.db_name }}"'?schema=public"
                     }
                   ],
                   "secrets": [
                     {
-                      "name": "DB_HOST",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_QA_SECRET_NAME}}:host::"
-                    },
-                    {
-                      "name": "DB_PORT",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_QA_SECRET_NAME}}:port::"
-                    },
-                    {
-                      "name": "DB_NAME",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_QA_SECRET_NAME}}:dbname::"
-                    },
-                    {
-                      "name": "DB_USER",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_QA_SECRET_NAME}}:username::"
-                    },
-                    {
-                      "name": "DB_PASSWORD",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_QA_SECRET_NAME}}:password::"
+                      "name": "DATABASE_URL",
+                      "valueFrom": "'"${{ steps.secrets.outputs.db_connection_arn }}"'"
                     },
                     {
                       "name": "REDIS_URL",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-qa-redis-connection-cuiTEQ"
+                      "valueFrom": "'"${{ steps.secrets.outputs.redis_connection_arn }}"'"
+                    },
+                    {
+                      "name": "JWT_SECRET",
+                      "valueFrom": "'"${{ steps.secrets.outputs.jwt_secret_arn }}"'"
+                    },
+                    {
+                      "name": "COGNITO_USER_POOL_ID",
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_USER_POOL_ID::"
+                    },
+                    {
+                      "name": "COGNITO_CLIENT_ID",
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_USER_POOL_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:secret:finefinds-qa-cognito-config:COGNITO_CLIENT_USER_POOL_ID::"
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_CLIENT_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:secret:finefinds-qa-cognito-config:COGNITO_CLIENT_CLIENT_ID::"
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_CLIENT_ID::"
                     },
                     {
                       "name": "COGNITO_ADMIN_USER_POOL_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:secret:finefinds-qa-cognito-config:COGNITO_ADMIN_USER_POOL_ID::"
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_ADMIN_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_ADMIN_CLIENT_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:secret:finefinds-qa-cognito-config:COGNITO_ADMIN_CLIENT_ID::"
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_ADMIN_CLIENT_ID::"
                     }
                   ],
                   "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                      "awslogs-group": "/finefinds/qa/app",
+                      "awslogs-group": "/finefinds/$env/app",
                       "awslogs-region": "'"${{ env.AWS_REGION }}"'",
                       "awslogs-stream-prefix": "finefinds"
                     }
                   }
                 }
               ]
-            }' > task-definition.json
-            
-            echo "Registering new task definition..."
-            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
-            if [ -z "$NEW_TASK_DEF_ARN" ]; then
-              echo "::error::Failed to register new task definition"
-              exit 1
-            fi
-            echo "New task definition registered: $NEW_TASK_DEF_ARN"
-          else
-            echo "Found existing task definition. Updating with new image..."
-            # Get the latest revision
-            LATEST_REVISION=$(echo $TASK_DEF_ARN | rev | cut -d: -f1 | rev | tr -d 'None')
-            echo "Latest revision: $LATEST_REVISION"
-            
-            # Get the current task definition
-            echo "Fetching current task definition..."
-            TASK_DEF=$(aws ecs describe-task-definition --task-definition ${{ env.TASK_DEF_FAMILY_QA }}:$LATEST_REVISION --query 'taskDefinition' --output json || echo "{}")
-            
-            if [ "$TASK_DEF" = "{}" ]; then
-              echo "::error::Failed to get task definition"
-              exit 1
-            fi
-            
-            echo "Creating new task definition with updated image..."
-            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
-            
-            echo "Registering updated task definition..."
-            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
-            if [ -z "$NEW_TASK_DEF_ARN" ]; then
-              echo "::error::Failed to register updated task definition"
-              exit 1
-            fi
-            echo "Updated task definition registered: $NEW_TASK_DEF_ARN"
-          fi
+            }
+            EOF
+          }
           
+          # Create task definition based on environment
+          create_task_definition "qa" "${{ env.TASK_DEF_FAMILY_QA }}"
+          
+          # Register task definition
+          echo "Registering task definition..."
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          if [ -z "$NEW_TASK_DEF_ARN" ]; then
+            echo "::error::Failed to register task definition"
+            exit 1
+          fi
+          echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
+
+      - name: Deploy to ECS
+        run: |
           echo "Updating ECS service..."
           aws ecs update-service \
             --cluster ${{ env.CLUSTER_NAME_QA }} \
             --service ${{ env.SERVICE_NAME_QA }} \
-            --task-definition $NEW_TASK_DEF_ARN
+            --task-definition ${{ steps.task_def.outputs.task_def_arn }}
             
           echo "Waiting for service to stabilize..."
           aws ecs wait services-stable \
@@ -760,7 +767,6 @@ jobs:
             --services ${{ env.SERVICE_NAME_QA }}
             
           echo "Deployment completed successfully"
-          echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
 
   deploy-staging:
     needs: build-and-push
@@ -786,62 +792,89 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
           
-      - name: Get RDS endpoint
-        id: rds
+      - name: Get Secret ARNs
+        id: secrets
         run: |
-          echo "Fetching RDS endpoint for ${{ env.SERVICES_ENV }} environment..."
-          RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier ${{ env.RDS_INSTANCE_STAGING }} --query 'DBInstances[0].Endpoint.Address' --output text)
-          if [ -z "$RDS_ENDPOINT" ]; then
-            echo "::error::Failed to get RDS endpoint"
-            exit 1
-          fi
-          echo "RDS endpoint: $RDS_ENDPOINT"
-          echo "rds_endpoint=$RDS_ENDPOINT" >> $GITHUB_OUTPUT
-
-      - name: Get RDS credentials
-        id: rds_creds
-        run: |
-          echo "Fetching RDS credentials from Secrets Manager..."
-          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{env.RDS_STAGING_SECRET_NAME}} --query 'SecretString' --output text)
-          if [ -z "$RDS_SECRET" ]; then
-            echo "::error::Failed to get RDS credentials from Secrets Manager"
-            exit 1
-          fi
-          DB_HOST=$(echo $RDS_SECRET | jq -r '.host')
-          DB_PORT=$(echo $RDS_SECRET | jq -r '.port')
-          DB_NAME=$(echo $RDS_SECRET | jq -r '.dbname')
-          DB_USER=$(echo $RDS_SECRET | jq -r '.username')
-          DB_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
-          if [ -z "$DB_HOST" ] || [ -z "$DB_PORT" ] || [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ]; then
-            echo "::error::Invalid RDS credentials format in Secrets Manager"
-            exit 1
-          fi
-          echo "RDS credentials retrieved successfully"
-          echo "db_host=$DB_HOST" >> $GITHUB_OUTPUT
-          echo "db_port=$DB_PORT" >> $GITHUB_OUTPUT
-          echo "db_name=$DB_NAME" >> $GITHUB_OUTPUT
-          echo "db_user=$DB_USER" >> $GITHUB_OUTPUT
-          echo "db_password=$DB_PASSWORD" >> $GITHUB_OUTPUT
+          echo "Fetching Secret ARNs..."
           
-      - name: Deploy to ECS
+          # Function to get secret ARN with retry
+          get_secret_arn() {
+            local secret_name=$1
+            local max_attempts=3
+            local attempt=1
+            local secret_arn=""
+            
+            while [ $attempt -le $max_attempts ]; do
+              echo "Attempt $attempt of $max_attempts to get ARN for $secret_name"
+              secret_arn=$(aws secretsmanager describe-secret --name "$secret_name" --query 'ARN' --output text)
+              
+              if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
+                echo "Successfully got ARN for $secret_name"
+                echo "$secret_arn"
+                return 0
+              fi
+              
+              echo "Failed to get ARN for $secret_name. Retrying..."
+              sleep 5
+              attempt=$((attempt + 1))
+            done
+            
+            echo "::error::Failed to get ARN for $secret_name after $max_attempts attempts"
+            return 1
+          }
+          
+          # Get DB Connection Secret ARN
+          DB_CONNECTION_ARN=$(get_secret_arn "finefinds-staging-db-connection")
+          if [ $? -ne 0 ]; then exit 1; fi
+          echo "db_connection_arn=$DB_CONNECTION_ARN" >> $GITHUB_OUTPUT
+          
+          # Get Redis Connection Secret ARN
+          REDIS_CONNECTION_ARN=$(get_secret_arn "finefinds-staging-redis-connection")
+          if [ $? -ne 0 ]; then exit 1; fi
+          echo "redis_connection_arn=$REDIS_CONNECTION_ARN" >> $GITHUB_OUTPUT
+          
+          # Get Cognito Config Secret ARN
+          COGNITO_CONFIG_ARN=$(get_secret_arn "finefinds-staging-cognito-config")
+          if [ $? -ne 0 ]; then exit 1; fi
+          echo "cognito_config_arn=$COGNITO_CONFIG_ARN" >> $GITHUB_OUTPUT
+          
+          # Get JWT Secret ARN
+          JWT_SECRET_ARN=$(get_secret_arn "finefinds-staging-jwt-secret")
+          if [ $? -ne 0 ]; then exit 1; fi
+          echo "jwt_secret_arn=$JWT_SECRET_ARN" >> $GITHUB_OUTPUT
+          
+          # Verify all secrets exist and are accessible
+          echo "Verifying secret access..."
+          for secret_arn in "$DB_CONNECTION_ARN" "$REDIS_CONNECTION_ARN" "$COGNITO_CONFIG_ARN" "$JWT_SECRET_ARN"; do
+            if ! aws secretsmanager describe-secret --secret-id "$secret_arn" > /dev/null; then
+              echo "::error::Failed to verify access to secret: $secret_arn"
+              exit 1
+            fi
+          done
+          
+          echo "All secrets verified successfully"
+
+      - name: Create Task Definition
+        id: task_def
         run: |
           VERSION=$(cat version.txt)
           
-          # Check if task definition exists
-          echo "Checking for existing task definition..."
-          TASK_DEF_ARN=$(aws ecs list-task-definitions --family-prefix ${{ env.TASK_DEF_FAMILY_STAGING }} --sort DESC --max-items 1 --query 'taskDefinitionArns[0]' --output text || echo "None")
-          
-          if [ "$TASK_DEF_ARN" = "None" ] || [ -z "$TASK_DEF_ARN" ]; then
-            echo "No existing task definition found. Creating new task definition..."
-            # Create new task definition from scratch
-            echo '{
-              "family": "'"${{ env.TASK_DEF_FAMILY_STAGING }}"'",
+          # Function to create task definition JSON
+          create_task_definition() {
+            local env=$1
+            local task_def_family=$2
+            local execution_role="finefinds-$env-ecs-execution-role"
+            local task_role="finefinds-$env-ecs-task-role"
+            
+            cat << EOF > task-definition.json
+            {
+              "family": "$task_def_family",
               "networkMode": "awsvpc",
               "requiresCompatibilities": ["FARGATE"],
               "cpu": "256",
               "memory": "512",
-              "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-staging-ecs-execution-role",
-              "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-staging-ecs-task-role",
+              "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/$execution_role",
+              "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/$task_role",
               "runtimePlatform": {
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
@@ -864,7 +897,7 @@ jobs:
                   },
                   {
                     "name": "AppPorts",
-                    "value": "3000,5432"
+                    "value": "3000"
                   },
                   {
                     "name": "EgressIgnoredIPs",
@@ -884,10 +917,6 @@ jobs:
                     {
                       "containerPort": 3000,
                       "protocol": "tcp"
-                    },
-                    {
-                      "containerPort": 5432,
-                      "protocol": "tcp"
                     }
                   ],
                   "environment": [
@@ -897,110 +926,84 @@ jobs:
                     },
                     {
                       "name": "NODE_ENV",
-                      "value": "staging"
+                      "value": "$env"
                     },
                     {
                       "name": "AWS_REGION",
                       "value": "'"${{ env.AWS_REGION }}"'"
-                    },
-                    {
-                      "name": "DATABASE_URL",
-                      "value": "postgresql://'"${{ steps.rds_creds.outputs.db_user }}"':'"${{ steps.rds_creds.outputs.db_password }}"'@'"${{ steps.rds.outputs.rds_endpoint }}"':5432/'"${{ steps.rds_creds.outputs.db_name }}"'?schema=public"
                     }
                   ],
                   "secrets": [
                     {
-                      "name": "DB_HOST",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_STAGING_SECRET_NAME}}:host::"
-                    },
-                    {
-                      "name": "DB_PORT",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_STAGING_SECRET_NAME}}:port::"
-                    },
-                    {
-                      "name": "DB_NAME",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_STAGING_SECRET_NAME}}:dbname::"
-                    },
-                    {
-                      "name": "DB_USER",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_STAGING_SECRET_NAME}}:username::"
-                    },
-                    {
-                      "name": "DB_PASSWORD",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_STAGING_SECRET_NAME}}:password::"
+                      "name": "DATABASE_URL",
+                      "valueFrom": "'"${{ steps.secrets.outputs.db_connection_arn }}"'"
                     },
                     {
                       "name": "REDIS_URL",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-staging-redis-connection-cuiTEQ"
+                      "valueFrom": "'"${{ steps.secrets.outputs.redis_connection_arn }}"'"
+                    },
+                    {
+                      "name": "JWT_SECRET",
+                      "valueFrom": "'"${{ steps.secrets.outputs.jwt_secret_arn }}"'"
+                    },
+                    {
+                      "name": "COGNITO_USER_POOL_ID",
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_USER_POOL_ID::"
+                    },
+                    {
+                      "name": "COGNITO_CLIENT_ID",
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_USER_POOL_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:secret:finefinds-staging-cognito-config:COGNITO_CLIENT_USER_POOL_ID::"
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_CLIENT_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:secret:finefinds-staging-cognito-config:COGNITO_CLIENT_CLIENT_ID::"
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_CLIENT_ID::"
                     },
                     {
                       "name": "COGNITO_ADMIN_USER_POOL_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:secret:finefinds-staging-cognito-config:COGNITO_ADMIN_USER_POOL_ID::"
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_ADMIN_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_ADMIN_CLIENT_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:secret:finefinds-staging-cognito-config:COGNITO_ADMIN_CLIENT_ID::"
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_ADMIN_CLIENT_ID::"
                     }
                   ],
                   "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                      "awslogs-group": "/finefinds/staging/app",
+                      "awslogs-group": "/finefinds/$env/app",
                       "awslogs-region": "'"${{ env.AWS_REGION }}"'",
                       "awslogs-stream-prefix": "finefinds"
                     }
                   }
                 }
               ]
-            }' > task-definition.json
-            
-            echo "Registering new task definition..."
-            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
-            if [ -z "$NEW_TASK_DEF_ARN" ]; then
-              echo "::error::Failed to register new task definition"
-              exit 1
-            fi
-            echo "New task definition registered: $NEW_TASK_DEF_ARN"
-          else
-            echo "Found existing task definition. Updating with new image..."
-            # Get the latest revision
-            LATEST_REVISION=$(echo $TASK_DEF_ARN | rev | cut -d: -f1 | rev | tr -d 'None')
-            echo "Latest revision: $LATEST_REVISION"
-            
-            # Get the current task definition
-            echo "Fetching current task definition..."
-            TASK_DEF=$(aws ecs describe-task-definition --task-definition ${{ env.TASK_DEF_FAMILY_STAGING }}:$LATEST_REVISION --query 'taskDefinition' --output json || echo "{}")
-            
-            if [ "$TASK_DEF" = "{}" ]; then
-              echo "::error::Failed to get task definition"
-              exit 1
-            fi
-            
-            echo "Creating new task definition with updated image..."
-            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
-            
-            echo "Registering updated task definition..."
-            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
-            if [ -z "$NEW_TASK_DEF_ARN" ]; then
-              echo "::error::Failed to register updated task definition"
-              exit 1
-            fi
-            echo "Updated task definition registered: $NEW_TASK_DEF_ARN"
-          fi
+            }
+            EOF
+          }
           
+          # Create task definition based on environment
+          create_task_definition "staging" "${{ env.TASK_DEF_FAMILY_STAGING }}"
+          
+          # Register task definition
+          echo "Registering task definition..."
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          if [ -z "$NEW_TASK_DEF_ARN" ]; then
+            echo "::error::Failed to register task definition"
+            exit 1
+          fi
+          echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
+
+      - name: Deploy to ECS
+        run: |
           echo "Updating ECS service..."
           aws ecs update-service \
             --cluster ${{ env.CLUSTER_NAME_STAGING }} \
             --service ${{ env.SERVICE_NAME_STAGING }} \
-            --task-definition $NEW_TASK_DEF_ARN
+            --task-definition ${{ steps.task_def.outputs.task_def_arn }}
             
           echo "Waiting for service to stabilize..."
           aws ecs wait services-stable \
@@ -1008,7 +1011,6 @@ jobs:
             --services ${{ env.SERVICE_NAME_STAGING }}
             
           echo "Deployment completed successfully"
-          echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
 
   deploy-prod:
     needs: build-and-push
@@ -1034,62 +1036,89 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
           
-      - name: Get RDS endpoint
-        id: rds
+      - name: Get Secret ARNs
+        id: secrets
         run: |
-          echo "Fetching RDS endpoint for ${{ env.SERVICES_ENV }} environment..."
-          RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier ${{ env.RDS_INSTANCE_PROD }} --query 'DBInstances[0].Endpoint.Address' --output text)
-          if [ -z "$RDS_ENDPOINT" ]; then
-            echo "::error::Failed to get RDS endpoint"
-            exit 1
-          fi
-          echo "RDS endpoint: $RDS_ENDPOINT"
-          echo "rds_endpoint=$RDS_ENDPOINT" >> $GITHUB_OUTPUT
-
-      - name: Get RDS credentials
-        id: rds_creds
-        run: |
-          echo "Fetching RDS credentials from Secrets Manager..."
-          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{env.RDS_PROD_SECRET_NAME}} --query 'SecretString' --output text)
-          if [ -z "$RDS_SECRET" ]; then
-            echo "::error::Failed to get RDS credentials from Secrets Manager"
-            exit 1
-          fi
-          DB_HOST=$(echo $RDS_SECRET | jq -r '.host')
-          DB_PORT=$(echo $RDS_SECRET | jq -r '.port')
-          DB_NAME=$(echo $RDS_SECRET | jq -r '.dbname')
-          DB_USER=$(echo $RDS_SECRET | jq -r '.username')
-          DB_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
-          if [ -z "$DB_HOST" ] || [ -z "$DB_PORT" ] || [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ]; then
-            echo "::error::Invalid RDS credentials format in Secrets Manager"
-            exit 1
-          fi
-          echo "RDS credentials retrieved successfully"
-          echo "db_host=$DB_HOST" >> $GITHUB_OUTPUT
-          echo "db_port=$DB_PORT" >> $GITHUB_OUTPUT
-          echo "db_name=$DB_NAME" >> $GITHUB_OUTPUT
-          echo "db_user=$DB_USER" >> $GITHUB_OUTPUT
-          echo "db_password=$DB_PASSWORD" >> $GITHUB_OUTPUT
+          echo "Fetching Secret ARNs..."
           
-      - name: Deploy to ECS
+          # Function to get secret ARN with retry
+          get_secret_arn() {
+            local secret_name=$1
+            local max_attempts=3
+            local attempt=1
+            local secret_arn=""
+            
+            while [ $attempt -le $max_attempts ]; do
+              echo "Attempt $attempt of $max_attempts to get ARN for $secret_name"
+              secret_arn=$(aws secretsmanager describe-secret --name "$secret_name" --query 'ARN' --output text)
+              
+              if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
+                echo "Successfully got ARN for $secret_name"
+                echo "$secret_arn"
+                return 0
+              fi
+              
+              echo "Failed to get ARN for $secret_name. Retrying..."
+              sleep 5
+              attempt=$((attempt + 1))
+            done
+            
+            echo "::error::Failed to get ARN for $secret_name after $max_attempts attempts"
+            return 1
+          }
+          
+          # Get DB Connection Secret ARN
+          DB_CONNECTION_ARN=$(get_secret_arn "finefinds-prod-db-connection")
+          if [ $? -ne 0 ]; then exit 1; fi
+          echo "db_connection_arn=$DB_CONNECTION_ARN" >> $GITHUB_OUTPUT
+          
+          # Get Redis Connection Secret ARN
+          REDIS_CONNECTION_ARN=$(get_secret_arn "finefinds-prod-redis-connection")
+          if [ $? -ne 0 ]; then exit 1; fi
+          echo "redis_connection_arn=$REDIS_CONNECTION_ARN" >> $GITHUB_OUTPUT
+          
+          # Get Cognito Config Secret ARN
+          COGNITO_CONFIG_ARN=$(get_secret_arn "finefinds-prod-cognito-config")
+          if [ $? -ne 0 ]; then exit 1; fi
+          echo "cognito_config_arn=$COGNITO_CONFIG_ARN" >> $GITHUB_OUTPUT
+          
+          # Get JWT Secret ARN
+          JWT_SECRET_ARN=$(get_secret_arn "finefinds-prod-jwt-secret")
+          if [ $? -ne 0 ]; then exit 1; fi
+          echo "jwt_secret_arn=$JWT_SECRET_ARN" >> $GITHUB_OUTPUT
+          
+          # Verify all secrets exist and are accessible
+          echo "Verifying secret access..."
+          for secret_arn in "$DB_CONNECTION_ARN" "$REDIS_CONNECTION_ARN" "$COGNITO_CONFIG_ARN" "$JWT_SECRET_ARN"; do
+            if ! aws secretsmanager describe-secret --secret-id "$secret_arn" > /dev/null; then
+              echo "::error::Failed to verify access to secret: $secret_arn"
+              exit 1
+            fi
+          done
+          
+          echo "All secrets verified successfully"
+
+      - name: Create Task Definition
+        id: task_def
         run: |
           VERSION=$(cat version.txt)
           
-          # Check if task definition exists
-          echo "Checking for existing task definition..."
-          TASK_DEF_ARN=$(aws ecs list-task-definitions --family-prefix ${{ env.TASK_DEF_FAMILY_PROD }} --sort DESC --max-items 1 --query 'taskDefinitionArns[0]' --output text || echo "None")
-          
-          if [ "$TASK_DEF_ARN" = "None" ] || [ -z "$TASK_DEF_ARN" ]; then
-            echo "No existing task definition found. Creating new task definition..."
-            # Create new task definition from scratch
-            echo '{
-              "family": "'"${{ env.TASK_DEF_FAMILY_PROD }}"'",
+          # Function to create task definition JSON
+          create_task_definition() {
+            local env=$1
+            local task_def_family=$2
+            local execution_role="finefinds-$env-ecs-execution-role"
+            local task_role="finefinds-$env-ecs-task-role"
+            
+            cat << EOF > task-definition.json
+            {
+              "family": "$task_def_family",
               "networkMode": "awsvpc",
               "requiresCompatibilities": ["FARGATE"],
               "cpu": "256",
               "memory": "512",
-              "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-prod-ecs-execution-role",
-              "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-prod-ecs-task-role",
+              "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/$execution_role",
+              "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/$task_role",
               "runtimePlatform": {
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
@@ -1112,7 +1141,7 @@ jobs:
                   },
                   {
                     "name": "AppPorts",
-                    "value": "3000,5432"
+                    "value": "3000"
                   },
                   {
                     "name": "EgressIgnoredIPs",
@@ -1132,10 +1161,6 @@ jobs:
                     {
                       "containerPort": 3000,
                       "protocol": "tcp"
-                    },
-                    {
-                      "containerPort": 5432,
-                      "protocol": "tcp"
                     }
                   ],
                   "environment": [
@@ -1145,110 +1170,84 @@ jobs:
                     },
                     {
                       "name": "NODE_ENV",
-                      "value": "prod"
+                      "value": "$env"
                     },
                     {
                       "name": "AWS_REGION",
                       "value": "'"${{ env.AWS_REGION }}"'"
-                    },
-                    {
-                      "name": "DATABASE_URL",
-                      "value": "postgresql://'"${{ steps.rds_creds.outputs.db_user }}"':'"${{ steps.rds_creds.outputs.db_password }}"'@'"${{ steps.rds.outputs.rds_endpoint }}"':5432/'"${{ steps.rds_creds.outputs.db_name }}"'?schema=public"
                     }
                   ],
                   "secrets": [
                     {
-                      "name": "DB_HOST",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_PROD_SECRET_NAME}}:host::"
-                    },
-                    {
-                      "name": "DB_PORT",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_PROD_SECRET_NAME}}:port::"
-                    },
-                    {
-                      "name": "DB_NAME",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_PROD_SECRET_NAME}}:dbname::"
-                    },
-                    {
-                      "name": "DB_USER",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_PROD_SECRET_NAME}}:username::"
-                    },
-                    {
-                      "name": "DB_PASSWORD",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:${{env.RDS_PROD_SECRET_NAME}}:password::"
+                      "name": "DATABASE_URL",
+                      "valueFrom": "'"${{ steps.secrets.outputs.db_connection_arn }}"'"
                     },
                     {
                       "name": "REDIS_URL",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:finefinds-prod-redis-connection-cuiTEQ"
+                      "valueFrom": "'"${{ steps.secrets.outputs.redis_connection_arn }}"'"
+                    },
+                    {
+                      "name": "JWT_SECRET",
+                      "valueFrom": "'"${{ steps.secrets.outputs.jwt_secret_arn }}"'"
+                    },
+                    {
+                      "name": "COGNITO_USER_POOL_ID",
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_USER_POOL_ID::"
+                    },
+                    {
+                      "name": "COGNITO_CLIENT_ID",
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_USER_POOL_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:secret:finefinds-prod-cognito-config:COGNITO_CLIENT_USER_POOL_ID::"
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_CLIENT_CLIENT_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:secret:finefinds-prod-cognito-config:COGNITO_CLIENT_CLIENT_ID::"
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_CLIENT_CLIENT_ID::"
                     },
                     {
                       "name": "COGNITO_ADMIN_USER_POOL_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:secret:finefinds-prod-cognito-config:COGNITO_ADMIN_USER_POOL_ID::"
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_ADMIN_USER_POOL_ID::"
                     },
                     {
                       "name": "COGNITO_ADMIN_CLIENT_ID",
-                      "valueFrom": "arn:aws:secretsmanager:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:secret:finefinds-prod-cognito-config:COGNITO_ADMIN_CLIENT_ID::"
+                      "valueFrom": "'"${{ steps.secrets.outputs.cognito_config_arn }}"':COGNITO_ADMIN_CLIENT_ID::"
                     }
                   ],
                   "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                      "awslogs-group": "/finefinds/prod/app",
+                      "awslogs-group": "/finefinds/$env/app",
                       "awslogs-region": "'"${{ env.AWS_REGION }}"'",
                       "awslogs-stream-prefix": "finefinds"
                     }
                   }
                 }
               ]
-            }' > task-definition.json
-            
-            echo "Registering new task definition..."
-            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
-            if [ -z "$NEW_TASK_DEF_ARN" ]; then
-              echo "::error::Failed to register new task definition"
-              exit 1
-            fi
-            echo "New task definition registered: $NEW_TASK_DEF_ARN"
-          else
-            echo "Found existing task definition. Updating with new image..."
-            # Get the latest revision
-            LATEST_REVISION=$(echo $TASK_DEF_ARN | rev | cut -d: -f1 | rev | tr -d 'None')
-            echo "Latest revision: $LATEST_REVISION"
-            
-            # Get the current task definition
-            echo "Fetching current task definition..."
-            TASK_DEF=$(aws ecs describe-task-definition --task-definition ${{ env.TASK_DEF_FAMILY_PROD }}:$LATEST_REVISION --query 'taskDefinition' --output json || echo "{}")
-            
-            if [ "$TASK_DEF" = "{}" ]; then
-              echo "::error::Failed to get task definition"
-              exit 1
-            fi
-            
-            echo "Creating new task definition with updated image..."
-            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "891076991993.dkr.ecr.us-east-1.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:$VERSION" '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
-            
-            echo "Registering updated task definition..."
-            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
-            if [ -z "$NEW_TASK_DEF_ARN" ]; then
-              echo "::error::Failed to register updated task definition"
-              exit 1
-            fi
-            echo "Updated task definition registered: $NEW_TASK_DEF_ARN"
-          fi
+            }
+            EOF
+          }
           
+          # Create task definition based on environment
+          create_task_definition "prod" "${{ env.TASK_DEF_FAMILY_PROD }}"
+          
+          # Register task definition
+          echo "Registering task definition..."
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          if [ -z "$NEW_TASK_DEF_ARN" ]; then
+            echo "::error::Failed to register task definition"
+            exit 1
+          fi
+          echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
+
+      - name: Deploy to ECS
+        run: |
           echo "Updating ECS service..."
           aws ecs update-service \
             --cluster ${{ env.CLUSTER_NAME_PROD }} \
             --service ${{ env.SERVICE_NAME_PROD }} \
-            --task-definition $NEW_TASK_DEF_ARN
+            --task-definition ${{ steps.task_def.outputs.task_def_arn }}
             
           echo "Waiting for service to stabilize..."
           aws ecs wait services-stable \
@@ -1256,7 +1255,6 @@ jobs:
             --services ${{ env.SERVICE_NAME_PROD }}
             
           echo "Deployment completed successfully"
-          echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
 
   notify:
     needs: [deploy-sandbox, deploy-dev, deploy-qa, deploy-staging, deploy-prod]
