@@ -307,21 +307,20 @@ jobs:
         id: rds_creds
         run: |
           echo "Fetching RDS credentials from Secrets Manager..."
-          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id "finefinds-${{ env.SERVICES_ENV }}-db-connection" --query 'SecretString' --output text)
+          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id "FineFindsdevRdsDatabaseSecr-0zIOqlcLlE2c" --query 'SecretString' --output text)
           if [ -z "$RDS_SECRET" ]; then
             echo "::error::Failed to get RDS credentials from Secrets Manager"
             exit 1
           fi
           DB_HOST=$(echo $RDS_SECRET | jq -r '.host')
           DB_PORT=$(echo $RDS_SECRET | jq -r '.port')
-          DB_NAME=$(echo $RDS_SECRET | jq -r '.dbname')
+          DB_NAME=$(echo $RDS_SECRET | jq -r '.dbName')
           DB_USER=$(echo $RDS_SECRET | jq -r '.username')
           DB_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
           if [ -z "$DB_HOST" ] || [ -z "$DB_PORT" ] || [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ]; then
             echo "::error::Invalid RDS credentials format in Secrets Manager"
             exit 1
           fi
-          
           # Create PostgreSQL connection URL
           DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
           
