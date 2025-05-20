@@ -6,34 +6,62 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "3001:3000"
+      - "3000:3000"
     volumes:
       - .:/app
       - /app/node_modules
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/finefinds?schema=public
-      - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=your-secret-key
-      - JWT_EXPIRATION=1d
-      - PORT=3000
-      - NODE_ENV=development
-      - AWS_REGION=us-east-1
-      - COGNITO_CLIENT_USER_POOL_ID=${COGNITO_CLIENT_USER_POOL_ID}
-      - COGNITO_CLIENT_CLIENT_ID=${COGNITO_CLIENT_CLIENT_ID}
-      - COGNITO_ADMIN_USER_POOL_ID=${COGNITO_ADMIN_USER_POOL_ID}
-      - COGNITO_ADMIN_CLIENT_ID=${COGNITO_ADMIN_CLIENT_ID}
+      # Node Environment
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${PORT:-3000}
+      
+      # AWS Configuration
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      
+      # Authentication - Client Cognito
+      COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID:-}
+      COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:-}
+      COGNITO_CLIENT_USER_POOL_ID: ${COGNITO_CLIENT_USER_POOL_ID:-}
+      COGNITO_CLIENT_CLIENT_ID: ${COGNITO_CLIENT_CLIENT_ID:-}
+      
+      # Authentication - Admin Cognito
+      COGNITO_ADMIN_USER_POOL_ID: ${COGNITO_ADMIN_USER_POOL_ID:-}
+      COGNITO_ADMIN_CLIENT_ID: ${COGNITO_ADMIN_CLIENT_ID:-}
+      
+      # Authentication - JWT
+      JWT_SECRET: ${JWT_SECRET:-}
+      
+      # Database Configuration
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/finefinds}
+      MONGODB_URI: ${MONGODB_URI:-mongodb://localhost:27017/finefinds}
+      
+      # API Configuration
+      API_URL: ${API_URL:-https://api.finefinds.com}
+      API_VERSION: ${API_VERSION:-v1}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     env_file:
       - config/local.env
     depends_on:
       - db
       - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
 
   db:
     image: postgres:15
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=finefinds
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-finefinds}
     ports:
       - "5432:5432"
     volumes:

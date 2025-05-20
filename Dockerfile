@@ -1,9 +1,9 @@
 # Build stage
-FROM --platform=$BUILDPLATFORM node:18-alpine AS builder
+FROM --platform=${BUILDPLATFORM:-linux/amd64} node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files and Prisma schema
 COPY package*.json ./
 COPY prisma ./prisma/
 
@@ -21,13 +21,26 @@ RUN npm run build && \
     find dist/ -type f
 
 # Production stage
-FROM --platform=$TARGETPLATFORM node:18-alpine
+FROM --platform=${TARGETPLATFORM:-linux/amd64} node:18-alpine
+
+# Define build arguments for environment variables
+ARG AWS_REGION
+ARG COGNITO_USER_POOL_ID
+ARG COGNITO_CLIENT_ID
+ARG COGNITO_CLIENT_USER_POOL_ID
+ARG COGNITO_CLIENT_CLIENT_ID
+ARG COGNITO_ADMIN_USER_POOL_ID
+ARG COGNITO_ADMIN_CLIENT_ID
+ARG JWT_SECRET
 
 WORKDIR /app
 
 # Copy package files and Prisma schema
 COPY package*.json ./
 COPY prisma ./prisma/
+
+# Copy config directory for environment variables
+COPY config ./config/
 
 # Install production dependencies only
 RUN npm ci --only=production
@@ -39,18 +52,34 @@ COPY --from=builder /app/node_modules ./node_modules
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Debug: Verify files are copied correctly
-RUN echo "Contents of /app directory:" && \
-    ls -la /app && \
-    echo "Contents of /app/dist directory:" && \
-    ls -la /app/dist && \
-    echo "Contents of /app/prisma directory:" && \
-    ls -la /app/prisma && \
-    echo "Contents of /app/dist directory (recursive):" && \
-    find /app/dist -type f
-
 # Set environment variables
 ENV NODE_ENV=production
+
+# Set environment variables from build arguments
+ENV AWS_REGION=${AWS_REGION}
+ENV COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
+ENV COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}
+ENV COGNITO_CLIENT_USER_POOL_ID=${COGNITO_CLIENT_USER_POOL_ID}
+ENV COGNITO_CLIENT_CLIENT_ID=${COGNITO_CLIENT_CLIENT_ID}
+ENV COGNITO_ADMIN_USER_POOL_ID=${COGNITO_ADMIN_USER_POOL_ID}
+ENV COGNITO_ADMIN_CLIENT_ID=${COGNITO_ADMIN_CLIENT_ID}
+ENV JWT_SECRET=${JWT_SECRET}
+
+# Create startup script that logs environment variables
+RUN echo '#!/bin/sh \n\
+echo "=== Environment Variables ===" \n\
+echo "NODE_ENV: $NODE_ENV" \n\
+echo "AWS_REGION: $AWS_REGION" \n\
+echo "COGNITO_USER_POOL_ID: $COGNITO_USER_POOL_ID" \n\
+echo "COGNITO_CLIENT_ID: $COGNITO_CLIENT_ID" \n\
+echo "COGNITO_CLIENT_USER_POOL_ID: $COGNITO_CLIENT_USER_POOL_ID" \n\
+echo "COGNITO_CLIENT_CLIENT_ID: $COGNITO_CLIENT_CLIENT_ID" \n\
+echo "COGNITO_ADMIN_USER_POOL_ID: $COGNITO_ADMIN_USER_POOL_ID" \n\
+echo "COGNITO_ADMIN_CLIENT_ID: $COGNITO_ADMIN_CLIENT_ID" \n\
+echo "JWT_SECRET set: $(if [ -z "$JWT_SECRET" ]; then echo "No"; else echo "Yes"; fi)" \n\
+echo "=============================" \n\
+node dist/src/main.js \
+' > /app/start.sh && chmod +x /app/start.sh
 
 # Expose port
 EXPOSE 3000
@@ -59,5 +88,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
 
-# Start the application
-CMD ["node", "dist/src/main.js"] 
+# Start the application with our logging script
+CMD ["/app/start.sh"] 

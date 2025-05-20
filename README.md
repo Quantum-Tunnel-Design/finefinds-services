@@ -247,4 +247,111 @@ To remove all data and start fresh:
 ```bash
 docker-compose down -v
 ./scripts/setup-local.sh
-``` 
+```
+
+# FineFinds Services
+
+Backend services for the FineFinds Education Platform.
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js v18+
+- npm
+- Docker and Docker Compose
+- AWS CLI configured with appropriate permissions
+
+### Installation
+
+```bash
+# Install dependencies
+npm install
+
+# Generate Prisma client
+npm run prisma:generate
+```
+
+### Development
+
+```bash
+# Start the development server
+npm run start:dev
+
+# Or use Docker Compose for local development
+docker-compose up
+```
+
+## Deployment to ECR
+
+### Using the Deploy Script
+
+The project includes a deploy script to build and push the Docker image to Amazon ECR.
+
+1. Make sure the AWS CLI is installed and configured with appropriate permissions:
+   ```bash
+   aws configure
+   ```
+
+2. Make the deploy script executable (if not already):
+   ```bash
+   chmod +x deploy-ecr.sh
+   ```
+
+3. Run the deploy script:
+   ```bash
+   ./deploy-ecr.sh
+   ```
+
+This will:
+- Authenticate to your AWS ECR registry
+- Create the ECR repository if it doesn't exist
+- Build the Docker image
+- Tag the image
+- Push the image to ECR
+
+### Manual Deployment
+
+1. Build the Docker image:
+   ```bash
+   docker build -t finefinds-services .
+   ```
+
+2. Tag the image for your ECR registry:
+   ```bash
+   docker tag finefinds-services:latest [AWS_ACCOUNT_ID].dkr.ecr.[REGION].amazonaws.com/finefinds-services:latest
+   ```
+
+3. Push to ECR:
+   ```bash
+   docker push [AWS_ACCOUNT_ID].dkr.ecr.[REGION].amazonaws.com/finefinds-services:latest
+   ```
+
+## Environment Variables
+
+The application requires the following environment variables to be set:
+
+### Required AWS/Cognito Variables
+- `AWS_REGION` - AWS region (e.g., us-east-1)
+- `COGNITO_USER_POOL_ID` - Cognito User Pool ID
+- `COGNITO_CLIENT_ID` - Cognito Client ID
+- `COGNITO_CLIENT_USER_POOL_ID` - Client User Pool ID
+- `COGNITO_CLIENT_CLIENT_ID` - Client Client ID 
+- `COGNITO_ADMIN_USER_POOL_ID` - Admin User Pool ID
+- `COGNITO_ADMIN_CLIENT_ID` - Admin Client ID
+
+### Database Configuration
+- `DATABASE_URL` - PostgreSQL connection string
+- `MONGODB_URI` - MongoDB connection string
+
+### Authentication
+- `JWT_SECRET` - Secret for JWT token generation/validation
+
+See `config/` directory for environment-specific configuration files.
+
+## Docker Configuration
+
+The application uses a multi-stage Docker build for efficient image creation.
+
+- `Dockerfile`: Multi-stage build for production
+- `docker-compose.yml`: Local development with PostgreSQL and Redis 
