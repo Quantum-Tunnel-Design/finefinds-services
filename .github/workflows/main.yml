@@ -41,34 +41,33 @@ on:
         type: boolean
         default: false
 
+# Add concurrency control
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.ref_name == 'main' && 'prod' || github.ref_name == 'staging' && 'staging' || github.ref_name == 'qa' && 'qa' || github.ref_name == 'dev' && 'dev' || 'sandbox' }}
+  cancel-in-progress: true
+
 permissions:
   id-token: write
   contents: read
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: finefindslk/base/node-services
-  SERVICES_ENV: >-
-    ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 
-    github.ref == 'refs/heads/main' && 'prod' || 
-    github.ref == 'refs/heads/staging' && 'staging' || 
-    github.ref == 'refs/heads/qa' && 'qa' || 
-    github.ref == 'refs/heads/dev' && 'dev' ||
-    'sandbox' }}
-  ECR_REPOSITORY_BACKEND: finefinds-services-${{ github.event_name == 'workflow_dispatch' && inputs.environment || github.ref == 'refs/heads/main' && 'prod' || github.ref == 'refs/heads/staging' && 'staging' || github.ref == 'refs/heads/qa' && 'qa' || github.ref == 'refs/heads/dev' && 'dev' || 'sandbox' }}
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY || 'finefindslk/base/node-services' }}
+  ECR_REPOSITORY_BACKEND: ${{ secrets.ECR_REPOSITORY_BACKEND || format('finefinds-services-{0}', github.event_name == 'workflow_dispatch' && inputs.environment || github.ref == 'refs/heads/main' && 'prod' || github.ref == 'refs/heads/staging' && 'staging' || github.ref == 'refs/heads/qa' && 'qa' || github.ref == 'refs/heads/dev' && 'dev' || 'sandbox') }}
   # Task definition and service names for each environment
-  TASK_DEF_FAMILY_DEV: FineFindsdevEcsTaskDef290F30C7
-  TASK_DEF_FAMILY_QA: FineFindsqaEcsTaskDef290F30C7
-  TASK_DEF_FAMILY_STAGING: FineFindsstagingEcsTaskDef290F30C7
-  TASK_DEF_FAMILY_PROD: FineFindsprodEcsTaskDef290F30C7
-  SERVICE_NAME_DEV: FineFinds-dev-EcsService5196398A-NE8PD74FF49F
-  SERVICE_NAME_QA: FineFinds-qa-EcsService5196398A-gBUy7Nla9Poj
-  SERVICE_NAME_STAGING: FineFinds-staging-EcsService5196398A-gBUy7Nla9Poj
-  SERVICE_NAME_PROD: FineFinds-prod-EcsService5196398A-gBUy7Nla9Poj
-  CLUSTER_NAME_DEV: finefinds-dev-cluster
-  CLUSTER_NAME_QA: finefinds-qa-cluster
-  CLUSTER_NAME_STAGING: finefinds-staging-cluster
-  CLUSTER_NAME_PROD: finefinds-prod-cluster
+  TASK_DEF_FAMILY_DEV: ${{ secrets.TASK_DEF_FAMILY_DEV || 'FineFindsdevEcsTaskDef290F30C7' }}
+  TASK_DEF_FAMILY_QA: ${{ secrets.TASK_DEF_FAMILY_QA || 'FineFindsqaEcsTaskDef290F30C7' }}
+  TASK_DEF_FAMILY_STAGING: ${{ secrets.TASK_DEF_FAMILY_STAGING || 'FineFindsstagingEcsTaskDef290F30C7' }}
+  TASK_DEF_FAMILY_PROD: ${{ secrets.TASK_DEF_FAMILY_PROD || 'FineFindsprodEcsTaskDef290F30C7' }}
+  SERVICE_NAME_DEV: ${{ secrets.SERVICE_NAME_DEV || 'FineFinds-dev-EcsService5196398A-NE8PD74FF49F' }}
+  SERVICE_NAME_QA: ${{ secrets.SERVICE_NAME_QA || 'FineFinds-qa-EcsService5196398A-gBUy7Nla9Poj' }}
+  SERVICE_NAME_STAGING: ${{ secrets.SERVICE_NAME_STAGING || 'FineFinds-staging-EcsService5196398A-gBUy7Nla9Poj' }}
+  SERVICE_NAME_PROD: ${{ secrets.SERVICE_NAME_PROD || 'FineFinds-prod-EcsService5196398A-gBUy7Nla9Poj' }}
+  CLUSTER_NAME_DEV: ${{ secrets.CLUSTER_NAME_DEV || 'finefinds-dev-cluster' }}
+  CLUSTER_NAME_QA: ${{ secrets.CLUSTER_NAME_QA || 'finefinds-qa-cluster' }}
+  CLUSTER_NAME_STAGING: ${{ secrets.CLUSTER_NAME_STAGING || 'finefinds-staging-cluster' }}
+  CLUSTER_NAME_PROD: ${{ secrets.CLUSTER_NAME_PROD || 'finefinds-prod-cluster' }}
+  LOG_LEVEL: ${{ secrets.LOG_LEVEL || 'INFO' }}
 jobs:
   input_check:
     runs-on: ubuntu-latest
@@ -79,6 +78,7 @@ jobs:
       - name: Check for inputs to validate
         id: input_check
         run: |
+          echo "::group::Input Validation"
           echo "Input Env: ${{inputs.environment }}"
           echo "Env: ${{env.SERVICES_ENV}}"
           echo "Branch: ${{inputs.branch}}"
@@ -88,6 +88,15 @@ jobs:
           echo "Ref: ${{ github.ref }}"
           echo "Event Name: ${{ github.event_name }}"
           echo "Environment: ${{ github.event.repository.name }}"
+          echo "::endgroup::"
+          
+          # Verify AWS role permissions
+          echo "::group::AWS Role Permission Check"
+          aws iam get-role --role-name github-actions-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }} || {
+            echo "::error::AWS role not found or insufficient permissions"
+            exit 1
+          }
+          echo "::endgroup::"
 
   test:
     needs: input_check
@@ -413,6 +422,47 @@ jobs:
         run: |
           VERSION=$(cat version.txt)
           
+          # Function to get current task definition
+          get_current_task_def() {
+            local cluster=$1
+            local service=$2
+            aws ecs describe-services --cluster $cluster --services $service --query 'services[0].taskDefinition' --output text
+          }
+          
+          # Function to rollback to previous task definition
+          rollback_task_def() {
+            local cluster=$1
+            local service=$2
+            local previous_task_def=$3
+            echo "Rolling back to previous task definition: $previous_task_def"
+            aws ecs update-service --cluster $cluster --service $service --task-definition $previous_task_def
+            aws ecs wait services-stable --cluster $cluster --services $service
+          }
+          
+          # Function to clean up old task definitions
+          cleanup_old_task_defs() {
+            local family=$1
+            local keep_count=5
+            echo "Cleaning up old task definitions for family: $family"
+            aws ecs list-task-definitions --family-prefix $family --sort DESC --query 'taskDefinitionArns[0:'$keep_count']' --output text | \
+            while read -r task_def; do
+              if [ ! -z "$task_def" ]; then
+                echo "Keeping task definition: $task_def"
+              fi
+            done
+            aws ecs list-task-definitions --family-prefix $family --sort DESC --query 'taskDefinitionArns['$keep_count':]' --output text | \
+            while read -r task_def; do
+              if [ ! -z "$task_def" ]; then
+                echo "Deregistering old task definition: $task_def"
+                aws ecs deregister-task-definition --task-definition $task_def
+              fi
+            done
+          }
+          
+          # Store current task definition for rollback
+          CURRENT_TASK_DEF=$(get_current_task_def "${{ env.CLUSTER_NAME_DEV }}" "${{ env.SERVICE_NAME_DEV }}")
+          echo "current_task_def=$CURRENT_TASK_DEF" >> $GITHUB_OUTPUT
+          
           # Function to create task definition JSON
           create_task_definition() {
             local env=$1
@@ -451,45 +501,131 @@ jobs:
             exit 1
           fi
           echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
+          
+          # Clean up old task definitions
+          cleanup_old_task_defs "${{ env.TASK_DEF_FAMILY_DEV }}"
+
+      - name: Check AWS Permissions
+        id: check_permissions
+        run: |
+          # Function to log with timestamp and level
+          log() {
+            local level=$1
+            shift
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*"
+          }
+          
+          log "INFO" "Checking AWS permissions..."
+          local required_permissions=(
+            "ecs:UpdateService"
+            "ecs:DescribeServices"
+            "ecs:ListTaskDefinitions"
+            "ecs:DeregisterTaskDefinition"
+            "iam:PassRole"
+            "secretsmanager:GetSecretValue"
+            "secretsmanager:DescribeSecret"
+          )
+          
+          for permission in "${required_permissions[@]}"; do
+            log "INFO" "Checking permission: $permission"
+            if ! aws iam simulate-principal-policy \
+              --policy-source-arn "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}" \
+              --action-names "$permission" \
+              --resource-arns "*" | grep -q "allowed"; then
+              log "ERROR" "Missing required permission: $permission"
+              exit 1
+            fi
+          done
+          
+          log "INFO" "All required permissions are present"
+          
+          # Check if the role can access the required secrets
+          log "INFO" "Verifying secret access permissions..."
+          local secrets=(
+            "finefinds-${{ env.SERVICES_ENV }}-db-connection"
+            "finefinds-${{ env.SERVICES_ENV }}-redis-connection"
+            "finefinds-${{ env.SERVICES_ENV }}-jwt"
+            "finefinds-${{ env.SERVICES_ENV }}-cognito-config"
+          )
+          
+          for secret in "${secrets[@]}"; do
+            log "INFO" "Checking access to secret: $secret"
+            if ! aws secretsmanager describe-secret --secret-id "$secret" > /dev/null 2>&1; then
+              log "ERROR" "Cannot access secret: $secret"
+              exit 1
+            fi
+          done
+          
+          log "INFO" "All secret access permissions verified"
 
       - name: Deploy to ECS
+        id: deploy
         run: |
-          echo "Updating ECS service..."
-          aws ecs update-service \
+          # Function to log with timestamp and level
+          log() {
+            local level=$1
+            shift
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*"
+          }
+          
+          log "INFO" "Starting deployment process..."
+          log "INFO" "Environment: ${{ env.SERVICES_ENV }}"
+          log "INFO" "Cluster: ${{ env.CLUSTER_NAME_DEV }}"
+          log "INFO" "Service: ${{ env.SERVICE_NAME_DEV }}"
+          log "INFO" "Task Definition: ${{ steps.task_def.outputs.task_def_arn }}"
+          
+          log "INFO" "Updating ECS service..."
+          if ! aws ecs update-service \
             --cluster ${{ env.CLUSTER_NAME_DEV }} \
             --service ${{ env.SERVICE_NAME_DEV }} \
-            --task-definition ${{ steps.task_def.outputs.task_def_arn }}
+            --task-definition ${{ steps.task_def.outputs.task_def_arn }}; then
+            log "ERROR" "Failed to update ECS service"
+            log "INFO" "Rolling back to previous task definition..."
+            rollback_task_def "${{ env.CLUSTER_NAME_DEV }}" "${{ env.SERVICE_NAME_DEV }}" "${{ steps.task_def.outputs.current_task_def }}"
+            exit 1
+          fi
             
-          echo "Waiting for service to stabilize..."
-          aws ecs wait services-stable \
+          log "INFO" "Waiting for service to stabilize..."
+          if ! aws ecs wait services-stable \
             --cluster ${{ env.CLUSTER_NAME_DEV }} \
-            --services ${{ env.SERVICE_NAME_DEV }}
+            --services ${{ env.SERVICE_NAME_DEV }}; then
+            log "ERROR" "Service failed to stabilize"
+            log "INFO" "Rolling back to previous task definition..."
+            rollback_task_def "${{ env.CLUSTER_NAME_DEV }}" "${{ env.SERVICE_NAME_DEV }}" "${{ steps.task_def.outputs.current_task_def }}"
+            exit 1
+          fi
             
           # Add health check after deployment
-          echo "Performing health check..."
+          log "INFO" "Starting health check..."
           max_attempts=30
           attempt=1
           while [ $attempt -le $max_attempts ]; do
-            echo "Health check attempt $attempt of $max_attempts"
+            log "INFO" "Health check attempt $attempt of $max_attempts"
             if aws ecs describe-services \
               --cluster ${{ env.CLUSTER_NAME_DEV }} \
               --services ${{ env.SERVICE_NAME_DEV }} \
               --query 'services[0].runningCount' \
               --output text | grep -q "1"; then
-              echo "Service is healthy"
+              log "INFO" "Service is healthy"
               break
             fi
-            echo "Service not healthy yet. Waiting..."
+            log "INFO" "Service not healthy yet. Waiting..."
             sleep 10
             attempt=$((attempt + 1))
           done
           
           if [ $attempt -gt $max_attempts ]; then
-            echo "::error::Service failed to become healthy after $max_attempts attempts"
+            log "ERROR" "Service failed to become healthy after $max_attempts attempts"
+            log "INFO" "Rolling back to previous task definition..."
+            rollback_task_def "${{ env.CLUSTER_NAME_DEV }}" "${{ env.SERVICE_NAME_DEV }}" "${{ steps.task_def.outputs.current_task_def }}"
             exit 1
           fi
           
-          echo "Deployment completed successfully"
+          log "INFO" "Deployment completed successfully"
+          
+          # Clean up temporary files
+          log "INFO" "Cleaning up temporary files..."
+          rm -f version.txt task-definition.json
 
   deploy-qa:
     needs: build-and-push
