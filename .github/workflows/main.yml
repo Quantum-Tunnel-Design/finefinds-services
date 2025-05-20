@@ -551,7 +551,7 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "envoy",
-                  "image": "public.ecr.aws/appmesh/aws-appmesh-envoy:v1.28.2.0-prod",
+                  "image": "840364872350.dkr.ecr.us-east-1.amazonaws.com/aws-appmesh-envoy:v1.28.2.0-prod",
                   "essential": true,
                   "user": "1337",
                   "environment": [
@@ -650,6 +650,60 @@ jobs:
           log "INFO" "Service: ${{ env.SERVICE_NAME_DEV }}"
           log "INFO" "Task Definition: ${{ steps.task_def.outputs.task_def_arn }}"
           
+          # Function to check container pull status
+          check_container_pull_status() {
+            local cluster=$1
+            local service=$2
+            local max_attempts=10
+            local attempt=1
+            
+            while [ $attempt -le $max_attempts ]; do
+              log "INFO" "Checking container pull status (attempt $attempt of $max_attempts)..."
+              
+              # Get the latest task ARN
+              local task_arn=$(aws ecs list-tasks \
+                --cluster "$cluster" \
+                --service-name "$service" \
+                --desired-status RUNNING \
+                --query 'taskArns[0]' \
+                --output text)
+              
+              if [ -z "$task_arn" ] || [ "$task_arn" == "None" ]; then
+                log "WARNING" "No running tasks found. Waiting..."
+                sleep 30
+                attempt=$((attempt + 1))
+                continue
+              fi
+              
+              # Check task status
+              local task_status=$(aws ecs describe-tasks \
+                --cluster "$cluster" \
+                --tasks "$task_arn" \
+                --query 'tasks[0].lastStatus' \
+                --output text)
+              
+              if [ "$task_status" == "RUNNING" ]; then
+                log "INFO" "Container successfully pulled and running"
+                return 0
+              elif [ "$task_status" == "STOPPED" ]; then
+                local stop_reason=$(aws ecs describe-tasks \
+                  --cluster "$cluster" \
+                  --tasks "$task_arn" \
+                  --query 'tasks[0].stoppedReason' \
+                  --output text)
+                log "ERROR" "Container stopped: $stop_reason"
+                return 1
+              fi
+              
+              log "INFO" "Container status: $task_status. Waiting..."
+              sleep 30
+              attempt=$((attempt + 1))
+            done
+            
+            log "ERROR" "Container pull timed out after $max_attempts attempts"
+            return 1
+          }
+          
           log "INFO" "Updating ECS service..."
           if ! aws ecs update-service \
             --cluster ${{ env.CLUSTER_NAME_DEV }} \
@@ -670,28 +724,10 @@ jobs:
             rollback_task_def "${{ env.CLUSTER_NAME_DEV }}" "${{ env.SERVICE_NAME_DEV }}" "${{ steps.task_def.outputs.current_task_def }}"
             exit 1
           fi
-            
-          # Add health check after deployment
-          log "INFO" "Starting health check..."
-          max_attempts=30
-          attempt=1
-          while [ $attempt -le $max_attempts ]; do
-            log "INFO" "Health check attempt $attempt of $max_attempts"
-            if aws ecs describe-services \
-              --cluster ${{ env.CLUSTER_NAME_DEV }} \
-              --services ${{ env.SERVICE_NAME_DEV }} \
-              --query 'services[0].runningCount' \
-              --output text | grep -q "1"; then
-              log "INFO" "Service is healthy"
-              break
-            fi
-            log "INFO" "Service not healthy yet. Waiting..."
-            sleep 10
-            attempt=$((attempt + 1))
-          done
           
-          if [ $attempt -gt $max_attempts ]; then
-            log "ERROR" "Service failed to become healthy after $max_attempts attempts"
+          # Check container pull status
+          if ! check_container_pull_status "${{ env.CLUSTER_NAME_DEV }}" "${{ env.SERVICE_NAME_DEV }}"; then
+            log "ERROR" "Container pull failed"
             log "INFO" "Rolling back to previous task definition..."
             rollback_task_def "${{ env.CLUSTER_NAME_DEV }}" "${{ env.SERVICE_NAME_DEV }}" "${{ steps.task_def.outputs.current_task_def }}"
             exit 1
@@ -887,7 +923,7 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "envoy",
-                  "image": "public.ecr.aws/appmesh/aws-appmesh-envoy:v1.28.2.0-prod",
+                  "image": "840364872350.dkr.ecr.us-east-1.amazonaws.com/aws-appmesh-envoy:v1.28.2.0-prod",
                   "essential": true,
                   "user": "1337",
                   "environment": [
@@ -1173,7 +1209,7 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "envoy",
-                  "image": "public.ecr.aws/appmesh/aws-appmesh-envoy:v1.28.2.0-prod",
+                  "image": "840364872350.dkr.ecr.us-east-1.amazonaws.com/aws-appmesh-envoy:v1.28.2.0-prod",
                   "essential": true,
                   "user": "1337",
                   "environment": [
@@ -1459,7 +1495,7 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "envoy",
-                  "image": "public.ecr.aws/appmesh/aws-appmesh-envoy:v1.28.2.0-prod",
+                  "image": "840364872350.dkr.ecr.us-east-1.amazonaws.com/aws-appmesh-envoy:v1.28.2.0-prod",
                   "essential": true,
                   "user": "1337",
                   "environment": [
