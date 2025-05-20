@@ -478,6 +478,29 @@ jobs:
             local execution_role="finefinds-$env-ecs-execution-role"
             local task_role="finefinds-$env-ecs-task-role"
             
+            # Verify roles exist before proceeding
+            echo "Verifying IAM roles..."
+            if ! aws iam get-role --role-name "$execution_role" > /dev/null 2>&1; then
+              echo "::error::Execution role $execution_role does not exist"
+              exit 1
+            fi
+            if ! aws iam get-role --role-name "$task_role" > /dev/null 2>&1; then
+              echo "::error::Task role $task_role does not exist"
+              exit 1
+            fi
+            
+            # Get role ARNs
+            local execution_role_arn=$(aws iam get-role --role-name "$execution_role" --query 'Role.Arn' --output text)
+            local task_role_arn=$(aws iam get-role --role-name "$task_role" --query 'Role.Arn' --output text)
+            
+            if [ -z "$execution_role_arn" ] || [ -z "$task_role_arn" ]; then
+              echo "::error::Failed to get role ARNs"
+              exit 1
+            fi
+            
+            echo "Using execution role: $execution_role_arn"
+            echo "Using task role: $task_role_arn"
+            
             # Get secret ARNs first
             echo "Getting secret ARNs..."
             DB_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-db-connection" --query 'ARN' --output text)
@@ -492,8 +515,8 @@ jobs:
               "requiresCompatibilities": ["FARGATE"],
               "cpu": "256",
               "memory": "512",
-              "executionRoleArn": "arn:aws:iam::'$AWS_ACCOUNT_ID':role/'$execution_role'",
-              "taskRoleArn": "arn:aws:iam::'$AWS_ACCOUNT_ID':role/'$task_role'",
+              "executionRoleArn": "'$execution_role_arn'",
+              "taskRoleArn": "'$task_role_arn'",
               "runtimePlatform": {
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
@@ -846,6 +869,29 @@ jobs:
             local execution_role="finefinds-$env-ecs-execution-role"
             local task_role="finefinds-$env-ecs-task-role"
             
+            # Verify roles exist before proceeding
+            echo "Verifying IAM roles..."
+            if ! aws iam get-role --role-name "$execution_role" > /dev/null 2>&1; then
+              echo "::error::Execution role $execution_role does not exist"
+              exit 1
+            fi
+            if ! aws iam get-role --role-name "$task_role" > /dev/null 2>&1; then
+              echo "::error::Task role $task_role does not exist"
+              exit 1
+            fi
+            
+            # Get role ARNs
+            local execution_role_arn=$(aws iam get-role --role-name "$execution_role" --query 'Role.Arn' --output text)
+            local task_role_arn=$(aws iam get-role --role-name "$task_role" --query 'Role.Arn' --output text)
+            
+            if [ -z "$execution_role_arn" ] || [ -z "$task_role_arn" ]; then
+              echo "::error::Failed to get role ARNs"
+              exit 1
+            fi
+            
+            echo "Using execution role: $execution_role_arn"
+            echo "Using task role: $task_role_arn"
+            
             # Get secret ARNs first
             echo "Getting secret ARNs..."
             DB_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-db-connection" --query 'ARN' --output text)
@@ -860,8 +906,8 @@ jobs:
               "requiresCompatibilities": ["FARGATE"],
               "cpu": "256",
               "memory": "512",
-              "executionRoleArn": "arn:aws:iam::'$AWS_ACCOUNT_ID':role/'$execution_role'",
-              "taskRoleArn": "arn:aws:iam::'$AWS_ACCOUNT_ID':role/'$task_role'",
+              "executionRoleArn": "'$execution_role_arn'",
+              "taskRoleArn": "'$task_role_arn'",
               "runtimePlatform": {
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
@@ -1111,6 +1157,29 @@ jobs:
             local execution_role="finefinds-$env-ecs-execution-role"
             local task_role="finefinds-$env-ecs-task-role"
             
+            # Verify roles exist before proceeding
+            echo "Verifying IAM roles..."
+            if ! aws iam get-role --role-name "$execution_role" > /dev/null 2>&1; then
+              echo "::error::Execution role $execution_role does not exist"
+              exit 1
+            fi
+            if ! aws iam get-role --role-name "$task_role" > /dev/null 2>&1; then
+              echo "::error::Task role $task_role does not exist"
+              exit 1
+            fi
+            
+            # Get role ARNs
+            local execution_role_arn=$(aws iam get-role --role-name "$execution_role" --query 'Role.Arn' --output text)
+            local task_role_arn=$(aws iam get-role --role-name "$task_role" --query 'Role.Arn' --output text)
+            
+            if [ -z "$execution_role_arn" ] || [ -z "$task_role_arn" ]; then
+              echo "::error::Failed to get role ARNs"
+              exit 1
+            fi
+            
+            echo "Using execution role: $execution_role_arn"
+            echo "Using task role: $task_role_arn"
+            
             # Get secret ARNs first
             echo "Getting secret ARNs..."
             DB_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-db-connection" --query 'ARN' --output text)
@@ -1125,8 +1194,8 @@ jobs:
               "requiresCompatibilities": ["FARGATE"],
               "cpu": "256",
               "memory": "512",
-              "executionRoleArn": "arn:aws:iam::'$AWS_ACCOUNT_ID':role/'$execution_role'",
-              "taskRoleArn": "arn:aws:iam::'$AWS_ACCOUNT_ID':role/'$task_role'",
+              "executionRoleArn": "'$execution_role_arn'",
+              "taskRoleArn": "'$task_role_arn'",
               "runtimePlatform": {
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
@@ -1376,6 +1445,29 @@ jobs:
             local execution_role="finefinds-$env-ecs-execution-role"
             local task_role="finefinds-$env-ecs-task-role"
             
+            # Verify roles exist before proceeding
+            echo "Verifying IAM roles..."
+            if ! aws iam get-role --role-name "$execution_role" > /dev/null 2>&1; then
+              echo "::error::Execution role $execution_role does not exist"
+              exit 1
+            fi
+            if ! aws iam get-role --role-name "$task_role" > /dev/null 2>&1; then
+              echo "::error::Task role $task_role does not exist"
+              exit 1
+            fi
+            
+            # Get role ARNs
+            local execution_role_arn=$(aws iam get-role --role-name "$execution_role" --query 'Role.Arn' --output text)
+            local task_role_arn=$(aws iam get-role --role-name "$task_role" --query 'Role.Arn' --output text)
+            
+            if [ -z "$execution_role_arn" ] || [ -z "$task_role_arn" ]; then
+              echo "::error::Failed to get role ARNs"
+              exit 1
+            fi
+            
+            echo "Using execution role: $execution_role_arn"
+            echo "Using task role: $task_role_arn"
+            
             # Get secret ARNs first
             echo "Getting secret ARNs..."
             DB_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-db-connection" --query 'ARN' --output text)
@@ -1390,8 +1482,8 @@ jobs:
               "requiresCompatibilities": ["FARGATE"],
               "cpu": "256",
               "memory": "512",
-              "executionRoleArn": "arn:aws:iam::'$AWS_ACCOUNT_ID':role/'$execution_role'",
-              "taskRoleArn": "arn:aws:iam::'$AWS_ACCOUNT_ID':role/'$task_role'",
+              "executionRoleArn": "'$execution_role_arn'",
+              "taskRoleArn": "'$task_role_arn'",
               "runtimePlatform": {
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
