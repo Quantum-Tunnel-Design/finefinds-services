@@ -593,7 +593,7 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "envoy",
-                  "image": "840364872350.dkr.ecr.us-east-1.amazonaws.com/aws-appmesh-envoy:v1.28.2.0-prod",
+                  "image": "public.ecr.aws/appmesh/aws-appmesh-envoy:v1.29.12.1-prod-fips",
                   "essential": true,
                   "user": "1337",
                   "environment": [
@@ -1007,7 +1007,7 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "envoy",
-                  "image": "840364872350.dkr.ecr.us-east-1.amazonaws.com/aws-appmesh-envoy:v1.28.2.0-prod",
+                  "image": "public.ecr.aws/appmesh/aws-appmesh-envoy:v1.29.12.1-prod-fips",
                   "essential": true,
                   "user": "1337",
                   "environment": [
@@ -1335,7 +1335,7 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "envoy",
-                  "image": "840364872350.dkr.ecr.us-east-1.amazonaws.com/aws-appmesh-envoy:v1.28.2.0-prod",
+                  "image": "public.ecr.aws/appmesh/aws-appmesh-envoy:v1.29.12.1-prod-fips",
                   "essential": true,
                   "user": "1337",
                   "environment": [
@@ -1663,7 +1663,7 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "envoy",
-                  "image": "840364872350.dkr.ecr.us-east-1.amazonaws.com/aws-appmesh-envoy:v1.28.2.0-prod",
+                  "image": "public.ecr.aws/appmesh/aws-appmesh-envoy:v1.29.12.1-prod-fips",
                   "essential": true,
                   "user": "1337",
                   "environment": [
