@@ -362,33 +362,33 @@ jobs:
             return 1
           }
           
-          # Get DB Connection Secret ARN
+          # Get and verify DB Connection Secret
+          echo "Getting DB Connection Secret ARN..."
           DB_CONNECTION_ARN=$(get_secret_arn "finefinds-dev-db-connection")
           if [ $? -ne 0 ]; then exit 1; fi
           echo "db_connection_arn=$DB_CONNECTION_ARN" >> $GITHUB_OUTPUT
+          if ! verify_secret_access "$DB_CONNECTION_ARN"; then exit 1; fi
           
-          # Get Redis Connection Secret ARN
+          # Get and verify Redis Connection Secret
+          echo "Getting Redis Connection Secret ARN..."
           REDIS_CONNECTION_ARN=$(get_secret_arn "finefinds-dev-redis-connection")
           if [ $? -ne 0 ]; then exit 1; fi
           echo "redis_connection_arn=$REDIS_CONNECTION_ARN" >> $GITHUB_OUTPUT
+          if ! verify_secret_access "$REDIS_CONNECTION_ARN"; then exit 1; fi
           
-          # Get Cognito Config Secret ARN
+          # Get and verify Cognito Config Secret
+          echo "Getting Cognito Config Secret ARN..."
           COGNITO_CONFIG_ARN=$(get_secret_arn "finefinds-dev-cognito-config")
           if [ $? -ne 0 ]; then exit 1; fi
           echo "cognito_config_arn=$COGNITO_CONFIG_ARN" >> $GITHUB_OUTPUT
+          if ! verify_secret_access "$COGNITO_CONFIG_ARN"; then exit 1; fi
           
-          # Get JWT Secret ARN
+          # Get and verify JWT Secret
+          echo "Getting JWT Secret ARN..."
           JWT_SECRET_ARN=$(get_secret_arn "finefinds-dev-jwt")
           if [ $? -ne 0 ]; then exit 1; fi
           echo "jwt_secret_arn=$JWT_SECRET_ARN" >> $GITHUB_OUTPUT
-          
-          # Verify all secrets exist and are accessible
-          echo "Verifying secret access..."
-          for secret_arn in "$DB_CONNECTION_ARN" "$REDIS_CONNECTION_ARN" "$COGNITO_CONFIG_ARN" "$JWT_SECRET_ARN"; do
-            if ! verify_secret_access "$secret_arn"; then
-              exit 1
-            fi
-          done
+          if ! verify_secret_access "$JWT_SECRET_ARN"; then exit 1; fi
           
           echo "All secrets verified successfully"
 
