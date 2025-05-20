@@ -425,6 +425,43 @@ jobs:
           
           echo "All secrets verified successfully"
 
+      - name: Create CloudWatch Log Groups
+        id: create_log_groups
+        run: |
+          # Function to log with timestamp and level
+          log() {
+            local level=$1
+            shift
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*"
+          }
+          
+          # Function to create log group if it doesn't exist
+          create_log_group() {
+            local log_group=$1
+            local retention_days=30
+            
+            log "INFO" "Checking if log group exists: $log_group"
+            if ! aws logs describe-log-groups --log-group-name-prefix "$log_group" --query 'logGroups[0].logGroupName' --output text | grep -q "$log_group"; then
+              log "INFO" "Creating log group: $log_group"
+              aws logs create-log-group --log-group-name "$log_group"
+              aws logs put-retention-policy --log-group-name "$log_group" --retention-in-days "$retention_days"
+              log "INFO" "Created log group: $log_group with retention period of $retention_days days"
+            else
+              log "INFO" "Log group already exists: $log_group"
+            fi
+          }
+          
+          # Create log groups for each environment
+          local env=${{ env.SERVICES_ENV }}
+          
+          # Create log group for Envoy container
+          create_log_group "/finefinds/$env/envoy"
+          
+          # Create log group for App container
+          create_log_group "/finefinds/$env/app"
+          
+          log "INFO" "All required log groups have been created"
+
       - name: Create Task Definition
         id: task_def
         run: |
@@ -854,6 +891,43 @@ jobs:
           
           echo "All secrets verified successfully"
 
+      - name: Create CloudWatch Log Groups
+        id: create_log_groups
+        run: |
+          # Function to log with timestamp and level
+          log() {
+            local level=$1
+            shift
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*"
+          }
+          
+          # Function to create log group if it doesn't exist
+          create_log_group() {
+            local log_group=$1
+            local retention_days=30
+            
+            log "INFO" "Checking if log group exists: $log_group"
+            if ! aws logs describe-log-groups --log-group-name-prefix "$log_group" --query 'logGroups[0].logGroupName' --output text | grep -q "$log_group"; then
+              log "INFO" "Creating log group: $log_group"
+              aws logs create-log-group --log-group-name "$log_group"
+              aws logs put-retention-policy --log-group-name "$log_group" --retention-in-days "$retention_days"
+              log "INFO" "Created log group: $log_group with retention period of $retention_days days"
+            else
+              log "INFO" "Log group already exists: $log_group"
+            fi
+          }
+          
+          # Create log groups for each environment
+          local env=${{ env.SERVICES_ENV }}
+          
+          # Create log group for Envoy container
+          create_log_group "/finefinds/$env/envoy"
+          
+          # Create log group for App container
+          create_log_group "/finefinds/$env/app"
+          
+          log "INFO" "All required log groups have been created"
+
       - name: Create Task Definition
         id: task_def
         run: |
@@ -1140,6 +1214,43 @@ jobs:
           
           echo "All secrets verified successfully"
 
+      - name: Create CloudWatch Log Groups
+        id: create_log_groups
+        run: |
+          # Function to log with timestamp and level
+          log() {
+            local level=$1
+            shift
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*"
+          }
+          
+          # Function to create log group if it doesn't exist
+          create_log_group() {
+            local log_group=$1
+            local retention_days=30
+            
+            log "INFO" "Checking if log group exists: $log_group"
+            if ! aws logs describe-log-groups --log-group-name-prefix "$log_group" --query 'logGroups[0].logGroupName' --output text | grep -q "$log_group"; then
+              log "INFO" "Creating log group: $log_group"
+              aws logs create-log-group --log-group-name "$log_group"
+              aws logs put-retention-policy --log-group-name "$log_group" --retention-in-days "$retention_days"
+              log "INFO" "Created log group: $log_group with retention period of $retention_days days"
+            else
+              log "INFO" "Log group already exists: $log_group"
+            fi
+          }
+          
+          # Create log groups for each environment
+          local env=${{ env.SERVICES_ENV }}
+          
+          # Create log group for Envoy container
+          create_log_group "/finefinds/$env/envoy"
+          
+          # Create log group for App container
+          create_log_group "/finefinds/$env/app"
+          
+          log "INFO" "All required log groups have been created"
+
       - name: Create Task Definition
         id: task_def
         run: |
@@ -1425,6 +1536,43 @@ jobs:
           done
           
           echo "All secrets verified successfully"
+
+      - name: Create CloudWatch Log Groups
+        id: create_log_groups
+        run: |
+          # Function to log with timestamp and level
+          log() {
+            local level=$1
+            shift
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*"
+          }
+          
+          # Function to create log group if it doesn't exist
+          create_log_group() {
+            local log_group=$1
+            local retention_days=30
+            
+            log "INFO" "Checking if log group exists: $log_group"
+            if ! aws logs describe-log-groups --log-group-name-prefix "$log_group" --query 'logGroups[0].logGroupName' --output text | grep -q "$log_group"; then
+              log "INFO" "Creating log group: $log_group"
+              aws logs create-log-group --log-group-name "$log_group"
+              aws logs put-retention-policy --log-group-name "$log_group" --retention-in-days "$retention_days"
+              log "INFO" "Created log group: $log_group with retention period of $retention_days days"
+            else
+              log "INFO" "Log group already exists: $log_group"
+            fi
+          }
+          
+          # Create log groups for each environment
+          local env=${{ env.SERVICES_ENV }}
+          
+          # Create log group for Envoy container
+          create_log_group "/finefinds/$env/envoy"
+          
+          # Create log group for App container
+          create_log_group "/finefinds/$env/app"
+          
+          log "INFO" "All required log groups have been created"
 
       - name: Create Task Definition
         id: task_def
