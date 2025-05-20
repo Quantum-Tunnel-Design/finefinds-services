@@ -621,7 +621,7 @@ jobs:
                 },
                 {
                   "name": "AppContainer",
-                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:${{ steps.version.outputs.version }}",
+                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:latest",
                   "essential": true,
                   "workingDirectory": "/app",
                   "entryPoint": ["node"],
@@ -1048,7 +1048,7 @@ jobs:
                 },
                 {
                   "name": "AppContainer",
-                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:${{ steps.version.outputs.version }}",
+                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:latest",
                   "essential": true,
                   "workingDirectory": "/app",
                   "entryPoint": ["node"],
@@ -1389,7 +1389,7 @@ jobs:
                 },
                 {
                   "name": "AppContainer",
-                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:${{ steps.version.outputs.version }}",
+                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:latest",
                   "essential": true,
                   "workingDirectory": "/app",
                   "entryPoint": ["node"],
@@ -1730,7 +1730,7 @@ jobs:
                 },
                 {
                   "name": "AppContainer",
-                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:${{ steps.version.outputs.version }}",
+                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:latest",
                   "essential": true,
                   "workingDirectory": "/app",
                   "entryPoint": ["node"],
