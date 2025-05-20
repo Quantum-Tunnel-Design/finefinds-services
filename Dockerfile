@@ -24,7 +24,7 @@ RUN npm run build && \
 FROM --platform=${TARGETPLATFORM:-linux/amd64} node:18-alpine
 
 # Install OpenSSL and other required dependencies
-RUN apk add --no-cache openssl1.1-compat
+RUN apk add --no-cache openssl
 
 # Define build arguments for environment variables
 ARG AWS_REGION
