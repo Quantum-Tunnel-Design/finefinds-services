@@ -325,7 +325,7 @@ jobs:
           DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
           
           echo "RDS credentials retrieved successfully"
-          echo "db_host=$DB_HOST" >> $GITHUB_OUTPUT
+          echo "db_host=localhost" >> $GITHUB_OUTPUT
           echo "db_port=$DB_PORT" >> $GITHUB_OUTPUT
           echo "db_name=$DB_NAME" >> $GITHUB_OUTPUT
           echo "db_user=$DB_USER" >> $GITHUB_OUTPUT
