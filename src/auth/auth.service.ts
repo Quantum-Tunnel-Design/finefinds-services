@@ -32,8 +32,8 @@ export class AuthService {
     this.cognitoClient = new CognitoIdentityProviderClient({
       region: this.configService.get('AWS_REGION'),
     });
-    this.userPoolId = this.configService.get('COGNITO_USER_POOL_ID');
-    this.clientId = this.configService.get('COGNITO_CLIENT_ID');
+    this.userPoolId = this.configService.get('COGNITO_CLIENT_USER_POOL_ID');
+    this.clientId = this.configService.get('COGNITO_CLIENT_CLIENT_ID');
   }
 
   async signUp(input: SignUpInput): Promise<AuthResponse> {

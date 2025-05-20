@@ -27,8 +27,6 @@ aws ecr describe-repositories --repository-names $ECR_REPOSITORY_NAME --region $
 echo "Building Docker image..."
 docker build \
   --build-arg AWS_REGION=${AWS_REGION} \
-  --build-arg COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID} \
-  --build-arg COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID} \
   --build-arg COGNITO_CLIENT_USER_POOL_ID=${COGNITO_CLIENT_USER_POOL_ID} \
   --build-arg COGNITO_CLIENT_CLIENT_ID=${COGNITO_CLIENT_CLIENT_ID} \
   --build-arg COGNITO_ADMIN_USER_POOL_ID=${COGNITO_ADMIN_USER_POOL_ID} \

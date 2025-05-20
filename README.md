@@ -333,8 +333,6 @@ The application requires the following environment variables to be set:
 
 ### Required AWS/Cognito Variables
 - `AWS_REGION` - AWS region (e.g., us-east-1)
-- `COGNITO_USER_POOL_ID` - Cognito User Pool ID
-- `COGNITO_CLIENT_ID` - Cognito Client ID
 - `COGNITO_CLIENT_USER_POOL_ID` - Client User Pool ID
 - `COGNITO_CLIENT_CLIENT_ID` - Client Client ID 
 - `COGNITO_ADMIN_USER_POOL_ID` - Admin User Pool ID

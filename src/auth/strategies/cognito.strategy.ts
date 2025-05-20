@@ -18,12 +18,12 @@ export class CognitoStrategy extends PassportStrategy(Strategy) {
         cache: true,
         rateLimit: true,
         jwksRequestsPerMinute: 5,
-        jwksUri: `https://cognito-idp.${configService.get('AWS_REGION')}.amazonaws.com/${configService.get('COGNITO_USER_POOL_ID')}/.well-known/jwks.json`,
+        jwksUri: `https://cognito-idp.${configService.get('AWS_REGION')}.amazonaws.com/${configService.get('COGNITO_CLIENT_USER_POOL_ID')}/.well-known/jwks.json`,
       }),
     });
 
-    const userPoolId = configService.get('COGNITO_USER_POOL_ID');
-    const clientId = configService.get('COGNITO_CLIENT_ID');
+    const userPoolId = configService.get('COGNITO_CLIENT_USER_POOL_ID');
+    const clientId = configService.get('COGNITO_CLIENT_CLIENT_ID');
 
     if (!userPoolId || !clientId) {
       throw new Error('Cognito configuration is missing. Please check your environment variables.');

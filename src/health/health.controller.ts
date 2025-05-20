@@ -15,8 +15,6 @@ export class HealthController {
       NODE_ENV: process.env.NODE_ENV,
       AWS_REGION: process.env.AWS_REGION,
       // Indicate if Cognito variables are set without showing values
-      COGNITO_USER_POOL_ID: process.env.COGNITO_USER_POOL_ID ? 'Set' : 'Not set',
-      COGNITO_CLIENT_ID: process.env.COGNITO_CLIENT_ID ? 'Set' : 'Not set',
       COGNITO_CLIENT_USER_POOL_ID: process.env.COGNITO_CLIENT_USER_POOL_ID ? 'Set' : 'Not set',
       COGNITO_CLIENT_CLIENT_ID: process.env.COGNITO_CLIENT_CLIENT_ID ? 'Set' : 'Not set',
       COGNITO_ADMIN_USER_POOL_ID: process.env.COGNITO_ADMIN_USER_POOL_ID ? 'Set' : 'Not set',
