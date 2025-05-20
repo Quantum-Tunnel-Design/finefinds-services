@@ -636,7 +636,7 @@ jobs:
                     {"name": "PORT", "value": "3000"},
                     {"name": "NODE_ENV", "value": "'$env'"},
                     {"name": "AWS_REGION", "value": "'$AWS_REGION'"},
-                    {"name": "DATABASE_URL", "value": "'$DATABASE_URL'"}
+                    {"name": "DATABASE_URL", "value": "${{ steps.rds_creds.outputs.database_url }}"}
                   ],
                   "secrets": [
                     {"name": "REDIS_URL", "valueFrom": "'$REDIS_CONNECTION_ARN'"},
@@ -1063,7 +1063,7 @@ jobs:
                     {"name": "PORT", "value": "3000"},
                     {"name": "NODE_ENV", "value": "'$env'"},
                     {"name": "AWS_REGION", "value": "'$AWS_REGION'"},
-                    {"name": "DATABASE_URL", "value": "'$DATABASE_URL'"}
+                    {"name": "DATABASE_URL", "value": "${{ steps.rds_creds.outputs.database_url }}"}
                   ],
                   "secrets": [
                     {"name": "REDIS_URL", "valueFrom": "'$REDIS_CONNECTION_ARN'"},
@@ -1404,7 +1404,7 @@ jobs:
                     {"name": "PORT", "value": "3000"},
                     {"name": "NODE_ENV", "value": "'$env'"},
                     {"name": "AWS_REGION", "value": "'$AWS_REGION'"},
-                    {"name": "DATABASE_URL", "value": "'$DATABASE_URL'"}
+                    {"name": "DATABASE_URL", "value": "${{ steps.rds_creds.outputs.database_url }}"}
                   ],
                   "secrets": [
                     {"name": "REDIS_URL", "valueFrom": "'$REDIS_CONNECTION_ARN'"},
@@ -1745,7 +1745,7 @@ jobs:
                     {"name": "PORT", "value": "3000"},
                     {"name": "NODE_ENV", "value": "'$env'"},
                     {"name": "AWS_REGION", "value": "'$AWS_REGION'"},
-                    {"name": "DATABASE_URL", "value": "'$DATABASE_URL'"}
+                    {"name": "DATABASE_URL", "value": "${{ steps.rds_creds.outputs.database_url }}"}
                   ],
                   "secrets": [
                     {"name": "REDIS_URL", "valueFrom": "'$REDIS_CONNECTION_ARN'"},
