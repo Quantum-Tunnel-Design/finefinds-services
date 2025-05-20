@@ -592,8 +592,6 @@ jobs:
                     {"name": "DATABASE_URL", "valueFrom": "'$DB_CONNECTION_ARN'"},
                     {"name": "REDIS_URL", "valueFrom": "'$REDIS_CONNECTION_ARN'"},
                     {"name": "JWT_SECRET", "valueFrom": "'$JWT_SECRET_ARN'"},
-                    {"name": "COGNITO_USER_POOL_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_USER_POOL_ID::"},
-                    {"name": "COGNITO_CLIENT_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_ID::"},
                     {"name": "COGNITO_CLIENT_USER_POOL_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_USER_POOL_ID::"},
                     {"name": "COGNITO_CLIENT_CLIENT_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_CLIENT_ID::"},
                     {"name": "COGNITO_ADMIN_USER_POOL_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_ADMIN_USER_POOL_ID::"},
