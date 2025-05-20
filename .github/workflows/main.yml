@@ -635,10 +635,10 @@ jobs:
                   "environment": [
                     {"name": "PORT", "value": "3000"},
                     {"name": "NODE_ENV", "value": "'$env'"},
-                    {"name": "AWS_REGION", "value": "'$AWS_REGION'"}
+                    {"name": "AWS_REGION", "value": "'$AWS_REGION'"},
+                    {"name": "DATABASE_URL", "value": "'$DATABASE_URL'"},
                   ],
                   "secrets": [
-                    {"name": "DATABASE_URL", "valueFrom": "'$DATABASE_URL'"},
                     {"name": "REDIS_URL", "valueFrom": "'$REDIS_CONNECTION_ARN'"},
                     {"name": "JWT_SECRET", "valueFrom": "'$JWT_SECRET_ARN'"},
                     {"name": "COGNITO_CLIENT_USER_POOL_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_USER_POOL_ID::"},
@@ -1062,10 +1062,10 @@ jobs:
                   "environment": [
                     {"name": "PORT", "value": "3000"},
                     {"name": "NODE_ENV", "value": "'$env'"},
-                    {"name": "AWS_REGION", "value": "'$AWS_REGION'"}
+                    {"name": "AWS_REGION", "value": "'$AWS_REGION'"},
+                    {"name": "DATABASE_URL","value": "'$DATABASE_URL'"},
                   ],
                   "secrets": [
-                    {"name": "DATABASE_URL","valueFrom": "'$DATABASE_URL'"},
                     {"name": "REDIS_URL", "valueFrom": "'$REDIS_CONNECTION_ARN'"},
                     {"name": "JWT_SECRET", "valueFrom": "'$JWT_SECRET_ARN'"},
                     {"name": "COGNITO_CLIENT_USER_POOL_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_USER_POOL_ID::"},
@@ -1403,10 +1403,10 @@ jobs:
                   "environment": [
                     {"name": "PORT", "value": "3000"},
                     {"name": "NODE_ENV", "value": "'$env'"},
-                    {"name": "AWS_REGION", "value": "'$AWS_REGION'"}
+                    {"name": "AWS_REGION", "value": "'$AWS_REGION'"},
+                    {"name": "DATABASE_URL", "value": "'$DATABASE_URL'"},
                   ],
                   "secrets": [
-                    {"name": "DATABASE_URL","valueFrom": "'$DATABASE_URL'"},
                     {"name": "REDIS_URL", "valueFrom": "'$REDIS_CONNECTION_ARN'"},
                     {"name": "JWT_SECRET", "valueFrom": "'$JWT_SECRET_ARN'"},
                     {"name": "COGNITO_CLIENT_USER_POOL_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_USER_POOL_ID::"},
@@ -1744,10 +1744,10 @@ jobs:
                   "environment": [
                     {"name": "PORT", "value": "3000"},
                     {"name": "NODE_ENV", "value": "'$env'"},
-                    {"name": "AWS_REGION", "value": "'$AWS_REGION'"}
+                    {"name": "AWS_REGION", "value": "'$AWS_REGION'"},
+                    {"name": "DATABASE_URL", "value": "'$DATABASE_URL'"},
                   ],
                   "secrets": [
-                    {"name": "DATABASE_URL","valueFrom": "'$DATABASE_URL'"},
                     {"name": "REDIS_URL", "valueFrom": "'$REDIS_CONNECTION_ARN'"},
                     {"name": "JWT_SECRET", "valueFrom": "'$JWT_SECRET_ARN'"},
                     {"name": "COGNITO_CLIENT_USER_POOL_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_USER_POOL_ID::"},
