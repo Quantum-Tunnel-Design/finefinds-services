@@ -646,48 +646,58 @@ jobs:
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*"
           }
           
-          log "INFO" "Checking AWS permissions..."
-          local required_permissions=(
-            "ecs:UpdateService"
-            "ecs:DescribeServices"
-            "ecs:ListTaskDefinitions"
-            "ecs:DeregisterTaskDefinition"
-            "iam:PassRole"
-            "secretsmanager:GetSecretValue"
-            "secretsmanager:DescribeSecret"
-          )
+          # Function to check AWS permissions
+          check_aws_permissions() {
+            log "INFO" "Checking AWS permissions..."
+            
+            # Define required permissions
+            local required_permissions=(
+              "ecs:UpdateService"
+              "ecs:DescribeServices"
+              "ecs:ListTaskDefinitions"
+              "ecs:DeregisterTaskDefinition"
+              "iam:PassRole"
+              "secretsmanager:GetSecretValue"
+              "secretsmanager:DescribeSecret"
+            )
+            
+            # Check each permission
+            for permission in "${required_permissions[@]}"; do
+              log "INFO" "Checking permission: $permission"
+              if ! aws iam simulate-principal-policy \
+                --policy-source-arn "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}" \
+                --action-names "$permission" \
+                --resource-arns "*" | grep -q "allowed"; then
+                log "ERROR" "Missing required permission: $permission"
+                return 1
+              fi
+            done
+            
+            log "INFO" "All required permissions are present"
+            
+            # Check if the role can access the required secrets
+            log "INFO" "Verifying secret access permissions..."
+            local secrets=(
+              "finefinds-${{ env.SERVICES_ENV }}-db-connection"
+              "finefinds-${{ env.SERVICES_ENV }}-redis-connection"
+              "finefinds-${{ env.SERVICES_ENV }}-jwt"
+              "finefinds-${{ env.SERVICES_ENV }}-cognito-config"
+            )
+            
+            for secret in "${secrets[@]}"; do
+              log "INFO" "Checking access to secret: $secret"
+              if ! aws secretsmanager describe-secret --secret-id "$secret" > /dev/null 2>&1; then
+                log "ERROR" "Cannot access secret: $secret"
+                return 1
+              fi
+            done
+            
+            log "INFO" "All secret access permissions verified"
+            return 0
+          }
           
-          for permission in "${required_permissions[@]}"; do
-            log "INFO" "Checking permission: $permission"
-            if ! aws iam simulate-principal-policy \
-              --policy-source-arn "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}" \
-              --action-names "$permission" \
-              --resource-arns "*" | grep -q "allowed"; then
-              log "ERROR" "Missing required permission: $permission"
-              exit 1
-            fi
-          done
-          
-          log "INFO" "All required permissions are present"
-          
-          # Check if the role can access the required secrets
-          log "INFO" "Verifying secret access permissions..."
-          local secrets=(
-            "finefinds-${{ env.SERVICES_ENV }}-db-connection"
-            "finefinds-${{ env.SERVICES_ENV }}-redis-connection"
-            "finefinds-${{ env.SERVICES_ENV }}-jwt"
-            "finefinds-${{ env.SERVICES_ENV }}-cognito-config"
-          )
-          
-          for secret in "${secrets[@]}"; do
-            log "INFO" "Checking access to secret: $secret"
-            if ! aws secretsmanager describe-secret --secret-id "$secret" > /dev/null 2>&1; then
-              log "ERROR" "Cannot access secret: $secret"
-              exit 1
-            fi
-          done
-          
-          log "INFO" "All secret access permissions verified"
+          # Run the permission check
+          check_aws_permissions
 
       - name: Deploy to ECS
         id: deploy
