@@ -451,16 +451,21 @@ jobs:
             fi
           }
           
-          # Create log groups for each environment
-          local env=${{ env.SERVICES_ENV }}
+          # Function to create all required log groups
+          create_all_log_groups() {
+            local env=${{ env.SERVICES_ENV }}
+            
+            # Create log group for Envoy container
+            create_log_group "/finefinds/$env/envoy"
+            
+            # Create log group for App container
+            create_log_group "/finefinds/$env/app"
+            
+            log "INFO" "All required log groups have been created"
+          }
           
-          # Create log group for Envoy container
-          create_log_group "/finefinds/$env/envoy"
-          
-          # Create log group for App container
-          create_log_group "/finefinds/$env/app"
-          
-          log "INFO" "All required log groups have been created"
+          # Execute the log group creation
+          create_all_log_groups
 
       - name: Create Task Definition
         id: task_def
@@ -917,16 +922,21 @@ jobs:
             fi
           }
           
-          # Create log groups for each environment
-          local env=${{ env.SERVICES_ENV }}
+          # Function to create all required log groups
+          create_all_log_groups() {
+            local env=${{ env.SERVICES_ENV }}
+            
+            # Create log group for Envoy container
+            create_log_group "/finefinds/$env/envoy"
+            
+            # Create log group for App container
+            create_log_group "/finefinds/$env/app"
+            
+            log "INFO" "All required log groups have been created"
+          }
           
-          # Create log group for Envoy container
-          create_log_group "/finefinds/$env/envoy"
-          
-          # Create log group for App container
-          create_log_group "/finefinds/$env/app"
-          
-          log "INFO" "All required log groups have been created"
+          # Execute the log group creation
+          create_all_log_groups
 
       - name: Create Task Definition
         id: task_def
@@ -1240,16 +1250,21 @@ jobs:
             fi
           }
           
-          # Create log groups for each environment
-          local env=${{ env.SERVICES_ENV }}
+          # Function to create all required log groups
+          create_all_log_groups() {
+            local env=${{ env.SERVICES_ENV }}
+            
+            # Create log group for Envoy container
+            create_log_group "/finefinds/$env/envoy"
+            
+            # Create log group for App container
+            create_log_group "/finefinds/$env/app"
+            
+            log "INFO" "All required log groups have been created"
+          }
           
-          # Create log group for Envoy container
-          create_log_group "/finefinds/$env/envoy"
-          
-          # Create log group for App container
-          create_log_group "/finefinds/$env/app"
-          
-          log "INFO" "All required log groups have been created"
+          # Execute the log group creation
+          create_all_log_groups
 
       - name: Create Task Definition
         id: task_def
@@ -1563,16 +1578,21 @@ jobs:
             fi
           }
           
-          # Create log groups for each environment
-          local env=${{ env.SERVICES_ENV }}
+          # Function to create all required log groups
+          create_all_log_groups() {
+            local env=${{ env.SERVICES_ENV }}
+            
+            # Create log group for Envoy container
+            create_log_group "/finefinds/$env/envoy"
+            
+            # Create log group for App container
+            create_log_group "/finefinds/$env/app"
+            
+            log "INFO" "All required log groups have been created"
+          }
           
-          # Create log group for Envoy container
-          create_log_group "/finefinds/$env/envoy"
-          
-          # Create log group for App container
-          create_log_group "/finefinds/$env/app"
-          
-          log "INFO" "All required log groups have been created"
+          # Execute the log group creation
+          create_all_log_groups
 
       - name: Create Task Definition
         id: task_def
