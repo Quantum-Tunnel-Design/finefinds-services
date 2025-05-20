@@ -168,15 +168,29 @@ jobs:
           build-args: |
             BUILDPLATFORM=linux/amd64
             TARGETPLATFORM=linux/amd64
+            NODE_ENV=production
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ steps.version.outputs.version }}
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ github.ref_name }}
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha,scope=${{ github.workflow }}-${{ github.ref }}
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:buildcache
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:buildcache,mode=max
           provenance: false
           sbom: false
           outputs: type=docker
+          no-cache-filters: |
+            node_modules
+            dist
+            .git
+            .github
+            **/*.md
+            **/*.log
+            **/*.test.*
+            **/*.spec.*
+            coverage
+            .env*
           
       - name: Save version for deployment
         run: echo "${{ steps.version.outputs.version }}" > version.txt
