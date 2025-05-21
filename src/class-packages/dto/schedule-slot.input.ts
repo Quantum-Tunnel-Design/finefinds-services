@@ -1,13 +1,8 @@
-import { Field, InputType, ID } from '@nestjs/graphql';
-import { IsDate, IsNotEmpty, IsOptional, IsUUID, IsInt, Min } from 'class-validator';
+import { Field, InputType, Int } from '@nestjs/graphql';
+import { IsDate, IsNotEmpty, IsInt, Min } from 'class-validator';
 
 @InputType()
 export class ScheduleSlotInput {
-  @Field(() => ID, { nullable: true })
-  @IsOptional()
-  @IsUUID()
-  id?: string; // Optional: used for updating existing slots
-
   @Field()
   @IsNotEmpty()
   @IsDate()
@@ -18,7 +13,7 @@ export class ScheduleSlotInput {
   @IsDate()
   endTime: Date;
 
-  @Field()
+  @Field(() => Int)
   @IsNotEmpty()
   @IsInt()
   @Min(1)
