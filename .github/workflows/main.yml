@@ -1,12 +1,34 @@
-name: Backend Service Deployment
+name: Service Workflows
 
 on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to deploy'
+        required: true
+        type: choice
+        options:
+          - admin
+          - client
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      skip_deploy:
+        description: 'Skip deployment and only run tests'
+        required: false
+        type: boolean
+        default: false
   push:
     branches:
-      - dev
-      - qa
-      - staging
       - main
+      - staging
+      - qa
+      - dev
   pull_request:
     types: [closed]
     branches:
@@ -14,32 +36,6 @@ on:
       - staging
       - qa
       - dev
-      - sandbox
-  workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Branch to deploy'
-        required: true
-        type: choice
-        options:
-          - dev
-          - qa
-          - staging
-          - main
-      environment:
-        description: 'Environment to deploy to'
-        required: true
-        type: choice
-        options:
-          - dev
-          - qa
-          - staging
-          - prod
-      skip_deploy:
-        description: 'Skip deployment (only build and push)'
-        required: false
-        type: boolean
-        default: false
 
 # Add concurrency control
 concurrency:
@@ -51,26 +47,38 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION: us-east-1
-  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY || 'finefindslk/base/node-services' }}
-  ECR_REPOSITORY_BACKEND: ${{ secrets.ECR_REPOSITORY_BACKEND || format('finefinds-services-{0}', github.event_name == 'workflow_dispatch' && inputs.environment || github.ref == 'refs/heads/main' && 'prod' || github.ref == 'refs/heads/staging' && 'staging' || github.ref == 'refs/heads/qa' && 'qa' || github.ref == 'refs/heads/dev' && 'dev' || 'sandbox') }}
-  ECR_REPOSITORY_ENVOY: ${{secrets.AWS_ACCOUNT_ID}}.dkr.ecr.us-east-1.amazonaws.com/finefinds-base/aws-envoy
-  ECR_ENVOY_IMAGE_TAG: envoy-v1.29.12.1-prod
-  SERVICES_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || github.ref == 'refs/heads/main' && 'prod' || github.ref == 'refs/heads/staging' && 'staging' || github.ref == 'refs/heads/qa' && 'qa' || github.ref == 'refs/heads/dev' && 'dev' || 'sandbox' }}
-  # Task definition and service names for each environment
-  TASK_DEF_FAMILY_DEV: ${{ secrets.TASK_DEF_FAMILY_DEV || 'FineFindsdevEcsTaskDef290F30C7' }}
-  TASK_DEF_FAMILY_QA: ${{ secrets.TASK_DEF_FAMILY_QA || 'FineFindsqaEcsTaskDef290F30C7' }}
-  TASK_DEF_FAMILY_STAGING: ${{ secrets.TASK_DEF_FAMILY_STAGING || 'FineFindsstagingEcsTaskDef290F30C7' }}
-  TASK_DEF_FAMILY_PROD: ${{ secrets.TASK_DEF_FAMILY_PROD || 'FineFindsprodEcsTaskDef290F30C7' }}
-  SERVICE_NAME_DEV: ${{ secrets.SERVICE_NAME_DEV || 'FineFinds-dev-EcsService5196398A-NE8PD74FF49F' }}
-  SERVICE_NAME_QA: ${{ secrets.SERVICE_NAME_QA || 'FineFinds-qa-EcsService5196398A-gBUy7Nla9Poj' }}
-  SERVICE_NAME_STAGING: ${{ secrets.SERVICE_NAME_STAGING || 'FineFinds-staging-EcsService5196398A-gBUy7Nla9Poj' }}
-  SERVICE_NAME_PROD: ${{ secrets.SERVICE_NAME_PROD || 'FineFinds-prod-EcsService5196398A-gBUy7Nla9Poj' }}
-  CLUSTER_NAME_DEV: ${{ secrets.CLUSTER_NAME_DEV || 'finefinds-dev-cluster' }}
-  CLUSTER_NAME_QA: ${{ secrets.CLUSTER_NAME_QA || 'finefinds-qa-cluster' }}
-  CLUSTER_NAME_STAGING: ${{ secrets.CLUSTER_NAME_STAGING || 'finefinds-staging-cluster' }}
-  CLUSTER_NAME_PROD: ${{ secrets.CLUSTER_NAME_PROD || 'finefinds-prod-cluster' }}
-  LOG_LEVEL: ${{ secrets.LOG_LEVEL || 'INFO' }}
+  # AWS Configuration
+  aws_region: us-east-1
+  github_actions_role: github-actions-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
+  
+  # Environment Configuration
+  services_env: ${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
+  
+  # ECR Configuration
+  ecr_repository_backend: finefinds-backend
+  ecr_repository_envoy: public.ecr.aws/appmesh/aws-appmesh-envoy
+  ecr_envoy_image_tag: v1.29.12.1-prod
+  
+  # ECS Configuration
+  cluster_name: finefinds-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}-cluster
+  service_name: finefinds-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}-service
+  task_def_family: finefinds-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}-task-def
+  
+  # App Mesh Configuration
+  mesh_name: finefinds-mesh
+  virtual_node_name: finefinds-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}-vn
+  virtual_service_name: finefinds-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}-vs
+  
+  # Secrets Configuration
+  db_connection_secret: finefinds-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}-rds-connection
+  redis_connection_secret: finefinds-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}-redis-connection
+  jwt_secret: finefinds-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}-jwt-secret
+  cognito_config_secret: finefinds-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}-cognito-config
+  
+  # Log Groups Configuration
+  log_group_envoy: /finefinds/${{ github.ref_name == 'main' && 'prod' || github.ref_name }}/envoy
+  log_group_app: /finefinds/${{ github.ref_name == 'main' && 'prod' || github.ref_name }}/app
+
 jobs:
   input_check:
     runs-on: ubuntu-latest
@@ -81,57 +89,112 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
-          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }}
+          aws-region: ${{ env.aws_region }}
           role-duration-seconds: 3600
 
       - name: Check for inputs to validate
         id: input_check
         run: |
           echo "::group::Input Validation"
-          echo "Input Env: ${{inputs.environment }}"
-          echo "Env: ${{env.SERVICES_ENV}}"
-          echo "Branch: ${{inputs.branch}}"
-          echo "Skip Deploy: ${{inputs.skip_deploy}}"
-          echo "Role Id: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-finefinds-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}"
+          echo "Input Environment: ${{ inputs.environment }}"
+          echo "Current Environment: ${{ env.services_env }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Role ARN: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }}"
           echo "Repository: ${{ github.repository }}"
           echo "Ref: ${{ github.ref }}"
           echo "Event Name: ${{ github.event_name }}"
-          echo "Environment: ${{ github.event.repository.name }}"
           echo "::endgroup::"
           
           # Verify AWS role permissions
           echo "::group::AWS Role Permission Check"
-          aws iam get-role --role-name github-actions-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }} || {
+          if ! aws iam get-role --role-name ${{ env.github_actions_role }} > /dev/null 2>&1; then
             echo "::error::AWS role not found or insufficient permissions"
             exit 1
-          }
+          fi
+          echo "✓ AWS role permissions verified"
+          echo "::endgroup::"
+
+          # Verify environment variables
+          echo "::group::Environment Variables Check"
+          required_vars=(
+            "aws_region"
+            "github_actions_role"
+            "services_env"
+            "ecr_repository_backend"
+            "ecr_repository_envoy"
+            "ecr_envoy_image_tag"
+            "cluster_name"
+            "service_name"
+            "task_def_family"
+            "mesh_name"
+            "virtual_node_name"
+            "virtual_service_name"
+            "db_connection_secret"
+            "redis_connection_secret"
+            "cognito_config_secret"
+            "jwt_secret"
+            "log_group_envoy"
+            "log_group_app"
+          )
+
+          for var in "${required_vars[@]}"; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Required environment variable $var is not set"
+              exit 1
+            fi
+            echo "✓ $var is set"
+          done
           echo "::endgroup::"
 
   test:
     needs: input_check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
       
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+          cache: 'npm'
           
       - name: Install dependencies
-        run: npm ci
+        run: |
+          echo "::group::Installing dependencies"
+          npm ci
+          echo "::endgroup::"
         
       - name: Run tests
-        run: npm test
-        
-      - name: Build
         run: |
-          npm run build
+          echo "::group::Running tests"
+          if ! npm test; then
+            echo "::error::Tests failed"
+            exit 1
+          fi
+          echo "::endgroup::"
+        
+      - name: Build application
+        run: |
+          echo "::group::Building application"
+          if ! npm run build; then
+            echo "::error::Build failed"
+            exit 1
+          fi
+          
+          echo "Verifying build output..."
+          if [ ! -d "dist" ]; then
+            echo "::error::Build output directory 'dist' not found"
+            exit 1
+          fi
+          
           echo "Contents of dist directory:"
           ls -la dist/
+          
           echo "Contents of dist directory (recursive):"
           find dist/ -type f
+          echo "::endgroup::"
 
   build-and-push:
     needs: test
@@ -143,13 +206,14 @@ jobs:
     if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') }}
     
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
       
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
-          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }}
+          aws-region: ${{ env.aws_region }}
           role-duration-seconds: 3600
           
       - name: Login to Amazon ECR
@@ -160,8 +224,17 @@ jobs:
         
       - name: Create ECR repository if not exists
         run: |
-          aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY_BACKEND }} || \
-          aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY_BACKEND }} --image-scanning-configuration scanOnPush=true
+          echo "::group::Creating ECR repository"
+          if ! aws ecr describe-repositories --repository-names ${{ env.ecr_repository_backend }} > /dev/null 2>&1; then
+            echo "Creating repository: ${{ env.ecr_repository_backend }}"
+            aws ecr create-repository \
+              --repository-name ${{ env.ecr_repository_backend }} \
+              --image-scanning-configuration scanOnPush=true
+            echo "Repository created successfully"
+          else
+            echo "Repository already exists"
+          fi
+          echo "::endgroup::"
           
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -169,6 +242,7 @@ jobs:
       - name: Generate version
         id: version
         run: |
+          echo "::group::Generating version"
           if [[ $GITHUB_REF == refs/tags/* ]]; then
             VERSION=${GITHUB_REF#refs/tags/}
           else
@@ -176,7 +250,9 @@ jobs:
             # Format: YYYYMMDD-{run_number}
             VERSION=$(date +'%Y%m%d')-${{ github.run_number }}
           fi
+          echo "Generated version: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
           
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -189,13 +265,13 @@ jobs:
             TARGETPLATFORM=linux/amd64
             NODE_ENV=production
           tags: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ steps.version.outputs.version }}
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ github.ref_name }}
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:latest
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ecr_repository_backend }}:${{ steps.version.outputs.version }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ecr_repository_backend }}:${{ github.ref_name }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ecr_repository_backend }}:latest
           cache-from: |
             type=gha,scope=${{ github.workflow }}-${{ github.ref }}
-            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:buildcache
-          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:buildcache,mode=max
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.ecr_repository_backend }}:buildcache
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.ecr_repository_backend }}:buildcache,mode=max
           provenance: false
           sbom: false
           outputs: type=docker
@@ -212,7 +288,11 @@ jobs:
             .env*
           
       - name: Save version for deployment
-        run: echo "${{ steps.version.outputs.version }}" > version.txt
+        run: |
+          echo "::group::Saving version"
+          echo "${{ steps.version.outputs.version }}" > version.txt
+          echo "Version saved: ${{ steps.version.outputs.version }}"
+          echo "::endgroup::"
         
       - name: Upload version file
         uses: actions/upload-artifact@v4
@@ -230,7 +310,8 @@ jobs:
       contents: read
     
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
       
       - name: Download version file
         uses: actions/download-artifact@v4
@@ -240,22 +321,97 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
-          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }}
+          aws-region: ${{ env.aws_region }}
           role-duration-seconds: 3600
+          
+      - name: Verify App Mesh Resources and Permissions
+        run: |
+          echo "::group::Verifying App Mesh Resources"
+          
+          # Function to check if resource exists
+          check_resource_exists() {
+            local resource_type=$1
+            local resource_name=$2
+            local command=$3
+            
+            echo "Checking $resource_type: $resource_name"
+            if ! $command > /dev/null 2>&1; then
+              echo "::error::$resource_type $resource_name does not exist"
+              return 1
+            fi
+            echo "✓ $resource_type $resource_name exists"
+            return 0
+          }
+          
+          # Check if mesh exists
+          check_resource_exists "mesh" "${{ env.mesh_name }}" "aws appmesh describe-mesh --mesh-name ${{ env.mesh_name }}"
+          
+          # Check if virtual node exists
+          check_resource_exists "virtual node" "${{ env.virtual_node_name }}" "aws appmesh describe-virtual-node --mesh-name ${{ env.mesh_name }} --virtual-node-name ${{ env.virtual_node_name }}"
+          
+          # Check if virtual service exists
+          check_resource_exists "virtual service" "${{ env.virtual_service_name }}" "aws appmesh describe-virtual-service --mesh-name ${{ env.mesh_name }} --virtual-service-name ${{ env.virtual_service_name }}"
+          
+          # Verify IAM permissions
+          echo "Verifying IAM permissions..."
+          if ! aws iam simulate-principal-policy \
+            --policy-source-arn arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }} \
+            --action-names \
+            appmesh:StreamAggregatedResources \
+            appmesh:DescribeVirtualNode \
+            appmesh:DescribeVirtualService \
+            appmesh:DescribeRoute \
+            appmesh:DescribeVirtualRouter > /dev/null 2>&1; then
+            echo "::error::Task role missing required App Mesh permissions"
+            exit 1
+          fi
+          echo "✓ Task role has required App Mesh permissions"
+          echo "::endgroup::"
+
+      - name: Validate Envoy Image
+        run: |
+          echo "::group::Validating Envoy Image"
+          echo "Authenticating to ECR Public..."
+          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
+          
+          echo "Pulling Envoy image..."
+          if ! docker pull ${{ env.ecr_repository_envoy }}:${{ env.ecr_envoy_image_tag }}; then
+            echo "::error::Failed to pull Envoy image. Please check if the image exists and is accessible."
+            exit 1
+          fi
+          echo "✓ Successfully validated Envoy image"
+          echo "::endgroup::"
           
       - name: Deploy to ECS
         run: |
+          echo "::group::Deploying to ECS"
           VERSION=$(cat version.txt)
-          aws ecs update-service \
-            --cluster finefinds-sandbox \
-            --service finefinds-backend \
+          
+          echo "Updating ECS service..."
+          if ! aws ecs update-service \
+            --cluster ${{ env.cluster_name }} \
+            --service ${{ env.service_name }} \
             --force-new-deployment \
-            --task-definition finefinds-backend:$VERSION
+            --task-definition ${{ env.task_def_family }}:$VERSION; then
+            echo "::error::Failed to update ECS service"
+            exit 1
+          fi
+          
+          echo "Waiting for service to stabilize..."
+          if ! aws ecs wait services-stable \
+            --cluster ${{ env.cluster_name }} \
+            --services ${{ env.service_name }}; then
+            echo "::error::Service failed to stabilize"
+            exit 1
+          fi
+          
+          echo "✓ Deployment completed successfully"
+          echo "::endgroup::"
 
   deploy-dev:
-    needs: build-and-push
-    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/dev' || github.event.pull_request.base.ref == 'dev' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'dev')) }}
+    needs: [test]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'dev' && !inputs.skip_deploy }}
     runs-on: ubuntu-latest
     environment: dev
     permissions:
@@ -263,7 +419,8 @@ jobs:
       contents: read
     
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
       
       - name: Download version file
         uses: actions/download-artifact@v4
@@ -273,71 +430,59 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
-          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }}
+          aws-region: ${{ env.aws_region }}
           role-duration-seconds: 3600
           
-      - name: Get RDS endpoint
-        id: rds
-        run: |
-          echo "Fetching RDS endpoint for ${{ env.SERVICES_ENV }} environment..."
-          # Add error handling and retry logic
-          max_attempts=3
-          attempt=1
-          while [ $attempt -le $max_attempts ]; do
-            echo "Attempt $attempt of $max_attempts"
-            # Get RDS endpoint from Secrets Manager
-            RDS_ENDPOINT=$(aws secretsmanager get-secret-value --secret-id "finefinds-${{ env.SERVICES_ENV }}-db-connection" --query 'SecretString' --output text | jq -r '.host')
-            if [ $? -eq 0 ] && [ ! -z "$RDS_ENDPOINT" ]; then
-              echo "RDS endpoint: $RDS_ENDPOINT"
-              echo "rds_endpoint=$RDS_ENDPOINT" >> $GITHUB_OUTPUT
-              break
-            fi
-            echo "Failed to get RDS endpoint. Retrying..."
-            sleep 5
-            attempt=$((attempt + 1))
-          done
-          
-          if [ -z "$RDS_ENDPOINT" ]; then
-            echo "::error::Failed to get RDS endpoint after $max_attempts attempts"
-            exit 1
-          fi
-
-      - name: Get RDS credentials
+      - name: Get RDS Endpoint and Credentials
         id: rds_creds
         run: |
-          echo "Fetching RDS credentials from Secrets Manager..."
-          RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id "FineFindsdevRdsDatabaseSecr-0zIOqlcLlE2c" --query 'SecretString' --output text)
-          if [ -z "$RDS_SECRET" ]; then
+          echo "::group::Fetching RDS Connection Details"
+          
+          # Get RDS endpoint from AWS Systems Manager Parameter Store
+          rds_endpoint=$(aws ssm get-parameter --name "/finefinds/${{ env.environment }}/rds/endpoint" --query "Parameter.Value" --output text)
+          if [ $? -ne 0 ]; then
+            echo "::error::Failed to get RDS endpoint from Parameter Store"
+            exit 1
+          fi
+          echo "RDS endpoint: $rds_endpoint"
+          
+          # Get database credentials from Secrets Manager
+          db_creds=$(aws secretsmanager get-secret-value \
+            --secret-id "finefinds-${{ env.services_env }}-rds-connection" \
+            --query "SecretString" \
+            --output text)
+          if [ $? -ne 0 ]; then
             echo "::error::Failed to get RDS credentials from Secrets Manager"
             exit 1
           fi
-          DB_HOST=$(echo $RDS_SECRET | jq -r '.host')
-          DB_PORT=$(echo $RDS_SECRET | jq -r '.port')
-          DB_NAME=$(echo $RDS_SECRET | jq -r '.dbname')
-          DB_USER=$(echo $RDS_SECRET | jq -r '.username')
-          DB_PASSWORD=$(echo $RDS_SECRET | jq -r '.password')
-          if [ -z "$DB_HOST" ] || [ -z "$DB_PORT" ] || [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ]; then
-            echo "::error::Invalid RDS credentials format in Secrets Manager"
+          
+          # Parse credentials from JSON
+          db_user=$(echo $db_creds | jq -r '.username')
+          db_password=$(echo $db_creds | jq -r '.password')
+          db_name=$(echo $db_creds | jq -r '.dbName')
+          db_port=$(echo $db_creds | jq -r '.port')
+          
+          # Validate required fields
+          if [ -z "$db_user" ] || [ -z "$db_password" ] || [ -z "$db_name" ] || [ -z "$db_port" ]; then
+            echo "::error::Missing required database credentials"
             exit 1
           fi
-          # Create PostgreSQL connection URL
-          DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@$localhost:${DB_PORT}/${DB_NAME}"
           
-          echo "RDS credentials retrieved successfully"
-          echo "db_host=$DB_HOST" >> $GITHUB_OUTPUT
-          echo "db_port=$DB_PORT" >> $GITHUB_OUTPUT
-          echo "db_name=$DB_NAME" >> $GITHUB_OUTPUT
-          echo "db_user=$DB_USER" >> $GITHUB_OUTPUT
-          echo "db_password=$DB_PASSWORD" >> $GITHUB_OUTPUT
-          echo "database_url=$DATABASE_URL" >> $GITHUB_OUTPUT
+          # Construct database URL
+          database_url="postgresql://${db_user}:${db_password}@${rds_endpoint}:${db_port}/${db_name}"
           
+          # Output database URL for task definition
+          echo "database_url=$database_url" >> $GITHUB_OUTPUT
+          
+          echo "✓ Successfully retrieved RDS connection details"
+          echo "::endgroup::"
+
       - name: Get Secret ARNs
         id: secrets
         run: |
-          echo "Fetching Secret ARNs..."
+          echo "::group::Fetching Secret ARNs"
           
-          # Function to get secret ARN with retry
           get_secret_arn() {
             local secret_name=$1
             local max_attempts=3
@@ -346,8 +491,11 @@ jobs:
             
             while [ $attempt -le $max_attempts ]; do
               echo "Attempt $attempt of $max_attempts to get ARN for $secret_name"
-              secret_arn=$(aws secretsmanager get-secret-value --secret-id "$secret_name" --query 'ARN' --output text)
-              
+              secret_arn=$(aws secretsmanager get-secret-value \
+                --secret-id "$secret_name" \
+                --query 'ARN' \
+                --output text)
+                
               if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
                 echo "Successfully got ARN for $secret_name"
                 echo "$secret_arn"
@@ -363,7 +511,6 @@ jobs:
             return 1
           }
           
-          # Function to verify secret access
           verify_secret_access() {
             local secret_name=$1
             local max_attempts=3
@@ -385,104 +532,88 @@ jobs:
             return 1
           }
           
-          # Get and verify DB Connection Secret
-          echo "Getting DB Connection Secret ARN..."
-          DB_CONNECTION_ARN=$(get_secret_arn "finefinds-dev-db-connection")
-          if [ $? -ne 0 ]; then exit 1; fi
-          echo "db_connection_arn<<EOF" >> $GITHUB_OUTPUT
-          echo "$DB_CONNECTION_ARN" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          # Get and verify all secret ARNs
+          for secret in \
+            "${{ env.db_connection_secret }}" \
+            "${{ env.redis_connection_secret }}" \
+            "${{ env.cognito_config_secret }}" \
+            "${{ env.jwt_secret }}"; do
+            
+            secret_arn=$(get_secret_arn "$secret")
+            if [ $? -ne 0 ]; then
+              exit 1
+            fi
+            
+            # Extract the base name of the secret for the output variable
+            secret_base_name=$(echo "$secret" | sed 's/.*-//')
+            echo "${secret_base_name}_arn<<EOF" >> $GITHUB_OUTPUT
+            echo "$secret_arn" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            
+            if ! verify_secret_access "$secret"; then
+              exit 1
+            fi
+          done
           
-          echo "Verifying DB Connection Secret access..."
-          if ! verify_secret_access "finefinds-dev-db-connection"; then exit 1; fi
-          
-          # Get and verify Redis Connection Secret
-          echo "Getting Redis Connection Secret ARN..."
-          REDIS_CONNECTION_ARN=$(get_secret_arn "finefinds-dev-redis-connection")
-          if [ $? -ne 0 ]; then exit 1; fi
-          echo "redis_connection_arn<<EOF" >> $GITHUB_OUTPUT
-          echo "$REDIS_CONNECTION_ARN" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          
-          echo "Verifying Redis Connection Secret access..."
-          if ! verify_secret_access "finefinds-dev-redis-connection"; then exit 1; fi
-          
-          # Get and verify Cognito Config Secret
-          echo "Getting Cognito Config Secret ARN..."
-          COGNITO_CONFIG_ARN=$(get_secret_arn "finefinds-dev-cognito-config")
-          if [ $? -ne 0 ]; then exit 1; fi
-          echo "cognito_config_arn<<EOF" >> $GITHUB_OUTPUT
-          echo "$COGNITO_CONFIG_ARN" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          
-          echo "Verifying Cognito Config Secret access..."
-          if ! verify_secret_access "finefinds-dev-cognito-config"; then exit 1; fi
-          
-          # Get and verify JWT Secret
-          echo "Getting JWT Secret ARN..."
-          JWT_SECRET_ARN=$(get_secret_arn "finefinds-dev-jwt")
-          if [ $? -ne 0 ]; then exit 1; fi
-          echo "jwt_secret_arn<<EOF" >> $GITHUB_OUTPUT
-          echo "$JWT_SECRET_ARN" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          
-          echo "Verifying JWT Secret access..."
-          if ! verify_secret_access "finefinds-dev-jwt"; then exit 1; fi
-          
-          echo "All secrets verified successfully"
+          echo "✓ All secrets verified successfully"
+          echo "::endgroup::"
 
       - name: Create CloudWatch Log Groups
         id: create_log_groups
         run: |
-          # Function to log with timestamp and level
+          echo "::group::Creating CloudWatch Log Groups"
+          
           log() {
             local level=$1
             shift
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*"
           }
           
-          # Function to create log group if it doesn't exist
           create_log_group() {
             local log_group=$1
             local retention_days=30
             
             log "INFO" "Checking if log group exists: $log_group"
-            if ! aws logs describe-log-groups --log-group-name-prefix "$log_group" --query 'logGroups[0].logGroupName' --output text | grep -q "$log_group"; then
+            if ! aws logs describe-log-groups \
+              --log-group-name-prefix "$log_group" \
+              --query 'logGroups[0].logGroupName' \
+              --output text | grep -q "$log_group"; then
+              
               log "INFO" "Creating log group: $log_group"
               aws logs create-log-group --log-group-name "$log_group"
-              aws logs put-retention-policy --log-group-name "$log_group" --retention-in-days "$retention_days"
+              aws logs put-retention-policy \
+                --log-group-name "$log_group" \
+                --retention-in-days "$retention_days"
               log "INFO" "Created log group: $log_group with retention period of $retention_days days"
             else
               log "INFO" "Log group already exists: $log_group"
             fi
           }
           
-          # Function to create all required log groups
           create_all_log_groups() {
-            local env=${{ env.SERVICES_ENV }}
-            
-            # Create log group for Envoy container
-            create_log_group "/finefinds/$env/envoy"
-            
-            # Create log group for App container
-            create_log_group "/finefinds/$env/app"
-            
+            create_log_group "${{ env.log_group_envoy }}"
+            create_log_group "${{ env.log_group_app }}"
             log "INFO" "All required log groups have been created"
           }
           
-          # Execute the log group creation
           create_all_log_groups
+          echo "::endgroup::"
 
       - name: Create Task Definition
         id: task_def
         run: |
+          echo "::group::Creating Task Definition"
           VERSION=$(cat version.txt)
           
           # Function to get current task definition
           get_current_task_def() {
             local cluster=$1
             local service=$2
-            aws ecs describe-services --cluster $cluster --services $service --query 'services[0].taskDefinition' --output text
+            aws ecs describe-services \
+              --cluster $cluster \
+              --services $service \
+              --query 'services[0].taskDefinition' \
+              --output text
           }
           
           # Function to rollback to previous task definition
@@ -491,8 +622,13 @@ jobs:
             local service=$2
             local previous_task_def=$3
             echo "Rolling back to previous task definition: $previous_task_def"
-            aws ecs update-service --cluster $cluster --service $service --task-definition $previous_task_def
-            aws ecs wait services-stable --cluster $cluster --services $service
+            aws ecs update-service \
+              --cluster $cluster \
+              --service $service \
+              --task-definition $previous_task_def
+            aws ecs wait services-stable \
+              --cluster $cluster \
+              --services $service
           }
           
           # Function to clean up old task definitions
@@ -532,7 +668,7 @@ jobs:
           }
           
           # Store current task definition for rollback
-          CURRENT_TASK_DEF=$(get_current_task_def "${{ env.CLUSTER_NAME_DEV }}" "${{ env.SERVICE_NAME_DEV }}")
+          CURRENT_TASK_DEF=$(get_current_task_def "${{ env.cluster_name }}" "${{ env.service_name }}")
           echo "current_task_def=$CURRENT_TASK_DEF" >> $GITHUB_OUTPUT
           
           # Function to create task definition JSON
@@ -542,53 +678,59 @@ jobs:
             local execution_role="finefinds-$env-ecs-execution-role"
             local task_role="finefinds-$env-ecs-task-role"
             
-            # Verify roles exist before proceeding
             echo "Verifying IAM roles..."
             if ! aws iam get-role --role-name "$execution_role" > /dev/null 2>&1; then
               echo "::error::Execution role $execution_role does not exist"
-              exit 1
+              return 1
             fi
             if ! aws iam get-role --role-name "$task_role" > /dev/null 2>&1; then
               echo "::error::Task role $task_role does not exist"
-              exit 1
+              return 1
             fi
             
-            # Get role ARNs
             local execution_role_arn=$(aws iam get-role --role-name "$execution_role" --query 'Role.Arn' --output text)
             local task_role_arn=$(aws iam get-role --role-name "$task_role" --query 'Role.Arn' --output text)
             
             if [ -z "$execution_role_arn" ] || [ -z "$task_role_arn" ]; then
               echo "::error::Failed to get role ARNs"
-              exit 1
+              return 1
             fi
             
             echo "Using execution role: $execution_role_arn"
             echo "Using task role: $task_role_arn"
             
-            # Get secret ARNs first
-            echo "Getting secret ARNs..."
-            DB_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-db-connection" --query 'ARN' --output text)
-            REDIS_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-redis-connection" --query 'ARN' --output text)
-            JWT_SECRET_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-jwt" --query 'ARN' --output text)
-            COGNITO_CONFIG_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-cognito-config" --query 'ARN' --output text)
+            # Get database connection secret ARN
+            local db_connection_arn=$(aws secretsmanager get-secret-value \
+              --secret-id "finefinds-${{ env.services_env }}-rds-connection" \
+              --query 'ARN' \
+              --output text)
+            
+            if [ -z "$db_connection_arn" ]; then
+              echo "::error::Failed to get database connection secret ARN"
+              return 1
+            fi
+            
+            echo "Using database connection secret ARN: $db_connection_arn"
+            echo "db_connection_arn=$db_connection_arn" >> $GITHUB_OUTPUT
             
             # Create task definition JSON
-            echo '{
-              "family": "'$task_def_family'",
+            cat > task-definition.json << EOF
+            {
+              "family": "$task_def_family",
               "networkMode": "awsvpc",
               "requiresCompatibilities": ["FARGATE"],
               "cpu": "256",
               "memory": "512",
-              "executionRoleArn": "'$execution_role_arn'",
-              "taskRoleArn": "'$task_role_arn'",
+              "executionRoleArn": "$execution_role_arn",
+              "taskRoleArn": "$task_role_arn",
               "runtimePlatform": {
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
               },
               "networkConfiguration": {
                 "awsvpcConfiguration": {
-                  "subnets": ["subnet-0a1b2c3d4", "subnet-5e6f7g8h"],
-                  "securityGroups": ["sg-0a1b2c3d4"],
+                  "subnets": ["${{ secrets.SUBNET_IDS }}"],
+                  "securityGroups": ["${{ secrets.SECURITY_GROUP_IDS }}"],
                   "assignPublicIp": "DISABLED"
                 }
               },
@@ -606,13 +748,14 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "envoy",
-                  "image": "${{ env.ECR_REPOSITORY_ENVOY }}:${{ env.ECR_ENVOY_IMAGE_TAG }}",
+                  "image": "${{ env.ecr_repository_envoy }}:${{ env.ecr_envoy_image_tag }}",
                   "essential": true,
                   "user": "1337",
                   "environment": [
-                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/finefinds-mesh/virtualNode/finefinds-${{ env.SERVICES_ENV }}-vn"},
+                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/${{ env.mesh_name }}/virtualNode/${{ env.virtual_node_name }}"},
                     {"name": "ENABLE_ENVOY_STATS_TAGS", "value": "1"},
-                    {"name": "ENABLE_ENVOY_XRAY_TRACING", "value": "1"}
+                    {"name": "ENABLE_ENVOY_XRAY_TRACING", "value": "1"},
+                    {"name": "APPMESH_PREVIEW", "value": "0"}
                   ],
                   "healthCheck": {
                     "command": ["CMD-SHELL", "curl -s http://localhost:9901/server_info | grep state | grep -q LIVE"],
@@ -624,15 +767,15 @@ jobs:
                   "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                      "awslogs-group": "/finefinds/'$env'/envoy",
-                      "awslogs-region": "'$AWS_REGION'",
+                      "awslogs-group": "${{ env.log_group_envoy }}",
+                      "awslogs-region": "${{ env.aws_region }}",
                       "awslogs-stream-prefix": "envoy"
                     }
                   }
                 },
                 {
                   "name": "AppContainer",
-                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:latest",
+                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.aws_region }}.amazonaws.com/${{ env.ecr_repository_backend }}:latest",
                   "essential": true,
                   "workingDirectory": "/app",
                   "entryPoint": ["node"],
@@ -640,33 +783,46 @@ jobs:
                   "portMappings": [{"containerPort": 3000, "protocol": "tcp"}],
                   "environment": [
                     {"name": "PORT", "value": "3000"},
-                    {"name": "NODE_ENV", "value": "'$env'"},
-                    {"name": "AWS_REGION", "value": "'$AWS_REGION'"},
-                    {"name": "DATABASE_URL", "value": "${{ steps.rds_creds.outputs.database_url }}"}
+                    {"name": "NODE_ENV", "value": "${{ env.services_env }}"},
+                    {"name": "AWS_REGION", "value": "${{ env.aws_region }}"},
+                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/${{ env.mesh_name }}/virtualNode/${{ env.virtual_node_name }}"}
                   ],
                   "secrets": [
-                    {"name": "REDIS_URL", "valueFrom": "'$REDIS_CONNECTION_ARN'"},
-                    {"name": "JWT_SECRET", "valueFrom": "'$JWT_SECRET_ARN'"},
-                    {"name": "COGNITO_CLIENT_USER_POOL_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_USER_POOL_ID::"},
-                    {"name": "COGNITO_CLIENT_CLIENT_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_CLIENT_ID::"},
-                    {"name": "COGNITO_ADMIN_USER_POOL_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_ADMIN_USER_POOL_ID::"},
-                    {"name": "COGNITO_ADMIN_CLIENT_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_ADMIN_CLIENT_ID::"}
+                    {"name": "DATABASE_URL", "valueFrom": "'$db_connection_arn'"},
+                    {"name": "REDIS_URL", "valueFrom": "${{ steps.secrets.outputs.redis_connection_arn }}"},
+                    {"name": "JWT_SECRET", "valueFrom": "${{ steps.secrets.outputs.jwt_secret_arn }}"}
+                  ],
+                  "environment": [
+                    {"name": "COGNITO_CLIENT_USER_POOL_ID", "value": "${{ steps.cognito_config.outputs.client_user_pool_id }}"},
+                    {"name": "COGNITO_CLIENT_CLIENT_ID", "value": "${{ steps.cognito_config.outputs.client_client_id }}"},
+                    {"name": "COGNITO_ADMIN_USER_POOL_ID", "value": "${{ steps.cognito_config.outputs.admin_user_pool_id }}"},
+                    {"name": "COGNITO_ADMIN_CLIENT_ID", "value": "${{ steps.cognito_config.outputs.admin_client_id }}"}
                   ],
                   "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                      "awslogs-group": "/finefinds/'$env'/app",
-                      "awslogs-region": "'$AWS_REGION'",
+                      "awslogs-group": "${{ env.log_group_app }}",
+                      "awslogs-region": "${{ env.aws_region }}",
                       "awslogs-stream-prefix": "finefinds"
                     }
+                  },
+                  "healthCheck": {
+                    "command": ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"],
+                    "interval": 30,
+                    "timeout": 5,
+                    "retries": 3,
+                    "startPeriod": 60
                   }
                 }
               ]
-            }' > task-definition.json
+            }
+            EOF
           }
           
           # Create task definition based on environment
-          create_task_definition "${{ env.SERVICES_ENV }}" "${{ env.TASK_DEF_FAMILY_DEV }}"
+          if ! create_task_definition "${{ env.services_env }}" "${{ env.task_def_family }}"; then
+            exit 1
+          fi
           
           # Validate task definition JSON
           if ! jq . task-definition.json > /dev/null 2>&1; then
@@ -677,21 +833,29 @@ jobs:
           
           # Register task definition
           echo "Registering task definition..."
-          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://task-definition.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+            
           if [ $? -ne 0 ] || [ -z "$NEW_TASK_DEF_ARN" ]; then
             echo "::error::Failed to register task definition"
             echo "Task definition JSON:"
             cat task-definition.json
             exit 1
           fi
+          
           echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
           
           # Clean up old task definitions
-          cleanup_old_task_defs "${{ env.TASK_DEF_FAMILY_DEV }}"
+          cleanup_old_task_defs "${{ env.task_def_family }}"
+          echo "::endgroup::"
 
       - name: Deploy to ECS
         id: deploy
         run: |
+          echo "::group::Deploying to ECS"
+          
           # Function to log with timestamp and level
           log() {
             local level=$1
@@ -700,9 +864,9 @@ jobs:
           }
           
           log "INFO" "Starting deployment process..."
-          log "INFO" "Environment: ${{ env.SERVICES_ENV }}"
-          log "INFO" "Cluster: ${{ env.CLUSTER_NAME_DEV }}"
-          log "INFO" "Service: ${{ env.SERVICE_NAME_DEV }}"
+          log "INFO" "Environment: ${{ env.services_env }}"
+          log "INFO" "Cluster: ${{ env.cluster_name }}"
+          log "INFO" "Service: ${{ env.service_name }}"
           log "INFO" "Task Definition: ${{ steps.task_def.outputs.task_def_arn }}"
           
           # Function to check container pull status
@@ -761,30 +925,30 @@ jobs:
           
           log "INFO" "Updating ECS service..."
           if ! aws ecs update-service \
-            --cluster ${{ env.CLUSTER_NAME_DEV }} \
-            --service ${{ env.SERVICE_NAME_DEV }} \
+            --cluster ${{ env.cluster_name }} \
+            --service ${{ env.service_name }} \
             --task-definition ${{ steps.task_def.outputs.task_def_arn }}; then
             log "ERROR" "Failed to update ECS service"
             log "INFO" "Rolling back to previous task definition..."
-            rollback_task_def "${{ env.CLUSTER_NAME_DEV }}" "${{ env.SERVICE_NAME_DEV }}" "${{ steps.task_def.outputs.current_task_def }}"
+            rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
             exit 1
           fi
             
           log "INFO" "Waiting for service to stabilize..."
           if ! aws ecs wait services-stable \
-            --cluster ${{ env.CLUSTER_NAME_DEV }} \
-            --services ${{ env.SERVICE_NAME_DEV }}; then
+            --cluster ${{ env.cluster_name }} \
+            --services ${{ env.service_name }}; then
             log "ERROR" "Service failed to stabilize"
             log "INFO" "Rolling back to previous task definition..."
-            rollback_task_def "${{ env.CLUSTER_NAME_DEV }}" "${{ env.SERVICE_NAME_DEV }}" "${{ steps.task_def.outputs.current_task_def }}"
+            rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
             exit 1
           fi
           
           # Check container pull status
-          if ! check_container_pull_status "${{ env.CLUSTER_NAME_DEV }}" "${{ env.SERVICE_NAME_DEV }}"; then
+          if ! check_container_pull_status "${{ env.cluster_name }}" "${{ env.service_name }}"; then
             log "ERROR" "Container pull failed"
             log "INFO" "Rolling back to previous task definition..."
-            rollback_task_def "${{ env.CLUSTER_NAME_DEV }}" "${{ env.SERVICE_NAME_DEV }}" "${{ steps.task_def.outputs.current_task_def }}"
+            rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
             exit 1
           fi
           
@@ -793,18 +957,19 @@ jobs:
           # Clean up temporary files
           log "INFO" "Cleaning up temporary files..."
           rm -f version.txt task-definition.json
+          echo "::endgroup::"
 
   deploy-qa:
-    needs: build-and-push
-    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/qa' || github.event.pull_request.base.ref == 'qa' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'qa')) }}
+    needs: [test]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'qa' && !inputs.skip_deploy }}
     runs-on: ubuntu-latest
     environment: qa
     permissions:
       id-token: write
       contents: read
-    
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
       
       - name: Download version file
         uses: actions/download-artifact@v4
@@ -814,29 +979,73 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
-          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }}
+          aws-region: ${{ env.aws_region }}
           role-duration-seconds: 3600
+          
+      - name: Verify App Mesh Resources and Permissions
+        run: |
+          echo "::group::Verifying App Mesh Resources"
+          
+          # Function to check if resource exists
+          check_resource_exists() {
+            local resource_type=$1
+            local resource_name=$2
+            local command=$3
+            
+            echo "Checking $resource_type: $resource_name"
+            if ! $command > /dev/null 2>&1; then
+              echo "::error::$resource_type $resource_name does not exist"
+              return 1
+            fi
+            echo "✓ $resource_type $resource_name exists"
+            return 0
+          }
+          
+          # Check if mesh exists
+          check_resource_exists "mesh" "${{ env.mesh_name }}" "aws appmesh describe-mesh --mesh-name ${{ env.mesh_name }}"
+          
+          # Check if virtual node exists
+          check_resource_exists "virtual node" "${{ env.virtual_node_name }}" "aws appmesh describe-virtual-node --mesh-name ${{ env.mesh_name }} --virtual-node-name ${{ env.virtual_node_name }}"
+          
+          # Check if virtual service exists
+          check_resource_exists "virtual service" "${{ env.virtual_service_name }}" "aws appmesh describe-virtual-service --mesh-name ${{ env.mesh_name }} --virtual-service-name ${{ env.virtual_service_name }}"
+          
+          # Verify IAM permissions
+          echo "Verifying IAM permissions..."
+          if ! aws iam simulate-principal-policy \
+            --policy-source-arn arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }} \
+            --action-names \
+            appmesh:StreamAggregatedResources \
+            appmesh:DescribeVirtualNode \
+            appmesh:DescribeVirtualService \
+            appmesh:DescribeRoute \
+            appmesh:DescribeVirtualRouter > /dev/null 2>&1; then
+            echo "::error::Task role missing required App Mesh permissions"
+            exit 1
+          fi
+          echo "✓ Task role has required App Mesh permissions"
+          echo "::endgroup::"
           
       - name: Validate Envoy Image
         run: |
-          echo "Validating Envoy image accessibility..."
-          # Authenticate to ECR Public
+          echo "::group::Validating Envoy Image"
+          echo "Authenticating to ECR Public..."
           aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
           
-          # Try to pull the image
-          if ! docker pull public.ecr.aws/appmesh/aws-appmesh-envoy:v1.29.12.1-prod; then
+          echo "Pulling Envoy image..."
+          if ! docker pull ${{ env.ecr_repository_envoy }}:${{ env.ecr_envoy_image_tag }}; then
             echo "::error::Failed to pull Envoy image. Please check if the image exists and is accessible."
             exit 1
           fi
-          echo "Successfully validated Envoy image"
+          echo "✓ Successfully validated Envoy image"
+          echo "::endgroup::"
           
       - name: Get Secret ARNs
         id: secrets
         run: |
-          echo "Fetching Secret ARNs..."
+          echo "::group::Fetching Secret ARNs"
           
-          # Function to get secret ARN with retry
           get_secret_arn() {
             local secret_name=$1
             local max_attempts=3
@@ -845,7 +1054,10 @@ jobs:
             
             while [ $attempt -le $max_attempts ]; do
               echo "Attempt $attempt of $max_attempts to get ARN for $secret_name"
-              secret_arn=$(aws secretsmanager get-secret-value --secret-id "$secret_name" --query 'ARN' --output text)
+              secret_arn=$(aws secretsmanager get-secret-value \
+                --secret-id "$secret_name" \
+                --query 'ARN' \
+                --output text)
               
               if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
                 echo "Successfully got ARN for $secret_name"
@@ -862,7 +1074,6 @@ jobs:
             return 1
           }
           
-          # Function to verify secret access
           verify_secret_access() {
             local secret_name=$1
             local max_attempts=3
@@ -884,90 +1095,174 @@ jobs:
             return 1
           }
           
-          # Get DB Connection Secret ARN
-          DB_CONNECTION_ARN=$(get_secret_arn "finefinds-qa-db-connection")
-          if [ $? -ne 0 ]; then exit 1; fi
-          echo "db_connection_arn<<EOF" >> $GITHUB_OUTPUT
-          echo "$DB_CONNECTION_ARN" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          
-          # Get Redis Connection Secret ARN
-          REDIS_CONNECTION_ARN=$(get_secret_arn "finefinds-qa-redis-connection")
-          if [ $? -ne 0 ]; then exit 1; fi
-          echo "redis_connection_arn<<EOF" >> $GITHUB_OUTPUT
-          echo "$REDIS_CONNECTION_ARN" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          
-          # Get Cognito Config Secret ARN
-          COGNITO_CONFIG_ARN=$(get_secret_arn "finefinds-qa-cognito-config")
-          if [ $? -ne 0 ]; then exit 1; fi
-          echo "cognito_config_arn<<EOF" >> $GITHUB_OUTPUT
-          echo "$COGNITO_CONFIG_ARN" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          
-          # Get JWT Secret ARN
-          JWT_SECRET_ARN=$(get_secret_arn "finefinds-qa-jwt")
-          if [ $? -ne 0 ]; then exit 1; fi
-          echo "jwt_secret_arn<<EOF" >> $GITHUB_OUTPUT
-          echo "$JWT_SECRET_ARN" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          
-          # Verify all secrets exist and are accessible
-          echo "Verifying secret access..."
-          for secret_arn in "$DB_CONNECTION_ARN" "$REDIS_CONNECTION_ARN" "$COGNITO_CONFIG_ARN" "$JWT_SECRET_ARN"; do
-            if ! verify_secret_access "$secret_arn"; then
+          # Get and verify all secret ARNs
+          for secret in \
+            "${{ env.db_connection_secret }}" \
+            "${{ env.redis_connection_secret }}" \
+            "${{ env.cognito_config_secret }}" \
+            "${{ env.jwt_secret }}"; do
+            
+            secret_arn=$(get_secret_arn "$secret")
+            if [ $? -ne 0 ]; then
+              exit 1
+            fi
+            
+            # Extract the base name of the secret for the output variable
+            secret_base_name=$(echo "$secret" | sed 's/.*-//')
+            echo "${secret_base_name}_arn<<EOF" >> $GITHUB_OUTPUT
+            echo "$secret_arn" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            
+            if ! verify_secret_access "$secret"; then
               exit 1
             fi
           done
           
-          echo "All secrets verified successfully"
+          echo "✓ All secrets verified successfully"
+          echo "::endgroup::"
 
       - name: Create CloudWatch Log Groups
         id: create_log_groups
         run: |
-          # Function to log with timestamp and level
+          echo "::group::Creating CloudWatch Log Groups"
+          
           log() {
             local level=$1
             shift
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*"
           }
           
-          # Function to create log group if it doesn't exist
           create_log_group() {
             local log_group=$1
             local retention_days=30
             
             log "INFO" "Checking if log group exists: $log_group"
-            if ! aws logs describe-log-groups --log-group-name-prefix "$log_group" --query 'logGroups[0].logGroupName' --output text | grep -q "$log_group"; then
+            if ! aws logs describe-log-groups \
+              --log-group-name-prefix "$log_group" \
+              --query 'logGroups[0].logGroupName' \
+              --output text | grep -q "$log_group"; then
+              
               log "INFO" "Creating log group: $log_group"
               aws logs create-log-group --log-group-name "$log_group"
-              aws logs put-retention-policy --log-group-name "$log_group" --retention-in-days "$retention_days"
+              aws logs put-retention-policy \
+                --log-group-name "$log_group" \
+                --retention-in-days "$retention_days"
               log "INFO" "Created log group: $log_group with retention period of $retention_days days"
             else
               log "INFO" "Log group already exists: $log_group"
             fi
           }
           
-          # Function to create all required log groups
           create_all_log_groups() {
-            local env=${{ env.SERVICES_ENV }}
-            
-            # Create log group for Envoy container
-            create_log_group "/finefinds/$env/envoy"
-            
-            # Create log group for App container
-            create_log_group "/finefinds/$env/app"
-            
+            create_log_group "${{ env.log_group_envoy }}"
+            create_log_group "${{ env.log_group_app }}"
             log "INFO" "All required log groups have been created"
           }
           
-          # Execute the log group creation
           create_all_log_groups
+          echo "::endgroup::"
+
+      - name: Get Cognito Configuration
+        id: cognito_config
+        run: |
+          echo "::group::Fetching Cognito Configuration"
+          
+          # Get Cognito configuration from CloudFormation outputs
+          cognito_config=$(aws cloudformation describe-stacks \
+            --stack-name "FineFinds-${{ env.services_env }}" \
+            --query 'Stacks[0].Outputs[?starts_with(OutputKey, `Cognito`)].{key:OutputKey,value:OutputValue}' \
+            --output json)
+            
+          if [ $? -ne 0 ]; then
+            echo "::error::Failed to get Cognito configuration from CloudFormation outputs"
+            exit 1
+          fi
+          
+          # Extract values and set as outputs
+          client_user_pool_id=$(echo "$cognito_config" | jq -r '.[] | select(.key=="CognitoClientUserPoolId") | .value')
+          client_client_id=$(echo "$cognito_config" | jq -r '.[] | select(.key=="CognitoClientClientId") | .value')
+          admin_user_pool_id=$(echo "$cognito_config" | jq -r '.[] | select(.key=="CognitoAdminUserPoolId") | .value')
+          admin_client_id=$(echo "$cognito_config" | jq -r '.[] | select(.key=="CognitoAdminClientId") | .value')
+          
+          echo "client_user_pool_id=$client_user_pool_id" >> $GITHUB_OUTPUT
+          echo "client_client_id=$client_client_id" >> $GITHUB_OUTPUT
+          echo "admin_user_pool_id=$admin_user_pool_id" >> $GITHUB_OUTPUT
+          echo "admin_client_id=$admin_client_id" >> $GITHUB_OUTPUT
+          
+          echo "✓ Successfully retrieved Cognito configuration"
+          echo "::endgroup::"
 
       - name: Create Task Definition
         id: task_def
         run: |
+          echo "::group::Creating Task Definition"
           VERSION=$(cat version.txt)
+          
+          # Function to get current task definition
+          get_current_task_def() {
+            local cluster=$1
+            local service=$2
+            aws ecs describe-services \
+              --cluster $cluster \
+              --services $service \
+              --query 'services[0].taskDefinition' \
+              --output text
+          }
+          
+          # Function to rollback to previous task definition
+          rollback_task_def() {
+            local cluster=$1
+            local service=$2
+            local previous_task_def=$3
+            echo "Rolling back to previous task definition: $previous_task_def"
+            aws ecs update-service \
+              --cluster $cluster \
+              --service $service \
+              --task-definition $previous_task_def
+            aws ecs wait services-stable \
+              --cluster $cluster \
+              --services $service
+          }
+          
+          # Function to clean up old task definitions
+          cleanup_old_task_defs() {
+            local family=$1
+            local keep_count=5
+            echo "Cleaning up old task definitions for family: $family"
+            
+            # Get all task definitions for the family
+            local task_defs=($(aws ecs list-task-definitions \
+              --family-prefix "$family" \
+              --sort DESC \
+              --query 'taskDefinitionArns[]' \
+              --output text))
+            
+            # Keep the most recent ones
+            local keep_defs=("${task_defs[@]:0:$keep_count}")
+            echo "Keeping task definitions:"
+            for def in "${keep_defs[@]}"; do
+              echo "  $def"
+            done
+            
+            # Deregister the rest
+            local deregister_defs=("${task_defs[@]:$keep_count}")
+            if [ ${#deregister_defs[@]} -gt 0 ]; then
+              echo "Deregistering old task definitions:"
+              for def in "${deregister_defs[@]}"; do
+                echo "  Deregistering: $def"
+                aws ecs deregister-task-definition --task-definition "$def" || {
+                  echo "::warning::Failed to deregister task definition: $def"
+                  continue
+                }
+              done
+            else
+              echo "No old task definitions to deregister"
+            fi
+          }
+          
+          # Store current task definition for rollback
+          CURRENT_TASK_DEF=$(get_current_task_def "${{ env.cluster_name }}" "${{ env.service_name }}")
+          echo "current_task_def=$CURRENT_TASK_DEF" >> $GITHUB_OUTPUT
           
           # Function to create task definition JSON
           create_task_definition() {
@@ -976,53 +1271,59 @@ jobs:
             local execution_role="finefinds-$env-ecs-execution-role"
             local task_role="finefinds-$env-ecs-task-role"
             
-            # Verify roles exist before proceeding
             echo "Verifying IAM roles..."
             if ! aws iam get-role --role-name "$execution_role" > /dev/null 2>&1; then
               echo "::error::Execution role $execution_role does not exist"
-              exit 1
+              return 1
             fi
             if ! aws iam get-role --role-name "$task_role" > /dev/null 2>&1; then
               echo "::error::Task role $task_role does not exist"
-              exit 1
+              return 1
             fi
             
-            # Get role ARNs
             local execution_role_arn=$(aws iam get-role --role-name "$execution_role" --query 'Role.Arn' --output text)
             local task_role_arn=$(aws iam get-role --role-name "$task_role" --query 'Role.Arn' --output text)
             
             if [ -z "$execution_role_arn" ] || [ -z "$task_role_arn" ]; then
               echo "::error::Failed to get role ARNs"
-              exit 1
+              return 1
             fi
             
             echo "Using execution role: $execution_role_arn"
             echo "Using task role: $task_role_arn"
             
-            # Get secret ARNs first
-            echo "Getting secret ARNs..."
-            DB_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-db-connection" --query 'ARN' --output text)
-            REDIS_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-redis-connection" --query 'ARN' --output text)
-            JWT_SECRET_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-jwt" --query 'ARN' --output text)
-            COGNITO_CONFIG_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-cognito-config" --query 'ARN' --output text)
+            # Get database connection secret ARN
+            local db_connection_arn=$(aws secretsmanager get-secret-value \
+              --secret-id "finefinds-${{ env.services_env }}-rds-connection" \
+              --query 'ARN' \
+              --output text)
+            
+            if [ -z "$db_connection_arn" ]; then
+              echo "::error::Failed to get database connection secret ARN"
+              return 1
+            fi
+            
+            echo "Using database connection secret ARN: $db_connection_arn"
+            echo "db_connection_arn=$db_connection_arn" >> $GITHUB_OUTPUT
             
             # Create task definition JSON
-            echo '{
-              "family": "'$task_def_family'",
+            cat > task-definition.json << EOF
+            {
+              "family": "$task_def_family",
               "networkMode": "awsvpc",
               "requiresCompatibilities": ["FARGATE"],
               "cpu": "256",
               "memory": "512",
-              "executionRoleArn": "'$execution_role_arn'",
-              "taskRoleArn": "'$task_role_arn'",
+              "executionRoleArn": "$execution_role_arn",
+              "taskRoleArn": "$task_role_arn",
               "runtimePlatform": {
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
               },
               "networkConfiguration": {
                 "awsvpcConfiguration": {
-                  "subnets": ["subnet-0a1b2c3d4", "subnet-5e6f7g8h"],
-                  "securityGroups": ["sg-0a1b2c3d4"],
+                  "subnets": ["${{ secrets.SUBNET_IDS }}"],
+                  "securityGroups": ["${{ secrets.SECURITY_GROUP_IDS }}"],
                   "assignPublicIp": "DISABLED"
                 }
               },
@@ -1040,13 +1341,14 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "envoy",
-                  "image": "${{ env.ECR_REPOSITORY_ENVOY }}:${{ env.ECR_ENVOY_IMAGE_TAG }}",
+                  "image": "${{ env.ecr_repository_envoy }}:${{ env.ecr_envoy_image_tag }}",
                   "essential": true,
                   "user": "1337",
                   "environment": [
-                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/finefinds-mesh/virtualNode/finefinds-${{ env.SERVICES_ENV }}-vn"},
+                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/${{ env.mesh_name }}/virtualNode/${{ env.virtual_node_name }}"},
                     {"name": "ENABLE_ENVOY_STATS_TAGS", "value": "1"},
-                    {"name": "ENABLE_ENVOY_XRAY_TRACING", "value": "1"}
+                    {"name": "ENABLE_ENVOY_XRAY_TRACING", "value": "1"},
+                    {"name": "APPMESH_PREVIEW", "value": "0"}
                   ],
                   "healthCheck": {
                     "command": ["CMD-SHELL", "curl -s http://localhost:9901/server_info | grep state | grep -q LIVE"],
@@ -1058,15 +1360,15 @@ jobs:
                   "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                      "awslogs-group": "/finefinds/'$env'/envoy",
-                      "awslogs-region": "'$AWS_REGION'",
+                      "awslogs-group": "${{ env.log_group_envoy }}",
+                      "awslogs-region": "${{ env.aws_region }}",
                       "awslogs-stream-prefix": "envoy"
                     }
                   }
                 },
                 {
                   "name": "AppContainer",
-                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:latest",
+                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.aws_region }}.amazonaws.com/${{ env.ecr_repository_backend }}:latest",
                   "essential": true,
                   "workingDirectory": "/app",
                   "entryPoint": ["node"],
@@ -1074,85 +1376,185 @@ jobs:
                   "portMappings": [{"containerPort": 3000, "protocol": "tcp"}],
                   "environment": [
                     {"name": "PORT", "value": "3000"},
-                    {"name": "NODE_ENV", "value": "'$env'"},
-                    {"name": "AWS_REGION", "value": "'$AWS_REGION'"},
-                    {"name": "DATABASE_URL", "value": "${{ steps.rds_creds.outputs.database_url }}"}
+                    {"name": "NODE_ENV", "value": "${{ env.services_env }}"},
+                    {"name": "AWS_REGION", "value": "${{ env.aws_region }}"},
+                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/${{ env.mesh_name }}/virtualNode/${{ env.virtual_node_name }}"}
                   ],
                   "secrets": [
-                    {"name": "REDIS_URL", "valueFrom": "'$REDIS_CONNECTION_ARN'"},
-                    {"name": "JWT_SECRET", "valueFrom": "'$JWT_SECRET_ARN'"},
-                    {"name": "COGNITO_CLIENT_USER_POOL_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_USER_POOL_ID::"},
-                    {"name": "COGNITO_CLIENT_CLIENT_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_CLIENT_ID::"},
-                    {"name": "COGNITO_ADMIN_USER_POOL_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_ADMIN_USER_POOL_ID::"},
-                    {"name": "COGNITO_ADMIN_CLIENT_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_ADMIN_CLIENT_ID::"}
+                    {"name": "DATABASE_URL", "valueFrom": "'$db_connection_arn'"},
+                    {"name": "REDIS_URL", "valueFrom": "${{ steps.secrets.outputs.redis_connection_arn }}"},
+                    {"name": "JWT_SECRET", "valueFrom": "${{ steps.secrets.outputs.jwt_secret_arn }}"}
+                  ],
+                  "environment": [
+                    {"name": "COGNITO_CLIENT_USER_POOL_ID", "value": "${{ steps.cognito_config.outputs.client_user_pool_id }}"},
+                    {"name": "COGNITO_CLIENT_CLIENT_ID", "value": "${{ steps.cognito_config.outputs.client_client_id }}"},
+                    {"name": "COGNITO_ADMIN_USER_POOL_ID", "value": "${{ steps.cognito_config.outputs.admin_user_pool_id }}"},
+                    {"name": "COGNITO_ADMIN_CLIENT_ID", "value": "${{ steps.cognito_config.outputs.admin_client_id }}"}
                   ],
                   "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                      "awslogs-group": "/finefinds/'$env'/app",
-                      "awslogs-region": "'$AWS_REGION'",
+                      "awslogs-group": "${{ env.log_group_app }}",
+                      "awslogs-region": "${{ env.aws_region }}",
                       "awslogs-stream-prefix": "finefinds"
                     }
+                  },
+                  "healthCheck": {
+                    "command": ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"],
+                    "interval": 30,
+                    "timeout": 5,
+                    "retries": 3,
+                    "startPeriod": 60
                   }
                 }
               ]
-            }' > task-definition.json
+            }
+            EOF
           }
           
           # Create task definition based on environment
-          create_task_definition "qa" "${{ env.TASK_DEF_FAMILY_QA }}"
+          if ! create_task_definition "${{ env.services_env }}" "${{ env.task_def_family }}"; then
+            exit 1
+          fi
+          
+          # Validate task definition JSON
+          if ! jq . task-definition.json > /dev/null 2>&1; then
+            echo "::error::Invalid JSON in task definition"
+            cat task-definition.json
+            exit 1
+          fi
           
           # Register task definition
           echo "Registering task definition..."
-          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
-          if [ -z "$NEW_TASK_DEF_ARN" ]; then
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://task-definition.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+            
+          if [ $? -ne 0 ] || [ -z "$NEW_TASK_DEF_ARN" ]; then
             echo "::error::Failed to register task definition"
+            echo "Task definition JSON:"
+            cat task-definition.json
             exit 1
           fi
+          
           echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
+          
+          # Clean up old task definitions
+          cleanup_old_task_defs "${{ env.task_def_family }}"
+          echo "::endgroup::"
 
       - name: Deploy to ECS
+        id: deploy
         run: |
-          echo "Updating ECS service..."
-          aws ecs update-service \
-            --cluster ${{ env.CLUSTER_NAME_QA }} \
-            --service ${{ env.SERVICE_NAME_QA }} \
-            --task-definition ${{ steps.task_def.outputs.task_def_arn }}
-            
-          echo "Waiting for service to stabilize..."
-          aws ecs wait services-stable \
-            --cluster ${{ env.CLUSTER_NAME_QA }} \
-            --services ${{ env.SERVICE_NAME_QA }}
-            
-          # Add health check after deployment
-          echo "Performing health check..."
-          max_attempts=30
-          attempt=1
-          while [ $attempt -le $max_attempts ]; do
-            echo "Health check attempt $attempt of $max_attempts"
-            if aws ecs describe-services \
-              --cluster ${{ env.CLUSTER_NAME_QA }} \
-              --services ${{ env.SERVICE_NAME_QA }} \
-              --query 'services[0].runningCount' \
-              --output text | grep -q "1"; then
-              echo "Service is healthy"
-              break
-            fi
-            echo "Service not healthy yet. Waiting..."
-            sleep 10
-            attempt=$((attempt + 1))
-          done
+          echo "::group::Deploying to ECS"
           
-          if [ $attempt -gt $max_attempts ]; then
-            echo "::error::Service failed to become healthy after $max_attempts attempts"
+          # Function to log with timestamp and level
+          log() {
+            local level=$1
+            shift
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*"
+          }
+          
+          log "INFO" "Starting deployment process..."
+          log "INFO" "Environment: ${{ env.services_env }}"
+          log "INFO" "Cluster: ${{ env.cluster_name }}"
+          log "INFO" "Service: ${{ env.service_name }}"
+          log "INFO" "Task Definition: ${{ steps.task_def.outputs.task_def_arn }}"
+          
+          # Function to check container pull status
+          check_container_pull_status() {
+            local cluster=$1
+            local service=$2
+            local max_attempts=10
+            local attempt=1
+            
+            while [ $attempt -le $max_attempts ]; do
+              log "INFO" "Checking container pull status (attempt $attempt of $max_attempts)..."
+              
+              # Get the latest task ARN
+              local task_arn=$(aws ecs list-tasks \
+                --cluster "$cluster" \
+                --service-name "$service" \
+                --desired-status RUNNING \
+                --query 'taskArns[0]' \
+                --output text)
+              
+              if [ -z "$task_arn" ] || [ "$task_arn" == "None" ]; then
+                log "WARNING" "No running tasks found. Waiting..."
+                sleep 30
+                attempt=$((attempt + 1))
+                continue
+              fi
+              
+              # Check task status
+              local task_status=$(aws ecs describe-tasks \
+                --cluster "$cluster" \
+                --tasks "$task_arn" \
+                --query 'tasks[0].lastStatus' \
+                --output text)
+              
+              if [ "$task_status" == "RUNNING" ]; then
+                log "INFO" "Container successfully pulled and running"
+                return 0
+              elif [ "$task_status" == "STOPPED" ]; then
+                local stop_reason=$(aws ecs describe-tasks \
+                  --cluster "$cluster" \
+                  --tasks "$task_arn" \
+                  --query 'tasks[0].stoppedReason' \
+                  --output text)
+                log "ERROR" "Container stopped: $stop_reason"
+                return 1
+              fi
+              
+              log "INFO" "Container status: $task_status. Waiting..."
+              sleep 30
+              attempt=$((attempt + 1))
+            done
+            
+            log "ERROR" "Container pull timed out after $max_attempts attempts"
+            return 1
+          }
+          
+          log "INFO" "Updating ECS service..."
+          if ! aws ecs update-service \
+            --cluster ${{ env.cluster_name }} \
+            --service ${{ env.service_name }} \
+            --task-definition ${{ steps.task_def.outputs.task_def_arn }}; then
+            log "ERROR" "Failed to update ECS service"
+            log "INFO" "Rolling back to previous task definition..."
+            rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
+            exit 1
+          fi
+            
+          log "INFO" "Waiting for service to stabilize..."
+          if ! aws ecs wait services-stable \
+            --cluster ${{ env.cluster_name }} \
+            --services ${{ env.service_name }}; then
+            log "ERROR" "Service failed to stabilize"
+            log "INFO" "Rolling back to previous task definition..."
+            rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
             exit 1
           fi
           
-          echo "Deployment completed successfully"
+          # Check container pull status
+          if ! check_container_pull_status "${{ env.cluster_name }}" "${{ env.service_name }}"; then
+            log "ERROR" "Container pull failed"
+            log "INFO" "Rolling back to previous task definition..."
+            rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
+            exit 1
+          fi
+          
+          log "INFO" "Deployment completed successfully"
+          
+          # Clean up temporary files
+          log "INFO" "Cleaning up temporary files..."
+          rm -f version.txt task-definition.json
+          echo "::endgroup::"
 
   deploy-staging:
-    needs: build-and-push
-    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/staging' || github.event.pull_request.base.ref == 'staging' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging')) }}
+    needs: [test]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'staging' && !inputs.skip_deploy }}
     runs-on: ubuntu-latest
     environment: staging
     permissions:
@@ -1160,7 +1562,8 @@ jobs:
       contents: read
     
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
       
       - name: Download version file
         uses: actions/download-artifact@v4
@@ -1170,29 +1573,73 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
-          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }}
+          aws-region: ${{ env.aws_region }}
           role-duration-seconds: 3600
           
+      - name: Verify App Mesh Resources and Permissions
+        run: |
+          echo "::group::Verifying App Mesh Resources"
+          
+          # Function to check if resource exists
+          check_resource_exists() {
+            local resource_type=$1
+            local resource_name=$2
+            local command=$3
+            
+            echo "Checking $resource_type: $resource_name"
+            if ! $command > /dev/null 2>&1; then
+              echo "::error::$resource_type $resource_name does not exist"
+              return 1
+            fi
+            echo "✓ $resource_type $resource_name exists"
+            return 0
+          }
+          
+          # Check if mesh exists
+          check_resource_exists "mesh" "${{ env.mesh_name }}" "aws appmesh describe-mesh --mesh-name ${{ env.mesh_name }}"
+          
+          # Check if virtual node exists
+          check_resource_exists "virtual node" "${{ env.virtual_node_name }}" "aws appmesh describe-virtual-node --mesh-name ${{ env.mesh_name }} --virtual-node-name ${{ env.virtual_node_name }}"
+          
+          # Check if virtual service exists
+          check_resource_exists "virtual service" "${{ env.virtual_service_name }}" "aws appmesh describe-virtual-service --mesh-name ${{ env.mesh_name }} --virtual-service-name ${{ env.virtual_service_name }}"
+          
+          # Verify IAM permissions
+          echo "Verifying IAM permissions..."
+          if ! aws iam simulate-principal-policy \
+            --policy-source-arn arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }} \
+            --action-names \
+            appmesh:StreamAggregatedResources \
+            appmesh:DescribeVirtualNode \
+            appmesh:DescribeVirtualService \
+            appmesh:DescribeRoute \
+            appmesh:DescribeVirtualRouter > /dev/null 2>&1; then
+            echo "::error::Task role missing required App Mesh permissions"
+            exit 1
+          fi
+          echo "✓ Task role has required App Mesh permissions"
+          echo "::endgroup::"
+
       - name: Validate Envoy Image
         run: |
-          echo "Validating Envoy image accessibility..."
-          # Authenticate to ECR Public
+          echo "::group::Validating Envoy Image"
+          echo "Authenticating to ECR Public..."
           aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
           
-          # Try to pull the image
-          if ! docker pull public.ecr.aws/appmesh/aws-appmesh-envoy:v1.29.12.1-prod; then
+          echo "Pulling Envoy image..."
+          if ! docker pull ${{ env.ecr_repository_envoy }}:${{ env.ecr_envoy_image_tag }}; then
             echo "::error::Failed to pull Envoy image. Please check if the image exists and is accessible."
             exit 1
           fi
-          echo "Successfully validated Envoy image"
+          echo "✓ Successfully validated Envoy image"
+          echo "::endgroup::"
           
       - name: Get Secret ARNs
         id: secrets
         run: |
-          echo "Fetching Secret ARNs..."
+          echo "::group::Fetching Secret ARNs"
           
-          # Function to get secret ARN with retry
           get_secret_arn() {
             local secret_name=$1
             local max_attempts=3
@@ -1201,8 +1648,11 @@ jobs:
             
             while [ $attempt -le $max_attempts ]; do
               echo "Attempt $attempt of $max_attempts to get ARN for $secret_name"
-              secret_arn=$(aws secretsmanager get-secret-value --secret-id "$secret_name" --query 'ARN' --output text)
-              
+              secret_arn=$(aws secretsmanager get-secret-value \
+                --secret-id "$secret_name" \
+                --query 'ARN' \
+                --output text)
+                
               if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
                 echo "Successfully got ARN for $secret_name"
                 echo "$secret_arn"
@@ -1218,7 +1668,6 @@ jobs:
             return 1
           }
           
-          # Function to verify secret access
           verify_secret_access() {
             local secret_name=$1
             local max_attempts=3
@@ -1240,82 +1689,144 @@ jobs:
             return 1
           }
           
-          # Get DB Connection Secret ARN
-          DB_CONNECTION_ARN=$(get_secret_arn "finefinds-staging-db-connection")
-          if [ $? -ne 0 ]; then exit 1; fi
-          echo "db_connection_arn=$DB_CONNECTION_ARN" >> $GITHUB_OUTPUT
-          
-          # Get Redis Connection Secret ARN
-          REDIS_CONNECTION_ARN=$(get_secret_arn "finefinds-staging-redis-connection")
-          if [ $? -ne 0 ]; then exit 1; fi
-          echo "redis_connection_arn=$REDIS_CONNECTION_ARN" >> $GITHUB_OUTPUT
-          
-          # Get Cognito Config Secret ARN
-          COGNITO_CONFIG_ARN=$(get_secret_arn "finefinds-staging-cognito-config")
-          if [ $? -ne 0 ]; then exit 1; fi
-          echo "cognito_config_arn=$COGNITO_CONFIG_ARN" >> $GITHUB_OUTPUT
-          
-          # Get JWT Secret ARN
-          JWT_SECRET_ARN=$(get_secret_arn "finefinds-staging-jwt")
-          if [ $? -ne 0 ]; then exit 1; fi
-          echo "jwt_secret_arn=$JWT_SECRET_ARN" >> $GITHUB_OUTPUT
-          
-          # Verify all secrets exist and are accessible
-          echo "Verifying secret access..."
-          for secret_arn in "$DB_CONNECTION_ARN" "$REDIS_CONNECTION_ARN" "$COGNITO_CONFIG_ARN" "$JWT_SECRET_ARN"; do
-            if ! verify_secret_access "$secret_arn"; then
+          # Get and verify all secret ARNs
+          for secret in \
+            "${{ env.db_connection_secret }}" \
+            "${{ env.redis_connection_secret }}" \
+            "${{ env.cognito_config_secret }}" \
+            "${{ env.jwt_secret }}"; do
+            
+            secret_arn=$(get_secret_arn "$secret")
+            if [ $? -ne 0 ]; then
+              exit 1
+            fi
+            
+            # Extract the base name of the secret for the output variable
+            secret_base_name=$(echo "$secret" | sed 's/.*-//')
+            echo "${secret_base_name}_arn<<EOF" >> $GITHUB_OUTPUT
+            echo "$secret_arn" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            
+            if ! verify_secret_access "$secret"; then
               exit 1
             fi
           done
           
-          echo "All secrets verified successfully"
+          echo "✓ All secrets verified successfully"
+          echo "::endgroup::"
 
       - name: Create CloudWatch Log Groups
         id: create_log_groups
         run: |
-          # Function to log with timestamp and level
+          echo "::group::Creating CloudWatch Log Groups"
+          
           log() {
             local level=$1
             shift
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*"
           }
           
-          # Function to create log group if it doesn't exist
           create_log_group() {
             local log_group=$1
             local retention_days=30
             
             log "INFO" "Checking if log group exists: $log_group"
-            if ! aws logs describe-log-groups --log-group-name-prefix "$log_group" --query 'logGroups[0].logGroupName' --output text | grep -q "$log_group"; then
+            if ! aws logs describe-log-groups \
+              --log-group-name-prefix "$log_group" \
+              --query 'logGroups[0].logGroupName' \
+              --output text | grep -q "$log_group"; then
+              
               log "INFO" "Creating log group: $log_group"
               aws logs create-log-group --log-group-name "$log_group"
-              aws logs put-retention-policy --log-group-name "$log_group" --retention-in-days "$retention_days"
+              aws logs put-retention-policy \
+                --log-group-name "$log_group" \
+                --retention-in-days "$retention_days"
               log "INFO" "Created log group: $log_group with retention period of $retention_days days"
             else
               log "INFO" "Log group already exists: $log_group"
             fi
           }
           
-          # Function to create all required log groups
           create_all_log_groups() {
-            local env=${{ env.SERVICES_ENV }}
-            
-            # Create log group for Envoy container
-            create_log_group "/finefinds/$env/envoy"
-            
-            # Create log group for App container
-            create_log_group "/finefinds/$env/app"
-            
+            create_log_group "${{ env.log_group_envoy }}"
+            create_log_group "${{ env.log_group_app }}"
             log "INFO" "All required log groups have been created"
           }
           
-          # Execute the log group creation
           create_all_log_groups
+          echo "::endgroup::"
 
       - name: Create Task Definition
         id: task_def
         run: |
+          echo "::group::Creating Task Definition"
           VERSION=$(cat version.txt)
+          
+          # Function to get current task definition
+          get_current_task_def() {
+            local cluster=$1
+            local service=$2
+            aws ecs describe-services \
+              --cluster $cluster \
+              --services $service \
+              --query 'services[0].taskDefinition' \
+              --output text
+          }
+          
+          # Function to rollback to previous task definition
+          rollback_task_def() {
+            local cluster=$1
+            local service=$2
+            local previous_task_def=$3
+            echo "Rolling back to previous task definition: $previous_task_def"
+            aws ecs update-service \
+              --cluster $cluster \
+              --service $service \
+              --task-definition $previous_task_def
+            aws ecs wait services-stable \
+              --cluster $cluster \
+              --services $service
+          }
+          
+          # Function to clean up old task definitions
+          cleanup_old_task_defs() {
+            local family=$1
+            local keep_count=5
+            echo "Cleaning up old task definitions for family: $family"
+            
+            # Get all task definitions for the family
+            local task_defs=($(aws ecs list-task-definitions \
+              --family-prefix "$family" \
+              --sort DESC \
+              --query 'taskDefinitionArns[]' \
+              --output text))
+            
+            # Keep the most recent ones
+            local keep_defs=("${task_defs[@]:0:$keep_count}")
+            echo "Keeping task definitions:"
+            for def in "${keep_defs[@]}"; do
+              echo "  $def"
+            done
+            
+            # Deregister the rest
+            local deregister_defs=("${task_defs[@]:$keep_count}")
+            if [ ${#deregister_defs[@]} -gt 0 ]; then
+              echo "Deregistering old task definitions:"
+              for def in "${deregister_defs[@]}"; do
+                echo "  Deregistering: $def"
+                aws ecs deregister-task-definition --task-definition "$def" || {
+                  echo "::warning::Failed to deregister task definition: $def"
+                  continue
+                }
+              done
+            else
+              echo "No old task definitions to deregister"
+            fi
+          }
+          
+          # Store current task definition for rollback
+          CURRENT_TASK_DEF=$(get_current_task_def "${{ env.cluster_name }}" "${{ env.service_name }}")
+          echo "current_task_def=$CURRENT_TASK_DEF" >> $GITHUB_OUTPUT
           
           # Function to create task definition JSON
           create_task_definition() {
@@ -1324,53 +1835,59 @@ jobs:
             local execution_role="finefinds-$env-ecs-execution-role"
             local task_role="finefinds-$env-ecs-task-role"
             
-            # Verify roles exist before proceeding
             echo "Verifying IAM roles..."
             if ! aws iam get-role --role-name "$execution_role" > /dev/null 2>&1; then
               echo "::error::Execution role $execution_role does not exist"
-              exit 1
+              return 1
             fi
             if ! aws iam get-role --role-name "$task_role" > /dev/null 2>&1; then
               echo "::error::Task role $task_role does not exist"
-              exit 1
+              return 1
             fi
             
-            # Get role ARNs
             local execution_role_arn=$(aws iam get-role --role-name "$execution_role" --query 'Role.Arn' --output text)
             local task_role_arn=$(aws iam get-role --role-name "$task_role" --query 'Role.Arn' --output text)
             
             if [ -z "$execution_role_arn" ] || [ -z "$task_role_arn" ]; then
               echo "::error::Failed to get role ARNs"
-              exit 1
+              return 1
             fi
             
             echo "Using execution role: $execution_role_arn"
             echo "Using task role: $task_role_arn"
             
-            # Get secret ARNs first
-            echo "Getting secret ARNs..."
-            DB_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-db-connection" --query 'ARN' --output text)
-            REDIS_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-redis-connection" --query 'ARN' --output text)
-            JWT_SECRET_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-jwt" --query 'ARN' --output text)
-            COGNITO_CONFIG_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-cognito-config" --query 'ARN' --output text)
+            # Get database connection secret ARN
+            local db_connection_arn=$(aws secretsmanager get-secret-value \
+              --secret-id "finefinds-${{ env.services_env }}-rds-connection" \
+              --query 'ARN' \
+              --output text)
+            
+            if [ -z "$db_connection_arn" ]; then
+              echo "::error::Failed to get database connection secret ARN"
+              return 1
+            fi
+            
+            echo "Using database connection secret ARN: $db_connection_arn"
+            echo "db_connection_arn=$db_connection_arn" >> $GITHUB_OUTPUT
             
             # Create task definition JSON
-            echo '{
-              "family": "'$task_def_family'",
+            cat > task-definition.json << EOF
+            {
+              "family": "$task_def_family",
               "networkMode": "awsvpc",
               "requiresCompatibilities": ["FARGATE"],
               "cpu": "256",
               "memory": "512",
-              "executionRoleArn": "'$execution_role_arn'",
-              "taskRoleArn": "'$task_role_arn'",
+              "executionRoleArn": "$execution_role_arn",
+              "taskRoleArn": "$task_role_arn",
               "runtimePlatform": {
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
               },
               "networkConfiguration": {
                 "awsvpcConfiguration": {
-                  "subnets": ["subnet-0a1b2c3d4", "subnet-5e6f7g8h"],
-                  "securityGroups": ["sg-0a1b2c3d4"],
+                  "subnets": ["${{ secrets.SUBNET_IDS }}"],
+                  "securityGroups": ["${{ secrets.SECURITY_GROUP_IDS }}"],
                   "assignPublicIp": "DISABLED"
                 }
               },
@@ -1388,13 +1905,14 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "envoy",
-                  "image": "${{ env.ECR_REPOSITORY_ENVOY }}:${{ env.ECR_ENVOY_IMAGE_TAG }}",
+                  "image": "${{ env.ecr_repository_envoy }}:${{ env.ecr_envoy_image_tag }}",
                   "essential": true,
                   "user": "1337",
                   "environment": [
-                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/finefinds-mesh/virtualNode/finefinds-${{ env.SERVICES_ENV }}-vn"},
+                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/${{ env.mesh_name }}/virtualNode/${{ env.virtual_node_name }}"},
                     {"name": "ENABLE_ENVOY_STATS_TAGS", "value": "1"},
-                    {"name": "ENABLE_ENVOY_XRAY_TRACING", "value": "1"}
+                    {"name": "ENABLE_ENVOY_XRAY_TRACING", "value": "1"},
+                    {"name": "APPMESH_PREVIEW", "value": "0"}
                   ],
                   "healthCheck": {
                     "command": ["CMD-SHELL", "curl -s http://localhost:9901/server_info | grep state | grep -q LIVE"],
@@ -1406,15 +1924,15 @@ jobs:
                   "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                      "awslogs-group": "/finefinds/'$env'/envoy",
-                      "awslogs-region": "'$AWS_REGION'",
+                      "awslogs-group": "${{ env.log_group_envoy }}",
+                      "awslogs-region": "${{ env.aws_region }}",
                       "awslogs-stream-prefix": "envoy"
                     }
                   }
                 },
                 {
                   "name": "AppContainer",
-                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:latest",
+                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.aws_region }}.amazonaws.com/${{ env.ecr_repository_backend }}:latest",
                   "essential": true,
                   "workingDirectory": "/app",
                   "entryPoint": ["node"],
@@ -1422,85 +1940,185 @@ jobs:
                   "portMappings": [{"containerPort": 3000, "protocol": "tcp"}],
                   "environment": [
                     {"name": "PORT", "value": "3000"},
-                    {"name": "NODE_ENV", "value": "'$env'"},
-                    {"name": "AWS_REGION", "value": "'$AWS_REGION'"},
-                    {"name": "DATABASE_URL", "value": "${{ steps.rds_creds.outputs.database_url }}"}
+                    {"name": "NODE_ENV", "value": "${{ env.services_env }}"},
+                    {"name": "AWS_REGION", "value": "${{ env.aws_region }}"},
+                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/${{ env.mesh_name }}/virtualNode/${{ env.virtual_node_name }}"}
                   ],
                   "secrets": [
-                    {"name": "REDIS_URL", "valueFrom": "'$REDIS_CONNECTION_ARN'"},
-                    {"name": "JWT_SECRET", "valueFrom": "'$JWT_SECRET_ARN'"},
-                    {"name": "COGNITO_CLIENT_USER_POOL_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_USER_POOL_ID::"},
-                    {"name": "COGNITO_CLIENT_CLIENT_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_CLIENT_ID::"},
-                    {"name": "COGNITO_ADMIN_USER_POOL_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_ADMIN_USER_POOL_ID::"},
-                    {"name": "COGNITO_ADMIN_CLIENT_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_ADMIN_CLIENT_ID::"}
+                    {"name": "DATABASE_URL", "valueFrom": "'$db_connection_arn'"},
+                    {"name": "REDIS_URL", "valueFrom": "${{ steps.secrets.outputs.redis_connection_arn }}"},
+                    {"name": "JWT_SECRET", "valueFrom": "${{ steps.secrets.outputs.jwt_secret_arn }}"}
+                  ],
+                  "environment": [
+                    {"name": "COGNITO_CLIENT_USER_POOL_ID", "value": "${{ steps.cognito_config.outputs.client_user_pool_id }}"},
+                    {"name": "COGNITO_CLIENT_CLIENT_ID", "value": "${{ steps.cognito_config.outputs.client_client_id }}"},
+                    {"name": "COGNITO_ADMIN_USER_POOL_ID", "value": "${{ steps.cognito_config.outputs.admin_user_pool_id }}"},
+                    {"name": "COGNITO_ADMIN_CLIENT_ID", "value": "${{ steps.cognito_config.outputs.admin_client_id }}"}
                   ],
                   "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                      "awslogs-group": "/finefinds/'$env'/app",
-                      "awslogs-region": "'$AWS_REGION'",
+                      "awslogs-group": "${{ env.log_group_app }}",
+                      "awslogs-region": "${{ env.aws_region }}",
                       "awslogs-stream-prefix": "finefinds"
                     }
+                  },
+                  "healthCheck": {
+                    "command": ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"],
+                    "interval": 30,
+                    "timeout": 5,
+                    "retries": 3,
+                    "startPeriod": 60
                   }
                 }
               ]
-            }' > task-definition.json
+            }
+            EOF
           }
           
           # Create task definition based on environment
-          create_task_definition "staging" "${{ env.TASK_DEF_FAMILY_STAGING }}"
+          if ! create_task_definition "${{ env.services_env }}" "${{ env.task_def_family }}"; then
+            exit 1
+          fi
+          
+          # Validate task definition JSON
+          if ! jq . task-definition.json > /dev/null 2>&1; then
+            echo "::error::Invalid JSON in task definition"
+            cat task-definition.json
+            exit 1
+          fi
           
           # Register task definition
           echo "Registering task definition..."
-          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
-          if [ -z "$NEW_TASK_DEF_ARN" ]; then
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://task-definition.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+            
+          if [ $? -ne 0 ] || [ -z "$NEW_TASK_DEF_ARN" ]; then
             echo "::error::Failed to register task definition"
+            echo "Task definition JSON:"
+            cat task-definition.json
             exit 1
           fi
+          
           echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
+          
+          # Clean up old task definitions
+          cleanup_old_task_defs "${{ env.task_def_family }}"
+          echo "::endgroup::"
 
       - name: Deploy to ECS
+        id: deploy
         run: |
-          echo "Updating ECS service..."
-          aws ecs update-service \
-            --cluster ${{ env.CLUSTER_NAME_STAGING }} \
-            --service ${{ env.SERVICE_NAME_STAGING }} \
-            --task-definition ${{ steps.task_def.outputs.task_def_arn }}
-            
-          echo "Waiting for service to stabilize..."
-          aws ecs wait services-stable \
-            --cluster ${{ env.CLUSTER_NAME_STAGING }} \
-            --services ${{ env.SERVICE_NAME_STAGING }}
-            
-          # Add health check after deployment
-          echo "Performing health check..."
-          max_attempts=30
-          attempt=1
-          while [ $attempt -le $max_attempts ]; do
-            echo "Health check attempt $attempt of $max_attempts"
-            if aws ecs describe-services \
-              --cluster ${{ env.CLUSTER_NAME_STAGING }} \
-              --services ${{ env.SERVICE_NAME_STAGING }} \
-              --query 'services[0].runningCount' \
-              --output text | grep -q "1"; then
-              echo "Service is healthy"
-              break
-            fi
-            echo "Service not healthy yet. Waiting..."
-            sleep 10
-            attempt=$((attempt + 1))
-          done
+          echo "::group::Deploying to ECS"
           
-          if [ $attempt -gt $max_attempts ]; then
-            echo "::error::Service failed to become healthy after $max_attempts attempts"
+          # Function to log with timestamp and level
+          log() {
+            local level=$1
+            shift
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*"
+          }
+          
+          log "INFO" "Starting deployment process..."
+          log "INFO" "Environment: ${{ env.services_env }}"
+          log "INFO" "Cluster: ${{ env.cluster_name }}"
+          log "INFO" "Service: ${{ env.service_name }}"
+          log "INFO" "Task Definition: ${{ steps.task_def.outputs.task_def_arn }}"
+          
+          # Function to check container pull status
+          check_container_pull_status() {
+            local cluster=$1
+            local service=$2
+            local max_attempts=10
+            local attempt=1
+            
+            while [ $attempt -le $max_attempts ]; do
+              log "INFO" "Checking container pull status (attempt $attempt of $max_attempts)..."
+              
+              # Get the latest task ARN
+              local task_arn=$(aws ecs list-tasks \
+                --cluster "$cluster" \
+                --service-name "$service" \
+                --desired-status RUNNING \
+                --query 'taskArns[0]' \
+                --output text)
+              
+              if [ -z "$task_arn" ] || [ "$task_arn" == "None" ]; then
+                log "WARNING" "No running tasks found. Waiting..."
+                sleep 30
+                attempt=$((attempt + 1))
+                continue
+              fi
+              
+              # Check task status
+              local task_status=$(aws ecs describe-tasks \
+                --cluster "$cluster" \
+                --tasks "$task_arn" \
+                --query 'tasks[0].lastStatus' \
+                --output text)
+              
+              if [ "$task_status" == "RUNNING" ]; then
+                log "INFO" "Container successfully pulled and running"
+                return 0
+              elif [ "$task_status" == "STOPPED" ]; then
+                local stop_reason=$(aws ecs describe-tasks \
+                  --cluster "$cluster" \
+                  --tasks "$task_arn" \
+                  --query 'tasks[0].stoppedReason' \
+                  --output text)
+                log "ERROR" "Container stopped: $stop_reason"
+                return 1
+              fi
+              
+              log "INFO" "Container status: $task_status. Waiting..."
+              sleep 30
+              attempt=$((attempt + 1))
+            done
+            
+            log "ERROR" "Container pull timed out after $max_attempts attempts"
+            return 1
+          }
+          
+          log "INFO" "Updating ECS service..."
+          if ! aws ecs update-service \
+            --cluster ${{ env.cluster_name }} \
+            --service ${{ env.service_name }} \
+            --task-definition ${{ steps.task_def.outputs.task_def_arn }}; then
+            log "ERROR" "Failed to update ECS service"
+            log "INFO" "Rolling back to previous task definition..."
+            rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
+            exit 1
+          fi
+            
+          log "INFO" "Waiting for service to stabilize..."
+          if ! aws ecs wait services-stable \
+            --cluster ${{ env.cluster_name }} \
+            --services ${{ env.service_name }}; then
+            log "ERROR" "Service failed to stabilize"
+            log "INFO" "Rolling back to previous task definition..."
+            rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
             exit 1
           fi
           
-          echo "Deployment completed successfully"
+          # Check container pull status
+          if ! check_container_pull_status "${{ env.cluster_name }}" "${{ env.service_name }}"; then
+            log "ERROR" "Container pull failed"
+            log "INFO" "Rolling back to previous task definition..."
+            rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
+            exit 1
+          fi
+          
+          log "INFO" "Deployment completed successfully"
+          
+          # Clean up temporary files
+          log "INFO" "Cleaning up temporary files..."
+          rm -f version.txt task-definition.json
+          echo "::endgroup::"
 
   deploy-prod:
-    needs: build-and-push
-    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/main' || github.event.pull_request.base.ref == 'main' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'prod')) }}
+    needs: [test]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'prod' && !inputs.skip_deploy }}
     runs-on: ubuntu-latest
     environment: prod
     permissions:
@@ -1508,7 +2126,8 @@ jobs:
       contents: read
     
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
       
       - name: Download version file
         uses: actions/download-artifact@v4
@@ -1518,29 +2137,56 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
-          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }}
+          aws-region: ${{ env.aws_region }}
           role-duration-seconds: 3600
           
-      - name: Validate Envoy Image
+      - name: Get RDS Endpoint and Credentials
+        id: rds_creds
         run: |
-          echo "Validating Envoy image accessibility..."
-          # Authenticate to ECR Public
-          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
+          echo "::group::Fetching RDS Connection Details"
           
-          # Try to pull the image
-          if ! docker pull public.ecr.aws/appmesh/aws-appmesh-envoy:v1.29.12.1-prod; then
-            echo "::error::Failed to pull Envoy image. Please check if the image exists and is accessible."
+          # Get RDS endpoint from AWS Systems Manager Parameter Store
+          rds_endpoint=$(aws ssm get-parameter --name "/finefinds/${{ env.environment }}/rds/endpoint" --query "Parameter.Value" --output text)
+          if [ $? -ne 0 ]; then
+            echo "::error::Failed to get RDS endpoint from Parameter Store"
             exit 1
           fi
-          echo "Successfully validated Envoy image"
+          echo "RDS endpoint: $rds_endpoint"
           
+          # Get database credentials from Secrets Manager
+          db_creds=$(aws secretsmanager get-secret-value --secret-id "finefinds-${{ env.environment }}-rds-connection" --query "SecretString" --output text)
+          if [ $? -ne 0 ]; then
+            echo "::error::Failed to get RDS credentials from Secrets Manager"
+            exit 1
+          fi
+          
+          # Parse credentials from JSON
+          db_user=$(echo $db_creds | jq -r '.username')
+          db_password=$(echo $db_creds | jq -r '.password')
+          db_name=$(echo $db_creds | jq -r '.dbName')
+          db_port=$(echo $db_creds | jq -r '.port')
+          
+          # Validate required fields
+          if [ -z "$db_user" ] || [ -z "$db_password" ] || [ -z "$db_name" ] || [ -z "$db_port" ]; then
+            echo "::error::Missing required database credentials"
+            exit 1
+          fi
+          
+          # Construct database URL
+          database_url="postgresql://${db_user}:${db_password}@${rds_endpoint}:${db_port}/${db_name}"
+          
+          # Output database URL for task definition
+          echo "database_url=$database_url" >> $GITHUB_OUTPUT
+          
+          echo "✓ Successfully retrieved RDS connection details"
+          echo "::endgroup::"
+
       - name: Get Secret ARNs
         id: secrets
         run: |
-          echo "Fetching Secret ARNs..."
+          echo "::group::Fetching Secret ARNs"
           
-          # Function to get secret ARN with retry
           get_secret_arn() {
             local secret_name=$1
             local max_attempts=3
@@ -1549,8 +2195,11 @@ jobs:
             
             while [ $attempt -le $max_attempts ]; do
               echo "Attempt $attempt of $max_attempts to get ARN for $secret_name"
-              secret_arn=$(aws secretsmanager get-secret-value --secret-id "$secret_name" --query 'ARN' --output text)
-              
+              secret_arn=$(aws secretsmanager get-secret-value \
+                --secret-id "$secret_name" \
+                --query 'ARN' \
+                --output text)
+                
               if [ $? -eq 0 ] && [ ! -z "$secret_arn" ]; then
                 echo "Successfully got ARN for $secret_name"
                 echo "$secret_arn"
@@ -1566,7 +2215,6 @@ jobs:
             return 1
           }
           
-          # Function to verify secret access
           verify_secret_access() {
             local secret_name=$1
             local max_attempts=3
@@ -1588,121 +2236,57 @@ jobs:
             return 1
           }
           
-          # Get DB Connection Secret ARN
-          DB_CONNECTION_ARN=$(get_secret_arn "finefinds-prod-db-connection")
-          if [ $? -ne 0 ]; then exit 1; fi
-          echo "db_connection_arn=$DB_CONNECTION_ARN" >> $GITHUB_OUTPUT
-          
-          # Get Redis Connection Secret ARN
-          REDIS_CONNECTION_ARN=$(get_secret_arn "finefinds-prod-redis-connection")
-          if [ $? -ne 0 ]; then exit 1; fi
-          echo "redis_connection_arn=$REDIS_CONNECTION_ARN" >> $GITHUB_OUTPUT
-          
-          # Get Cognito Config Secret ARN
-          COGNITO_CONFIG_ARN=$(get_secret_arn "finefinds-prod-cognito-config")
-          if [ $? -ne 0 ]; then exit 1; fi
-          echo "cognito_config_arn=$COGNITO_CONFIG_ARN" >> $GITHUB_OUTPUT
-          
-          # Get JWT Secret ARN
-          JWT_SECRET_ARN=$(get_secret_arn "finefinds-prod-jwt")
-          if [ $? -ne 0 ]; then exit 1; fi
-          echo "jwt_secret_arn=$JWT_SECRET_ARN" >> $GITHUB_OUTPUT
-          
-          # Verify all secrets exist and are accessible
-          echo "Verifying secret access..."
-          for secret_arn in "$DB_CONNECTION_ARN" "$REDIS_CONNECTION_ARN" "$COGNITO_CONFIG_ARN" "$JWT_SECRET_ARN"; do
-            if ! verify_secret_access "$secret_arn"; then
+          # Get and verify all secret ARNs
+          for secret in \
+            "${{ env.db_connection_secret }}" \
+            "${{ env.redis_connection_secret }}" \
+            "${{ env.cognito_config_secret }}" \
+            "${{ env.jwt_secret }}"; do
+            
+            secret_arn=$(get_secret_arn "$secret")
+            if [ $? -ne 0 ]; then
+              exit 1
+            fi
+            
+            # Extract the base name of the secret for the output variable
+            secret_base_name=$(echo "$secret" | sed 's/.*-//')
+            echo "${secret_base_name}_arn<<EOF" >> $GITHUB_OUTPUT
+            echo "$secret_arn" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            
+            if ! verify_secret_access "$secret"; then
               exit 1
             fi
           done
           
-          echo "All secrets verified successfully"
+          echo "✓ All secrets verified successfully"
+          echo "::endgroup::"
 
       - name: Create CloudWatch Log Groups
         id: create_log_groups
         run: |
-          # Function to log with timestamp and level
+          echo "::group::Creating CloudWatch Log Groups"
+          
           log() {
             local level=$1
             shift
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*"
-          }
-          
-          # Function to create log group if it doesn't exist
-          create_log_group() {
-            local log_group=$1
-            local retention_days=30
-            
-            log "INFO" "Checking if log group exists: $log_group"
-            if ! aws logs describe-log-groups --log-group-name-prefix "$log_group" --query 'logGroups[0].logGroupName' --output text | grep -q "$log_group"; then
-              log "INFO" "Creating log group: $log_group"
-              aws logs create-log-group --log-group-name "$log_group"
-              aws logs put-retention-policy --log-group-name "$log_group" --retention-in-days "$retention_days"
-              log "INFO" "Created log group: $log_group with retention period of $retention_days days"
-            else
-              log "INFO" "Log group already exists: $log_group"
-            fi
-          }
-          
-          # Function to create all required log groups
-          create_all_log_groups() {
-            local env=${{ env.SERVICES_ENV }}
-            
-            # Create log group for Envoy container
-            create_log_group "/finefinds/$env/envoy"
-            
-            # Create log group for App container
-            create_log_group "/finefinds/$env/app"
-            
-            log "INFO" "All required log groups have been created"
-          }
-          
-          # Execute the log group creation
-          create_all_log_groups
-
-      - name: Create Task Definition
-        id: task_def
-        run: |
-          VERSION=$(cat version.txt)
-          
-          # Function to create task definition JSON
-          create_task_definition() {
-            local env=$1
-            local task_def_family=$2
-            local execution_role="finefinds-$env-ecs-execution-role"
-            local task_role="finefinds-$env-ecs-task-role"
-            
-            # Verify roles exist before proceeding
-            echo "Verifying IAM roles..."
-            if ! aws iam get-role --role-name "$execution_role" > /dev/null 2>&1; then
-              echo "::error::Execution role $execution_role does not exist"
-              exit 1
-            fi
             if ! aws iam get-role --role-name "$task_role" > /dev/null 2>&1; then
               echo "::error::Task role $task_role does not exist"
               exit 1
             fi
-            
-            # Get role ARNs
             local execution_role_arn=$(aws iam get-role --role-name "$execution_role" --query 'Role.Arn' --output text)
             local task_role_arn=$(aws iam get-role --role-name "$task_role" --query 'Role.Arn' --output text)
-            
             if [ -z "$execution_role_arn" ] || [ -z "$task_role_arn" ]; then
               echo "::error::Failed to get role ARNs"
               exit 1
             fi
-            
             echo "Using execution role: $execution_role_arn"
             echo "Using task role: $task_role_arn"
-            
-            # Get secret ARNs first
             echo "Getting secret ARNs..."
-            DB_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-db-connection" --query 'ARN' --output text)
-            REDIS_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-redis-connection" --query 'ARN' --output text)
-            JWT_SECRET_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-jwt" --query 'ARN' --output text)
-            COGNITO_CONFIG_ARN=$(aws secretsmanager get-secret-value --secret-id "finefinds-$env-cognito-config" --query 'ARN' --output text)
-            
-            # Create task definition JSON
+            DB_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "${{ env.db_connection_secret }}" --query 'ARN' --output text)
+            REDIS_CONNECTION_ARN=$(aws secretsmanager get-secret-value --secret-id "${{ env.redis_connection_secret }}" --query 'ARN' --output text)
+            JWT_SECRET_ARN=$(aws secretsmanager get-secret-value --secret-id "${{ env.jwt_secret }}" --query 'ARN' --output text)
+            COGNITO_CONFIG_ARN=$(aws secretsmanager get-secret-value --secret-id "${{ env.cognito_config_secret }}" --query 'ARN' --output text)
             echo '{
               "family": "'$task_def_family'",
               "networkMode": "awsvpc",
@@ -1717,8 +2301,8 @@ jobs:
               },
               "networkConfiguration": {
                 "awsvpcConfiguration": {
-                  "subnets": ["subnet-0a1b2c3d4", "subnet-5e6f7g8h"],
-                  "securityGroups": ["sg-0a1b2c3d4"],
+                  "subnets": ["${{ secrets.SUBNET_IDS }}"],
+                  "securityGroups": ["${{ secrets.SECURITY_GROUP_IDS }}"],
                   "assignPublicIp": "DISABLED"
                 }
               },
@@ -1736,13 +2320,14 @@ jobs:
               "containerDefinitions": [
                 {
                   "name": "envoy",
-                  "image": "${{ env.ECR_REPOSITORY_ENVOY }}:${{ env.ECR_ENVOY_IMAGE_TAG }}",
+                  "image": "${{ env.ecr_repository_envoy }}:${{ env.ecr_envoy_image_tag }}",
                   "essential": true,
                   "user": "1337",
                   "environment": [
-                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/finefinds-mesh/virtualNode/finefinds-${{ env.SERVICES_ENV }}-vn"},
+                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/${{ env.mesh_name }}/virtualNode/${{ env.virtual_node_name }}"},
                     {"name": "ENABLE_ENVOY_STATS_TAGS", "value": "1"},
-                    {"name": "ENABLE_ENVOY_XRAY_TRACING", "value": "1"}
+                    {"name": "ENABLE_ENVOY_XRAY_TRACING", "value": "1"},
+                    {"name": "APPMESH_PREVIEW", "value": "0"}
                   ],
                   "healthCheck": {
                     "command": ["CMD-SHELL", "curl -s http://localhost:9901/server_info | grep state | grep -q LIVE"],
@@ -1754,15 +2339,15 @@ jobs:
                   "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                      "awslogs-group": "/finefinds/'$env'/envoy",
-                      "awslogs-region": "'$AWS_REGION'",
+                      "awslogs-group": "${{ env.log_group_envoy }}",
+                      "awslogs-region": "${{ env.AWS_REGION }}",
                       "awslogs-stream-prefix": "envoy"
                     }
                   }
                 },
                 {
                   "name": "AppContainer",
-                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_BACKEND }}:latest",
+                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ecr_repository_backend }}:latest",
                   "essential": true,
                   "workingDirectory": "/app",
                   "entryPoint": ["node"],
@@ -1770,11 +2355,12 @@ jobs:
                   "portMappings": [{"containerPort": 3000, "protocol": "tcp"}],
                   "environment": [
                     {"name": "PORT", "value": "3000"},
-                    {"name": "NODE_ENV", "value": "'$env'"},
-                    {"name": "AWS_REGION", "value": "'$AWS_REGION'"},
-                    {"name": "DATABASE_URL", "value": "${{ steps.rds_creds.outputs.database_url }}"}
+                    {"name": "NODE_ENV", "value": "${{ env.services_env }}"},
+                    {"name": "AWS_REGION", "value": "${{ env.AWS_REGION }}"},
+                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/${{ env.mesh_name }}/virtualNode/${{ env.virtual_node_name }}"}
                   ],
                   "secrets": [
+                    {"name": "DATABASE_URL", "valueFrom": "'$DB_CONNECTION_ARN'"},
                     {"name": "REDIS_URL", "valueFrom": "'$REDIS_CONNECTION_ARN'"},
                     {"name": "JWT_SECRET", "valueFrom": "'$JWT_SECRET_ARN'"},
                     {"name": "COGNITO_CLIENT_USER_POOL_ID", "valueFrom": "'$COGNITO_CONFIG_ARN':COGNITO_CLIENT_USER_POOL_ID::"},
@@ -1785,10 +2371,17 @@ jobs:
                   "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                      "awslogs-group": "/finefinds/'$env'/app",
-                      "awslogs-region": "'$AWS_REGION'",
+                      "awslogs-group": "${{ env.log_group_app }}",
+                      "awslogs-region": "${{ env.AWS_REGION }}",
                       "awslogs-stream-prefix": "finefinds"
                     }
+                  },
+                  "healthCheck": {
+                    "command": ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"],
+                    "interval": 30,
+                    "timeout": 5,
+                    "retries": 3,
+                    "startPeriod": 60
                   }
                 }
               ]
@@ -1796,7 +2389,7 @@ jobs:
           }
           
           # Create task definition based on environment
-          create_task_definition "prod" "${{ env.TASK_DEF_FAMILY_PROD }}"
+          create_task_definition "prod" "${{ env.task_def_family }}"
           
           # Register task definition
           echo "Registering task definition..."
@@ -1811,14 +2404,14 @@ jobs:
         run: |
           echo "Updating ECS service..."
           aws ecs update-service \
-            --cluster ${{ env.CLUSTER_NAME_PROD }} \
-            --service ${{ env.SERVICE_NAME_PROD }} \
+            --cluster ${{ env.cluster_name }} \
+            --service ${{ env.service_name }} \
             --task-definition ${{ steps.task_def.outputs.task_def_arn }}
             
           echo "Waiting for service to stabilize..."
           aws ecs wait services-stable \
-            --cluster ${{ env.CLUSTER_NAME_PROD }} \
-            --services ${{ env.SERVICE_NAME_PROD }}
+            --cluster ${{ env.cluster_name }} \
+            --services ${{ env.service_name }}
             
           # Add health check after deployment
           echo "Performing health check..."
@@ -1827,8 +2420,8 @@ jobs:
           while [ $attempt -le $max_attempts ]; do
             echo "Health check attempt $attempt of $max_attempts"
             if aws ecs describe-services \
-              --cluster ${{ env.CLUSTER_NAME_PROD }} \
-              --services ${{ env.SERVICE_NAME_PROD }} \
+              --cluster ${{ env.cluster_name }} \
+              --services ${{ env.service_name }} \
               --query 'services[0].runningCount' \
               --output text | grep -q "1"; then
               echo "Service is healthy"
