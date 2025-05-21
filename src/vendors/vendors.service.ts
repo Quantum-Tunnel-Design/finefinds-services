@@ -1,12 +1,17 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateVendorProfileDto } from './dto/create-vendor-profile.dto';
 import { UpdateVendorProfileDto } from './dto/update-vendor-profile.dto';
 import { User, UserRole } from '@prisma/client';
+import { CreateBusinessProfileInput } from './dto/create-business-profile.input';
+import { S3Service } from '../s3/s3.service';
 
 @Injectable()
 export class VendorsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private s3Service: S3Service,
+  ) {}
 
   /**
    * Creates or updates a vendor profile for a user
@@ -89,5 +94,94 @@ export class VendorsService {
       data: { approved: true },
       include: { user: true },
     });
+  }
+
+  async createBusinessProfile(userId: string, input: CreateBusinessProfileInput, files: {
+    logo?: Express.Multer.File;
+    coverImage?: Express.Multer.File;
+    gallery?: Express.Multer.File[];
+  }): Promise<any> {
+    // Check if user is a vendor
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { businessProfile: true },
+    });
+
+    if (!user || user.role !== UserRole.VENDOR) {
+      throw new ForbiddenException('Only vendors can create business profiles');
+    }
+
+    // Check if profile already exists
+    if (user.businessProfile) {
+      throw new BadRequestException('Business profile already exists');
+    }
+
+    // Validate image files
+    if (files.logo) {
+      this.validateImage(files.logo, 'logo');
+    }
+    if (files.coverImage) {
+      this.validateImage(files.coverImage, 'cover image');
+    }
+    if (files.gallery) {
+      if (files.gallery.length > 10) {
+        throw new BadRequestException('Maximum 10 gallery images allowed');
+      }
+      files.gallery.forEach(image => this.validateImage(image, 'gallery image'));
+    }
+
+    // Upload images to S3
+    const logoUrl = files.logo ? await this.uploadImage(files.logo, 'logo') : null;
+    const coverImageUrl = files.coverImage ? await this.uploadImage(files.coverImage, 'cover') : null;
+    const galleryUrls = files.gallery ? await Promise.all(
+      files.gallery.map(image => this.uploadImage(image, 'gallery'))
+    ) : [];
+
+    // Create business profile
+    const profile = await this.prisma.businessProfile.create({
+      data: {
+        userId,
+        businessName: input.businessName,
+        location: input.location,
+        description: input.description,
+        contactNumber: input.contactNumber,
+        website: input.website,
+        facebookUrl: input.facebookUrl,
+        instagramUrl: input.instagramUrl,
+        twitterUrl: input.twitterUrl,
+        bankName: input.bankName,
+        accountNumber: input.accountNumber,
+        branch: input.branch,
+        logoUrl,
+        coverImageUrl,
+        galleryUrls,
+        categories: input.categories,
+        tags: input.tags,
+      },
+    });
+
+    return profile;
+  }
+
+  private validateImage(file: Express.Multer.File, type: string): void {
+    // Check file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      throw new BadRequestException(`${type} size must not exceed 5MB`);
+    }
+
+    // Check file type
+    const allowedTypes = ['image/jpeg', 'image/png'];
+    if (!allowedTypes.includes(file.mimetype)) {
+      throw new BadRequestException(`${type} must be a valid image format (JPG, PNG)`);
+    }
+
+    // Check dimensions
+    // Note: This would require additional image processing library
+    // For now, we'll rely on client-side validation for dimensions
+  }
+
+  private async uploadImage(file: Express.Multer.File, type: string): Promise<string> {
+    const key = `vendors/${type}/${Date.now()}-${file.originalname}`;
+    return this.s3Service.uploadFile(file.buffer, key, file.mimetype);
   }
 } 

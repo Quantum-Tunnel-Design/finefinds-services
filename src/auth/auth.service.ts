@@ -15,6 +15,7 @@ import {
   AdminInitiateAuthCommand,
   AdminUpdateUserAttributesCommand,
   ChangePasswordCommand,
+  AuthFlowType,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { UsersService } from '../users/users.service';
 import { SignUpInput } from './dto/sign-up.input';
@@ -32,6 +33,9 @@ import { UpdateParentProfileInput } from './dto/update-parent-profile.input';
 import { UpdateParentPasswordInput } from './dto/update-parent-password.input';
 import { VendorSignUpInput } from './dto/vendor-sign-up.input';
 import { MailerService } from '@nestjs-modules/mailer';
+import { PrismaService } from '../prisma/prisma.service';
+import { VendorLoginInput } from './dto/vendor-login.input';
+import { LoginAttemptService } from './services/login-attempt.service';
 
 @Injectable()
 export class AuthService {
@@ -46,6 +50,8 @@ export class AuthService {
     private usersService: UsersService,
     private sessionService: SessionService,
     private mailerService: MailerService,
+    private prisma: PrismaService,
+    private loginAttemptService: LoginAttemptService,
   ) {
     this.cognitoClient = new CognitoIdentityProviderClient({
       region: this.configService.get('AWS_REGION'),
@@ -674,6 +680,78 @@ export class AuthService {
       };
     } catch (error) {
       throw new UnauthorizedException('Failed to create vendors');
+    }
+  }
+
+  async vendorLogin(input: VendorLoginInput) {
+    // Check if account is locked
+    const { locked, lockedUntil } = await this.loginAttemptService.isAccountLocked(input.email);
+    if (locked) {
+      throw new ForbiddenException(
+        `Account is locked. Please try again after ${lockedUntil.toLocaleString()}`,
+      );
+    }
+
+    try {
+      const command = new InitiateAuthCommand({
+        AuthFlow: AuthFlowType.USER_PASSWORD_AUTH,
+        ClientId: this.clientId,
+        AuthParameters: {
+          USERNAME: input.email,
+          PASSWORD: input.password,
+        },
+      });
+
+      const response = await this.cognitoClient.send(command);
+
+      // Get user from database
+      const user = await this.prisma.user.findUnique({
+        where: { email: input.email },
+      });
+
+      if (!user || user.role !== UserRole.VENDOR) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+
+      // Clear failed attempts on successful login
+      await this.loginAttemptService.clearFailedAttempts(user.id);
+
+      // Create session
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 1); // Sessions expire in 1 day
+
+      await this.sessionService.createSession(
+        user.id,
+        response.AuthenticationResult.AccessToken,
+        expiresAt
+      );
+
+      return {
+        accessToken: response.AuthenticationResult.AccessToken,
+        idToken: response.AuthenticationResult.IdToken,
+        refreshToken: response.AuthenticationResult.RefreshToken,
+        expiresIn: response.AuthenticationResult.ExpiresIn,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+        },
+      };
+    } catch (error) {
+      // Record failed attempt
+      const { attemptsLeft, lockedUntil } = await this.loginAttemptService.recordFailedAttempt(input.email);
+
+      if (lockedUntil) {
+        throw new ForbiddenException(
+          `Account is locked. Please try again after ${lockedUntil.toLocaleString()}`,
+        );
+      }
+
+      throw new UnauthorizedException(
+        `Invalid credentials. ${attemptsLeft} attempts remaining before account is locked.`,
+      );
     }
   }
 } 

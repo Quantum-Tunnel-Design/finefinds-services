@@ -25,6 +25,8 @@ model User {
   payments      Payment[]
   reviews       Review[]
   vendorProfile VendorProfile?
+  businessProfile BusinessProfile?
+  loginAttempts LoginAttempt[]
 
   @@map("users")
 }
@@ -154,6 +156,43 @@ model Session {
 
   @@index([userId])
   @@index([token])
+}
+
+model BusinessProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+  businessName  String   @db.VarChar(100)
+  location      String   @db.VarChar(500)
+  description   String   @db.Text
+  contactNumber String
+  website       String?  @db.VarChar(255)
+  facebookUrl   String?  @db.VarChar(255)
+  instagramUrl  String?  @db.VarChar(255)
+  twitterUrl    String?  @db.VarChar(255)
+  bankName      String?  @db.VarChar(100)
+  accountNumber String?  @db.VarChar(20)
+  branch        String?  @db.VarChar(100)
+  logoUrl       String?  @db.VarChar(255)
+  coverImageUrl String?  @db.VarChar(255)
+  galleryUrls   String[] @db.VarChar(255)
+  categories    String[]
+  tags          String[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model LoginAttempt {
+  id        String   @id @default(uuid())
+  userId    String
+  success   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 enum UserRole {

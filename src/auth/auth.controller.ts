@@ -16,6 +16,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
+import { VendorLoginInput } from './dto/vendor-login.input';
 
 @Controller('auth')
 export class AuthController {
@@ -78,5 +79,16 @@ export class AuthController {
   @Roles(UserRole.ADMIN)
   async bulkCreateVendors(@Body('vendors') vendors: Partial<VendorSignUpInput>[]): Promise<AuthResponse> {
     return this.authService.bulkCreateVendors(vendors);
+  }
+
+  @Post('vendor/login')
+  async vendorLogin(@Body() input: VendorLoginInput) {
+    return this.authService.vendorLogin(input);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  async logout(@Req() req) {
+    return this.authService.logout(req.user.id);
   }
 }
