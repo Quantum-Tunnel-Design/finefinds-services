@@ -13,6 +13,8 @@ import {
   AdminCreateUserCommand,
   AdminSetUserPasswordCommand,
   AdminInitiateAuthCommand,
+  AdminUpdateUserAttributesCommand,
+  ChangePasswordCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { UsersService } from '../users/users.service';
 import { SignUpInput } from './dto/sign-up.input';
@@ -26,6 +28,8 @@ import { AdminAccountInput } from './dto/admin-account.input';
 import { UserRole } from '@prisma/client';
 import { AuthResponse } from './models/auth-response.model';
 import { SessionService } from './session.service';
+import { UpdateParentProfileInput } from './dto/update-parent-profile.input';
+import { UpdateParentPasswordInput } from './dto/update-parent-password.input';
 
 @Injectable()
 export class AuthService {
@@ -458,6 +462,96 @@ export class AuthService {
         throw error;
       }
       throw new UnauthorizedException('Failed to reset admin password');
+    }
+  }
+
+  async updateParentProfile(userId: string, input: UpdateParentProfileInput): Promise<AuthResponse> {
+    try {
+      const user = await this.usersService.findById(userId);
+      if (!user || user.role !== UserRole.PARENT) {
+        throw new ForbiddenException('User not found or not a parent');
+      }
+
+      // Update user in Cognito
+      const updateUserCommand = new AdminUpdateUserAttributesCommand({
+        UserPoolId: this.clientUserPoolId,
+        Username: user.email,
+        UserAttributes: [
+          { Name: 'given_name', Value: input.firstName },
+          { Name: 'family_name', Value: input.lastName },
+          { Name: 'phone_number', Value: input.phoneNumber },
+        ],
+      });
+
+      await this.cognitoClient.send(updateUserCommand);
+
+      // Update user in database
+      await this.usersService.update(userId, {
+        firstName: input.firstName,
+        lastName: input.lastName,
+        phoneNumber: input.phoneNumber,
+      });
+
+      return {
+        message: 'Profile updated successfully',
+      };
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Failed to update profile');
+    }
+  }
+
+  async updateParentPassword(userId: string, input: UpdateParentPasswordInput): Promise<AuthResponse> {
+    try {
+      const user = await this.usersService.findById(userId);
+      if (!user || user.role !== UserRole.PARENT) {
+        throw new ForbiddenException('User not found or not a parent');
+      }
+
+      // Validate password match
+      if (input.newPassword !== input.confirmNewPassword) {
+        throw new BadRequestException('New passwords do not match');
+      }
+
+      // Verify current password
+      try {
+        const authCommand = new InitiateAuthCommand({
+          AuthFlow: 'USER_PASSWORD_AUTH',
+          ClientId: this.clientId,
+          AuthParameters: {
+            USERNAME: user.email,
+            PASSWORD: input.currentPassword,
+          },
+        });
+
+        await this.cognitoClient.send(authCommand);
+      } catch (error) {
+        throw new UnauthorizedException('Current password is incorrect');
+      }
+
+      // Update password in Cognito using admin API
+      const setPasswordCommand = new AdminSetUserPasswordCommand({
+        UserPoolId: this.clientUserPoolId,
+        Username: user.email,
+        Password: input.newPassword,
+        Permanent: true,
+      });
+
+      await this.cognitoClient.send(setPasswordCommand);
+
+      // Delete all sessions
+      await this.sessionService.deleteUserSessions(userId);
+
+      return {
+        message: 'Password updated successfully',
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Failed to update password');
     }
   }
 } 

@@ -8,6 +8,8 @@ import { ResetPasswordInput } from './dto/reset-password.input';
 import { ParentSignUpInput } from './dto/parent-sign-up.input';
 import { AdminSignInInput } from './dto/admin-sign-in.input';
 import { AdminAccountInput } from './dto/admin-account.input';
+import { UpdateParentProfileInput } from './dto/update-parent-profile.input';
+import { UpdateParentPasswordInput } from './dto/update-parent-password.input';
 import { AuthResponse } from './models/auth-response.model';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
@@ -43,5 +45,25 @@ export class AuthController {
     @Body('newPassword') newPassword: string,
   ): Promise<AuthResponse> {
     return this.authService.resetAdminPassword(email, newPassword);
+  }
+
+  @Post('parent/profile')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PARENT)
+  async updateParentProfile(
+    @Req() req,
+    @Body() input: UpdateParentProfileInput,
+  ): Promise<AuthResponse> {
+    return this.authService.updateParentProfile(req.user.id, input);
+  }
+
+  @Post('parent/password')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PARENT)
+  async updateParentPassword(
+    @Req() req,
+    @Body() input: UpdateParentPasswordInput,
+  ): Promise<AuthResponse> {
+    return this.authService.updateParentPassword(req.user.id, input);
   }
 }
