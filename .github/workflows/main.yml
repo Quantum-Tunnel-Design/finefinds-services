@@ -666,6 +666,37 @@ jobs:
           log "INFO" "Service: ${{ env.service_name }}"
           log "INFO" "Task Definition: ${{ steps.task_def.outputs.task_def_arn }}"
           
+          # Function to check if service exists
+          check_service_exists() {
+            local cluster=$1
+            local service=$2
+            aws ecs describe-services \
+              --cluster "$cluster" \
+              --services "$service" \
+              --query 'services[0].status' \
+              --output text 2>/dev/null || echo "NONEXISTENT"
+          }
+          
+          # Function to create service
+          create_service() {
+            local cluster=$1
+            local service=$2
+            local task_def=$3
+            
+            log "INFO" "Creating new ECS service..."
+            aws ecs create-service \
+              --cluster "$cluster" \
+              --service-name "$service" \
+              --task-definition "$task_def" \
+              --desired-count 1 \
+              --launch-type FARGATE \
+              --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.SUBNET_IDS }}],securityGroups=[${{ secrets.SECURITY_GROUP_IDS }}],assignPublicIp=DISABLED}" \
+              --service-registries "registryArn=arn:aws:servicediscovery:${{ env.aws_region }}:${{ secrets.AWS_ACCOUNT_ID }}:service/${{ env.services_env }}-service-discovery" || {
+                log "ERROR" "Failed to create ECS service"
+                return 1
+              }
+          }
+          
           # Function to check container pull status
           check_container_pull_status() {
             local cluster=$1
@@ -720,16 +751,24 @@ jobs:
             return 1
           }
           
-          log "INFO" "Updating ECS service..."
-          if ! aws ecs update-service \
-            --cluster ${{ env.cluster_name }} \
-            --service ${{ env.service_name }} \
-            --task-definition ${{ steps.task_def.outputs.task_def_arn }} \
-            --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.SUBNET_IDS }}],securityGroups=[${{ secrets.SECURITY_GROUP_IDS }}],assignPublicIp=DISABLED}"; then
-            log "ERROR" "Failed to update ECS service"
-            log "INFO" "Rolling back to previous task definition..."
-            rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
-            exit 1
+          # Check if service exists
+          service_status=$(check_service_exists "${{ env.cluster_name }}" "${{ env.service_name }}")
+          
+          if [ "$service_status" == "NONEXISTENT" ]; then
+            log "INFO" "Service does not exist. Creating new service..."
+            if ! create_service "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.task_def_arn }}"; then
+              exit 1
+            fi
+          else
+            log "INFO" "Updating existing ECS service..."
+            if ! aws ecs update-service \
+              --cluster ${{ env.cluster_name }} \
+              --service ${{ env.service_name }} \
+              --task-definition ${{ steps.task_def.outputs.task_def_arn }} \
+              --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.SUBNET_IDS }}],securityGroups=[${{ secrets.SECURITY_GROUP_IDS }}],assignPublicIp=DISABLED}"; then
+              log "ERROR" "Failed to update ECS service"
+              exit 1
+            fi
           fi
           
           log "INFO" "Waiting for service to stabilize..."
@@ -737,16 +776,12 @@ jobs:
             --cluster ${{ env.cluster_name }} \
             --services ${{ env.service_name }}; then
             log "ERROR" "Service failed to stabilize"
-            log "INFO" "Rolling back to previous task definition..."
-            rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
             exit 1
           fi
           
           # Check container pull status
           if ! check_container_pull_status "${{ env.cluster_name }}" "${{ env.service_name }}"; then
             log "ERROR" "Container pull failed"
-            log "INFO" "Rolling back to previous task definition..."
-            rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
             exit 1
           fi
           
@@ -1223,6 +1258,37 @@ jobs:
           log "INFO" "Service: ${{ env.service_name }}"
           log "INFO" "Task Definition: ${{ steps.task_def.outputs.task_def_arn }}"
           
+          # Function to check if service exists
+          check_service_exists() {
+            local cluster=$1
+            local service=$2
+            aws ecs describe-services \
+              --cluster "$cluster" \
+              --services "$service" \
+              --query 'services[0].status' \
+              --output text 2>/dev/null || echo "NONEXISTENT"
+          }
+          
+          # Function to create service
+          create_service() {
+            local cluster=$1
+            local service=$2
+            local task_def=$3
+            
+            log "INFO" "Creating new ECS service..."
+            aws ecs create-service \
+              --cluster "$cluster" \
+              --service-name "$service" \
+              --task-definition "$task_def" \
+              --desired-count 1 \
+              --launch-type FARGATE \
+              --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.SUBNET_IDS }}],securityGroups=[${{ secrets.SECURITY_GROUP_IDS }}],assignPublicIp=DISABLED}" \
+              --service-registries "registryArn=arn:aws:servicediscovery:${{ env.aws_region }}:${{ secrets.AWS_ACCOUNT_ID }}:service/${{ env.services_env }}-service-discovery" || {
+                log "ERROR" "Failed to create ECS service"
+                return 1
+              }
+          }
+          
           # Function to check container pull status
           check_container_pull_status() {
             local cluster=$1
@@ -1277,16 +1343,24 @@ jobs:
             return 1
           }
           
-          log "INFO" "Updating ECS service..."
-          if ! aws ecs update-service \
-            --cluster ${{ env.cluster_name }} \
-            --service ${{ env.service_name }} \
-            --task-definition ${{ steps.task_def.outputs.task_def_arn }} \
-            --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.SUBNET_IDS }}],securityGroups=[${{ secrets.SECURITY_GROUP_IDS }}],assignPublicIp=DISABLED}"; then
-            log "ERROR" "Failed to update ECS service"
-            log "INFO" "Rolling back to previous task definition..."
-            rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
-            exit 1
+          # Check if service exists
+          service_status=$(check_service_exists "${{ env.cluster_name }}" "${{ env.service_name }}")
+          
+          if [ "$service_status" == "NONEXISTENT" ]; then
+            log "INFO" "Service does not exist. Creating new service..."
+            if ! create_service "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.task_def_arn }}"; then
+              exit 1
+            fi
+          else
+            log "INFO" "Updating existing ECS service..."
+            if ! aws ecs update-service \
+              --cluster ${{ env.cluster_name }} \
+              --service ${{ env.service_name }} \
+              --task-definition ${{ steps.task_def.outputs.task_def_arn }} \
+              --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.SUBNET_IDS }}],securityGroups=[${{ secrets.SECURITY_GROUP_IDS }}],assignPublicIp=DISABLED}"; then
+              log "ERROR" "Failed to update ECS service"
+              exit 1
+            fi
           fi
           
           log "INFO" "Waiting for service to stabilize..."
@@ -1294,16 +1368,12 @@ jobs:
             --cluster ${{ env.cluster_name }} \
             --services ${{ env.service_name }}; then
             log "ERROR" "Service failed to stabilize"
-            log "INFO" "Rolling back to previous task definition..."
-            rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
             exit 1
           fi
           
           # Check container pull status
           if ! check_container_pull_status "${{ env.cluster_name }}" "${{ env.service_name }}"; then
             log "ERROR" "Container pull failed"
-            log "INFO" "Rolling back to previous task definition..."
-            rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
             exit 1
           fi
           
@@ -1781,6 +1851,37 @@ jobs:
           log "INFO" "Service: ${{ env.service_name }}"
           log "INFO" "Task Definition: ${{ steps.task_def.outputs.task_def_arn }}"
           
+          # Function to check if service exists
+          check_service_exists() {
+            local cluster=$1
+            local service=$2
+            aws ecs describe-services \
+              --cluster "$cluster" \
+              --services "$service" \
+              --query 'services[0].status' \
+              --output text 2>/dev/null || echo "NONEXISTENT"
+          }
+          
+          # Function to create service
+          create_service() {
+            local cluster=$1
+            local service=$2
+            local task_def=$3
+            
+            log "INFO" "Creating new ECS service..."
+            aws ecs create-service \
+              --cluster "$cluster" \
+              --service-name "$service" \
+              --task-definition "$task_def" \
+              --desired-count 1 \
+              --launch-type FARGATE \
+              --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.SUBNET_IDS }}],securityGroups=[${{ secrets.SECURITY_GROUP_IDS }}],assignPublicIp=DISABLED}" \
+              --service-registries "registryArn=arn:aws:servicediscovery:${{ env.aws_region }}:${{ secrets.AWS_ACCOUNT_ID }}:service/${{ env.services_env }}-service-discovery" || {
+                log "ERROR" "Failed to create ECS service"
+                return 1
+              }
+          }
+          
           # Function to check container pull status
           check_container_pull_status() {
             local cluster=$1
@@ -1835,16 +1936,24 @@ jobs:
             return 1
           }
           
-          log "INFO" "Updating ECS service..."
-          if ! aws ecs update-service \
-            --cluster ${{ env.cluster_name }} \
-            --service ${{ env.service_name }} \
-            --task-definition ${{ steps.task_def.outputs.task_def_arn }} \
-            --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.SUBNET_IDS }}],securityGroups=[${{ secrets.SECURITY_GROUP_IDS }}],assignPublicIp=DISABLED}"; then
-            log "ERROR" "Failed to update ECS service"
-            log "INFO" "Rolling back to previous task definition..."
-            rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
-            exit 1
+          # Check if service exists
+          service_status=$(check_service_exists "${{ env.cluster_name }}" "${{ env.service_name }}")
+          
+          if [ "$service_status" == "NONEXISTENT" ]; then
+            log "INFO" "Service does not exist. Creating new service..."
+            if ! create_service "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.task_def_arn }}"; then
+              exit 1
+            fi
+          else
+            log "INFO" "Updating existing ECS service..."
+            if ! aws ecs update-service \
+              --cluster ${{ env.cluster_name }} \
+              --service ${{ env.service_name }} \
+              --task-definition ${{ steps.task_def.outputs.task_def_arn }} \
+              --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.SUBNET_IDS }}],securityGroups=[${{ secrets.SECURITY_GROUP_IDS }}],assignPublicIp=DISABLED}"; then
+              log "ERROR" "Failed to update ECS service"
+              exit 1
+            fi
           fi
           
           log "INFO" "Waiting for service to stabilize..."
@@ -1852,16 +1961,12 @@ jobs:
             --cluster ${{ env.cluster_name }} \
             --services ${{ env.service_name }}; then
             log "ERROR" "Service failed to stabilize"
-            log "INFO" "Rolling back to previous task definition..."
-            rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
             exit 1
           fi
           
           # Check container pull status
           if ! check_container_pull_status "${{ env.cluster_name }}" "${{ env.service_name }}"; then
             log "ERROR" "Container pull failed"
-            log "INFO" "Rolling back to previous task definition..."
-            rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
             exit 1
           fi
           

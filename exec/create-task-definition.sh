@@ -190,11 +190,15 @@ cleanup_old_task_defs() {
     echo "Cleaning up old task definitions for family: $family"
     
     # Get all task definitions for the family
-    local task_defs=($(aws ecs list-task-definitions \
+    local task_defs
+    if ! task_defs=($(aws ecs list-task-definitions \
         --family-prefix "$family" \
         --sort DESC \
         --query 'taskDefinitionArns[]' \
-        --output text))
+        --output text 2>/dev/null)); then
+        echo "::warning::Unable to list task definitions - skipping cleanup"
+        return 0
+    fi
     
     # Keep the most recent ones
     local keep_defs=("${task_defs[@]:0:$keep_count}")
