@@ -37,11 +37,6 @@ on:
       - qa
       - dev
 
-# Add concurrency control
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.ref_name == 'main' && 'prod' || github.ref_name == 'staging' && 'staging' || github.ref_name == 'qa' && 'qa' || github.ref_name == 'dev' && 'dev' || 'sandbox' }}
-  cancel-in-progress: true
-
 permissions:
   id-token: write
   contents: read
@@ -410,7 +405,7 @@ jobs:
           echo "::endgroup::"
 
   deploy-dev:
-    needs: [test]
+    needs: build-and-push
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'dev' && !inputs.skip_deploy }}
     runs-on: ubuntu-latest
     environment: dev
@@ -960,7 +955,7 @@ jobs:
           echo "::endgroup::"
 
   deploy-qa:
-    needs: [test]
+    needs: build-and-push
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'qa' && !inputs.skip_deploy }}
     runs-on: ubuntu-latest
     environment: qa
@@ -1553,7 +1548,7 @@ jobs:
           echo "::endgroup::"
 
   deploy-staging:
-    needs: [test]
+    needs: build-and-push
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'staging' && !inputs.skip_deploy }}
     runs-on: ubuntu-latest
     environment: staging
@@ -2117,7 +2112,7 @@ jobs:
           echo "::endgroup::"
 
   deploy-prod:
-    needs: [test]
+    needs: build-and-push
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'prod' && !inputs.skip_deploy }}
     runs-on: ubuntu-latest
     environment: prod
