@@ -36,9 +36,27 @@ export class ClassPackagesService {
         input.rescheduleDaysBefore = null; 
     }
 
+    const now = new Date();
+    const twoMonthsLater = new Date();
+    twoMonthsLater.setMonth(now.getMonth() + 2);
+    // Disallow time in the past for the 2 month calculation
+    if (twoMonthsLater < now) { // Should not happen with setMonth logic but as a safe guard
+        twoMonthsLater.setFullYear(now.getFullYear() + Math.floor((now.getMonth() + 2) / 12));
+        twoMonthsLater.setMonth((now.getMonth() + 2) % 12);
+    }
+
     input.scheduleSlots.forEach(slot => {
-      if (new Date(slot.endTime) <= new Date(slot.startTime)) {
+      const startTime = new Date(slot.startTime);
+      const endTime = new Date(slot.endTime);
+
+      if (endTime <= startTime) {
         throw new BadRequestException('Schedule slot end time must be after start time.');
+      }
+      if (startTime < now) {
+        throw new BadRequestException('Schedule slot start time cannot be in the past.');
+      }
+      if (startTime > twoMonthsLater) {
+        throw new BadRequestException('Schedule slot start time cannot be more than 2 months in the future.');
       }
     });
 
@@ -109,13 +127,35 @@ export class ClassPackagesService {
         rescheduleDays = null; 
     }
 
+    const now = new Date();
+    const twoMonthsLater = new Date();
+    twoMonthsLater.setMonth(now.getMonth() + 2);
+     // Disallow time in the past for the 2 month calculation
+    if (twoMonthsLater < now) { 
+        twoMonthsLater.setFullYear(now.getFullYear() + Math.floor((now.getMonth() + 2) / 12));
+        twoMonthsLater.setMonth((now.getMonth() + 2) % 12);
+    }
+
     if (input.scheduleSlots) {
+        // Rule: Schedule structure can only be changed if the package is DRAFT
+        if (existingPackage.status !== ClassPackageStatus.DRAFT) {
+            throw new ForbiddenException('Schedules can only be modified for DRAFT packages. To make changes to a published package, please create a new version or unpublish it first.');
+        }
+        // Rule: Cannot update schedules if there are active enrollments (existing rule)
         if (existingPackage.enrollments && existingPackage.enrollments.length > 0) {
             throw new ForbiddenException('Cannot update schedules for a class package with active enrollments.');
         }
         input.scheduleSlots.forEach(slot => {
-            if (new Date(slot.endTime) <= new Date(slot.startTime)) {
+            const startTime = new Date(slot.startTime);
+            const endTime = new Date(slot.endTime);
+            if (endTime <= startTime) {
                 throw new BadRequestException('Schedule slot end time must be after start time.');
+            }
+            if (startTime < now) {
+                throw new BadRequestException('Schedule slot start time cannot be in the past.');
+            }
+            if (startTime > twoMonthsLater) {
+                throw new BadRequestException('Schedule slot start time cannot be more than 2 months in the future.');
             }
         });
     }
@@ -224,16 +264,4 @@ export class ClassPackagesService {
 
   private validateImage(file: Express.Multer.File, type: string): void {
     if (file.size > 5 * 1024 * 1024) { 
-      throw new BadRequestException(`${type} size must not exceed 5MB.`);
-    }
-    const allowedTypes = ['image/jpeg', 'image/png'];
-    if (!allowedTypes.includes(file.mimetype)) {
-      throw new BadRequestException(`${type} must be a valid image format (JPG, PNG).`);
-    }
-  }
-
-  private async uploadImage(file: Express.Multer.File, vendorId: string, type: string, packageId?: string ): Promise<string> {
-    const key = `vendors/${vendorId}/class-packages/${packageId || 'new'}/${type}/${Date.now()}-${file.originalname.replace(/\s+/g, '_')}`;
-    return this.s3Service.uploadFile(file.buffer, key, file.mimetype);
-  }
-} 
+      throw new BadRequestException(`${type} size must not exceed 5MB.`
