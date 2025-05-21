@@ -57,13 +57,6 @@ create_task_definition() {
     "operatingSystemFamily": "LINUX",
     "cpuArchitecture": "X86_64"
   },
-  "networkConfiguration": {
-    "awsvpcConfiguration": {
-      "subnets": ["$SUBNET_IDS"],
-      "securityGroups": ["$SECURITY_GROUP_IDS"],
-      "assignPublicIp": "DISABLED"
-    }
-  },
   "proxyConfiguration": {
     "type": "APPMESH",
     "containerName": "envoy",

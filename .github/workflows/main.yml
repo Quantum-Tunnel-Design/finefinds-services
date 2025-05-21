@@ -724,13 +724,14 @@ jobs:
           if ! aws ecs update-service \
             --cluster ${{ env.cluster_name }} \
             --service ${{ env.service_name }} \
-            --task-definition ${{ steps.task_def.outputs.task_def_arn }}; then
+            --task-definition ${{ steps.task_def.outputs.task_def_arn }} \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.SUBNET_IDS }}],securityGroups=[${{ secrets.SECURITY_GROUP_IDS }}],assignPublicIp=DISABLED}"; then
             log "ERROR" "Failed to update ECS service"
             log "INFO" "Rolling back to previous task definition..."
             rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
             exit 1
           fi
-            
+          
           log "INFO" "Waiting for service to stabilize..."
           if ! aws ecs wait services-stable \
             --cluster ${{ env.cluster_name }} \
@@ -1087,13 +1088,6 @@ jobs:
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
               },
-              "networkConfiguration": {
-                "awsvpcConfiguration": {
-                  "subnets": ["${{ secrets.SUBNET_IDS }}"],
-                  "securityGroups": ["${{ secrets.SECURITY_GROUP_IDS }}"],
-                  "assignPublicIp": "DISABLED"
-                }
-              },
               "proxyConfiguration": {
                 "type": "APPMESH",
                 "containerName": "envoy",
@@ -1287,13 +1281,14 @@ jobs:
           if ! aws ecs update-service \
             --cluster ${{ env.cluster_name }} \
             --service ${{ env.service_name }} \
-            --task-definition ${{ steps.task_def.outputs.task_def_arn }}; then
+            --task-definition ${{ steps.task_def.outputs.task_def_arn }} \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.SUBNET_IDS }}],securityGroups=[${{ secrets.SECURITY_GROUP_IDS }}],assignPublicIp=DISABLED}"; then
             log "ERROR" "Failed to update ECS service"
             log "INFO" "Rolling back to previous task definition..."
             rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
             exit 1
           fi
-            
+          
           log "INFO" "Waiting for service to stabilize..."
           if ! aws ecs wait services-stable \
             --cluster ${{ env.cluster_name }} \
@@ -1651,13 +1646,6 @@ jobs:
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
               },
-              "networkConfiguration": {
-                "awsvpcConfiguration": {
-                  "subnets": ["${{ secrets.SUBNET_IDS }}"],
-                  "securityGroups": ["${{ secrets.SECURITY_GROUP_IDS }}"],
-                  "assignPublicIp": "DISABLED"
-                }
-              },
               "proxyConfiguration": {
                 "type": "APPMESH",
                 "containerName": "envoy",
@@ -1851,13 +1839,14 @@ jobs:
           if ! aws ecs update-service \
             --cluster ${{ env.cluster_name }} \
             --service ${{ env.service_name }} \
-            --task-definition ${{ steps.task_def.outputs.task_def_arn }}; then
+            --task-definition ${{ steps.task_def.outputs.task_def_arn }} \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.SUBNET_IDS }}],securityGroups=[${{ secrets.SECURITY_GROUP_IDS }}],assignPublicIp=DISABLED}"; then
             log "ERROR" "Failed to update ECS service"
             log "INFO" "Rolling back to previous task definition..."
             rollback_task_def "${{ env.cluster_name }}" "${{ env.service_name }}" "${{ steps.task_def.outputs.current_task_def }}"
             exit 1
           fi
-            
+          
           log "INFO" "Waiting for service to stabilize..."
           if ! aws ecs wait services-stable \
             --cluster ${{ env.cluster_name }} \
@@ -2065,13 +2054,6 @@ jobs:
               "runtimePlatform": {
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
-              },
-              "networkConfiguration": {
-                "awsvpcConfiguration": {
-                  "subnets": ["${{ secrets.SUBNET_IDS }}"],
-                  "securityGroups": ["${{ secrets.SECURITY_GROUP_IDS }}"],
-                  "assignPublicIp": "DISABLED"
-                }
               },
               "proxyConfiguration": {
                 "type": "APPMESH",
