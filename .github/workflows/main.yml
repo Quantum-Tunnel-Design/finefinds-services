@@ -55,9 +55,9 @@ env:
   services_env: ${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
   
   # ECR Configuration
-  ecr_repository_backend: finefinds-backend
-  ecr_repository_envoy: public.ecr.aws/appmesh/aws-appmesh-envoy
-  ecr_envoy_image_tag: v1.29.12.1-prod
+  ecr_repository_backend: finefinds-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
+  ecr_repository_envoy: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/finefinds-base/aws-envoy
+  ecr_envoy_image_tag: envoy-v1.29.12.1-prod
   
   # ECS Configuration
   cluster_name: finefinds-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}-cluster
