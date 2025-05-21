@@ -5,6 +5,7 @@ import { UpdateVendorProfileDto } from './dto/update-vendor-profile.dto';
 import { User, UserRole } from '@prisma/client';
 import { CreateBusinessProfileInput } from './dto/create-business-profile.input';
 import { UpdateBusinessProfileInput } from './dto/update-business-profile.input';
+import { DeleteBusinessProfileInput } from './dto/delete-business-profile.input';
 import { S3Service } from '../s3/s3.service';
 import { AuditService } from '../audit/audit.service';
 
@@ -253,6 +254,89 @@ export class VendorsService {
     );
 
     return updatedProfile;
+  }
+
+  async deleteBusinessProfile(userId: string, input: DeleteBusinessProfileInput) {
+    // Get current profile with courses
+    const currentProfile = await this.prisma.businessProfile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          include: {
+            courses: {
+              include: {
+                enrollments: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!currentProfile) {
+      throw new NotFoundException('Business profile not found');
+    }
+
+    // Check for scheduled classes with paid registrations
+    const hasActiveEnrollments = currentProfile.user.courses.some(course => 
+      course.enrollments.some(enrollment => 
+        enrollment.status === 'ACTIVE' && 
+        new Date(course.schedules[0]?.startTime) > new Date()
+      )
+    );
+
+    if (hasActiveEnrollments) {
+      throw new ForbiddenException(
+        'Cannot delete profile while there are scheduled classes with active enrollments'
+      );
+    }
+
+    // Archive courses instead of deleting them
+    await this.prisma.course.updateMany({
+      where: {
+        vendorId: userId,
+      },
+      data: {
+        status: 'ARCHIVED',
+        isPublished: false,
+      },
+    });
+
+    // Get profile data for audit log
+    const profileData = {
+      businessName: currentProfile.businessName,
+      location: currentProfile.location,
+      description: currentProfile.description,
+      contactNumber: currentProfile.contactNumber,
+      website: currentProfile.website,
+      facebookUrl: currentProfile.facebookUrl,
+      instagramUrl: currentProfile.instagramUrl,
+      twitterUrl: currentProfile.twitterUrl,
+      bankName: currentProfile.bankName,
+      accountNumber: currentProfile.accountNumber,
+      branch: currentProfile.branch,
+      categories: currentProfile.categories,
+      tags: currentProfile.tags,
+      logoUrl: currentProfile.logoUrl,
+      coverImageUrl: currentProfile.coverImageUrl,
+      galleryUrls: currentProfile.galleryUrls,
+    };
+
+    // Delete profile
+    await this.prisma.businessProfile.delete({
+      where: { userId },
+    });
+
+    // Log deletion for audit
+    await this.auditService.logProfileDeletion(
+      userId,
+      currentProfile.id,
+      profileData
+    );
+
+    return {
+      message: 'Business profile deleted successfully',
+    };
   }
 
   private validateImage(file: Express.Multer.File, type: string): void {

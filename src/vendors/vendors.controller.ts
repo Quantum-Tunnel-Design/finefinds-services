@@ -1,8 +1,9 @@
-import { Controller, Post, Put, Body, UseGuards, Req, UseInterceptors, UploadedFiles } from '@nestjs/common';
+import { Controller, Post, Put, Delete, Body, UseGuards, Req, UseInterceptors, UploadedFiles } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { VendorsService } from './vendors.service';
 import { CreateBusinessProfileInput } from './dto/create-business-profile.input';
 import { UpdateBusinessProfileInput } from './dto/update-business-profile.input';
+import { DeleteBusinessProfileInput } from './dto/delete-business-profile.input';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -62,5 +63,13 @@ export class VendorsController {
       coverImage: files.coverImage?.[0],
       gallery: files.gallery,
     });
+  }
+
+  @Delete('business-profile')
+  async deleteBusinessProfile(
+    @Req() req,
+    @Body() input: DeleteBusinessProfileInput,
+  ) {
+    return this.vendorsService.deleteBusinessProfile(req.user.id, input);
   }
 } 
