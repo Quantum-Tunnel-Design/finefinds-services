@@ -157,10 +157,10 @@ create_task_definition() {
         {"name": "DB_PASSWORD", "valueFrom": "$db_connection_arn:password::"},
         {"name": "REDIS_URL", "valueFrom": "$redis_connection_arn"},
         {"name": "JWT_SECRET", "valueFrom": "$jwt_secret_arn"},
-        {"name": "COGNITO_CLIENT_USER_POOL_ID", "valueFrom": "$cognito_config_arn:COGNITO_CLIENT_USER_POOL_ID::"},
-        {"name": "COGNITO_CLIENT_CLIENT_ID", "valueFrom": "$cognito_config_arn:COGNITO_CLIENT_CLIENT_ID::"},
-        {"name": "COGNITO_ADMIN_USER_POOL_ID", "valueFrom": "$cognito_config_arn:COGNITO_ADMIN_USER_POOL_ID::"},
-        {"name": "COGNITO_ADMIN_CLIENT_ID", "valueFrom": "$cognito_config_arn:COGNITO_ADMIN_CLIENT_ID::"}
+        {"name": "COGNITO_CLIENT_USER_POOL_ID", "valueFrom": "$cognito_config_arn:clientUserPoolId::"},
+        {"name": "COGNITO_CLIENT_CLIENT_ID", "valueFrom": "$cognito_config_arn:clientUserPoolClientId::"},
+        {"name": "COGNITO_ADMIN_USER_POOL_ID", "valueFrom": "$cognito_config_arn:adminUserPoolId::"},
+        {"name": "COGNITO_ADMIN_CLIENT_ID", "valueFrom": "$cognito_config_arn:adminUserPoolClientId::"}
       ],
       "logConfiguration": {
         "logDriver": "awslogs",

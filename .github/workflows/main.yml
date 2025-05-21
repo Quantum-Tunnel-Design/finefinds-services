@@ -1251,13 +1251,11 @@ jobs:
                   "secrets": [
                     {"name": "DATABASE_URL", "valueFrom": "'$db_connection_arn'"},
                     {"name": "REDIS_URL", "valueFrom": "${{ steps.secrets.outputs.redis_connection_arn }}"},
-                    {"name": "JWT_SECRET", "valueFrom": "${{ steps.secrets.outputs.jwt_secret_arn }}"}
-                  ],
-                  "environment": [
-                    {"name": "COGNITO_CLIENT_USER_POOL_ID", "value": "${{ steps.cognito_config.outputs.client_user_pool_id }}"},
-                    {"name": "COGNITO_CLIENT_CLIENT_ID", "value": "${{ steps.cognito_config.outputs.client_client_id }}"},
-                    {"name": "COGNITO_ADMIN_USER_POOL_ID", "value": "${{ steps.cognito_config.outputs.admin_user_pool_id }}"},
-                    {"name": "COGNITO_ADMIN_CLIENT_ID", "value": "${{ steps.cognito_config.outputs.admin_client_id }}"}
+                    {"name": "JWT_SECRET", "valueFrom": "${{ steps.secrets.outputs.jwt_secret_arn }}"},
+                    {"name": "COGNITO_CLIENT_USER_POOL_ID", "valueFrom": "${{ steps.secrets.outputs.cognito_config_arn }}:COGNITO_CLIENT_USER_POOL_ID::"},
+                    {"name": "COGNITO_CLIENT_CLIENT_ID", "valueFrom": "${{ steps.secrets.outputs.cognito_config_arn }}:COGNITO_CLIENT_CLIENT_ID::"},
+                    {"name": "COGNITO_ADMIN_USER_POOL_ID", "valueFrom": "${{ steps.secrets.outputs.cognito_config_arn }}:COGNITO_ADMIN_USER_POOL_ID::"},
+                    {"name": "COGNITO_ADMIN_CLIENT_ID", "valueFrom": "${{ steps.secrets.outputs.cognito_config_arn }}:COGNITO_ADMIN_CLIENT_ID::"}
                   ],
                   "logConfiguration": {
                     "logDriver": "awslogs",
@@ -1310,6 +1308,30 @@ jobs:
           
           # Clean up old task definitions
           cleanup_old_task_defs "${{ env.task_def_family }}"
+          echo "::endgroup::"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }}
+          aws-region: ${{ env.aws_region }}
+          role-duration-seconds: 3600
+
+      - name: Get Cognito Configuration
+        id: cognito_config
+        run: |
+          echo "::group::Fetching Cognito Configuration"
+          # Get Cognito configuration from Secrets Manager
+          cognito_config=$(aws secretsmanager get-secret-value \
+            --secret-id "${{ env.cognito_config_secret }}" \
+            --query 'SecretString' \
+            --output text)
+          
+          # Parse and set outputs
+          echo "client_user_pool_id=$(echo $cognito_config | jq -r '.COGNITO_CLIENT_USER_POOL_ID')" >> $GITHUB_OUTPUT
+          echo "client_client_id=$(echo $cognito_config | jq -r '.COGNITO_CLIENT_CLIENT_ID')" >> $GITHUB_OUTPUT
+          echo "admin_user_pool_id=$(echo $cognito_config | jq -r '.COGNITO_ADMIN_USER_POOL_ID')" >> $GITHUB_OUTPUT
+          echo "admin_client_id=$(echo $cognito_config | jq -r '.COGNITO_ADMIN_CLIENT_ID')" >> $GITHUB_OUTPUT
           echo "::endgroup::"
 
       - name: Deploy to ECS
@@ -1849,13 +1871,11 @@ jobs:
                   "secrets": [
                     {"name": "DATABASE_URL", "valueFrom": "'$db_connection_arn'"},
                     {"name": "REDIS_URL", "valueFrom": "${{ steps.secrets.outputs.redis_connection_arn }}"},
-                    {"name": "JWT_SECRET", "valueFrom": "${{ steps.secrets.outputs.jwt_secret_arn }}"}
-                  ],
-                  "environment": [
-                    {"name": "COGNITO_CLIENT_USER_POOL_ID", "value": "${{ steps.cognito_config.outputs.client_user_pool_id }}"},
-                    {"name": "COGNITO_CLIENT_CLIENT_ID", "value": "${{ steps.cognito_config.outputs.client_client_id }}"},
-                    {"name": "COGNITO_ADMIN_USER_POOL_ID", "value": "${{ steps.cognito_config.outputs.admin_user_pool_id }}"},
-                    {"name": "COGNITO_ADMIN_CLIENT_ID", "value": "${{ steps.cognito_config.outputs.admin_client_id }}"}
+                    {"name": "JWT_SECRET", "valueFrom": "${{ steps.secrets.outputs.jwt_secret_arn }}"},
+                    {"name": "COGNITO_CLIENT_USER_POOL_ID", "valueFrom": "${{ steps.secrets.outputs.cognito_config_arn }}:COGNITO_CLIENT_USER_POOL_ID::"},
+                    {"name": "COGNITO_CLIENT_CLIENT_ID", "valueFrom": "${{ steps.secrets.outputs.cognito_config_arn }}:COGNITO_CLIENT_CLIENT_ID::"},
+                    {"name": "COGNITO_ADMIN_USER_POOL_ID", "valueFrom": "${{ steps.secrets.outputs.cognito_config_arn }}:COGNITO_ADMIN_USER_POOL_ID::"},
+                    {"name": "COGNITO_ADMIN_CLIENT_ID", "valueFrom": "${{ steps.secrets.outputs.cognito_config_arn }}:COGNITO_ADMIN_CLIENT_ID::"}
                   ],
                   "logConfiguration": {
                     "logDriver": "awslogs",
@@ -1908,6 +1928,30 @@ jobs:
           
           # Clean up old task definitions
           cleanup_old_task_defs "${{ env.task_def_family }}"
+          echo "::endgroup::"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }}
+          aws-region: ${{ env.aws_region }}
+          role-duration-seconds: 3600
+
+      - name: Get Cognito Configuration
+        id: cognito_config
+        run: |
+          echo "::group::Fetching Cognito Configuration"
+          # Get Cognito configuration from Secrets Manager
+          cognito_config=$(aws secretsmanager get-secret-value \
+            --secret-id "${{ env.cognito_config_secret }}" \
+            --query 'SecretString' \
+            --output text)
+          
+          # Parse and set outputs
+          echo "client_user_pool_id=$(echo $cognito_config | jq -r '.COGNITO_CLIENT_USER_POOL_ID')" >> $GITHUB_OUTPUT
+          echo "client_client_id=$(echo $cognito_config | jq -r '.COGNITO_CLIENT_CLIENT_ID')" >> $GITHUB_OUTPUT
+          echo "admin_user_pool_id=$(echo $cognito_config | jq -r '.COGNITO_ADMIN_USER_POOL_ID')" >> $GITHUB_OUTPUT
+          echo "admin_client_id=$(echo $cognito_config | jq -r '.COGNITO_ADMIN_CLIENT_ID')" >> $GITHUB_OUTPUT
           echo "::endgroup::"
 
       - name: Deploy to ECS
