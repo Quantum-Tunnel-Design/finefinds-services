@@ -95,45 +95,7 @@ create_task_definition() {
     "operatingSystemFamily": "LINUX",
     "cpuArchitecture": "X86_64"
   },
-  "proxyConfiguration": {
-    "type": "APPMESH",
-    "containerName": "envoy",
-    "properties": [
-      {"name": "IgnoredUID", "value": "1337"},
-      {"name": "ProxyIngressPort", "value": "15000"},
-      {"name": "ProxyEgressPort", "value": "15001"},
-      {"name": "AppPorts", "value": "3000"},
-      {"name": "EgressIgnoredIPs", "value": "169.254.170.2,169.254.169.254"}
-    ]
-  },
   "containerDefinitions": [
-    {
-      "name": "envoy",
-      "image": "$ECR_REPOSITORY_ENVOY:$ECR_ENVOY_IMAGE_TAG",
-      "essential": true,
-      "user": "1337",
-      "environment": [
-        {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/$MESH_NAME/virtualNode/$VIRTUAL_NODE_NAME"},
-        {"name": "ENABLE_ENVOY_STATS_TAGS", "value": "1"},
-        {"name": "ENABLE_ENVOY_XRAY_TRACING", "value": "1"},
-        {"name": "APPMESH_PREVIEW", "value": "0"}
-      ],
-      "healthCheck": {
-        "command": ["CMD-SHELL", "curl -s http://localhost:9901/server_info | grep state | grep -q LIVE"],
-        "interval": 5,
-        "timeout": 2,
-        "retries": 3,
-        "startPeriod": 10
-      },
-      "logConfiguration": {
-        "logDriver": "awslogs",
-        "options": {
-          "awslogs-group": "$LOG_GROUP_ENVOY",
-          "awslogs-region": "$AWS_REGION",
-          "awslogs-stream-prefix": "envoy"
-        }
-      }
-    },
     {
       "name": "AppContainer",
       "image": "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY_BACKEND:latest",
@@ -146,7 +108,6 @@ create_task_definition() {
         {"name": "PORT", "value": "3000"},
         {"name": "NODE_ENV", "value": "$SERVICES_ENV"},
         {"name": "AWS_REGION", "value": "$AWS_REGION"},
-        {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/$MESH_NAME/virtualNode/$VIRTUAL_NODE_NAME"},
         {"name": "DATABASE_URL", "value": "postgresql://\${DB_USER}:\${DB_PASSWORD}@\${DB_HOST}:\${DB_PORT}/\${DB_NAME}"}
       ],
       "secrets": [
