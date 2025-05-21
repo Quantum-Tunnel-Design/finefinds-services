@@ -884,8 +884,7 @@ jobs:
             if ! aws ecs update-service \
               --cluster ${{ env.cluster_name }} \
               --service ${{ env.service_name }} \
-              --task-definition ${{ steps.task_def.outputs.task_def_arn }} \
-              --network-configuration "awsvpcConfiguration={subnets=[${{ steps.vpc_info.outputs.subnet_ids }}],securityGroups=[${{ steps.vpc_info.outputs.security_group_id }}],assignPublicIp=DISABLED}"; then
+              --task-definition ${{ steps.task_def.outputs.task_def_arn }}; then
               log "ERROR" "Failed to update ECS service"
               exit 1
             fi
@@ -1536,8 +1535,7 @@ jobs:
             if ! aws ecs update-service \
               --cluster ${{ env.cluster_name }} \
               --service ${{ env.service_name }} \
-              --task-definition ${{ steps.task_def.outputs.task_def_arn }} \
-              --network-configuration "awsvpcConfiguration={subnets=[${{ steps.vpc_info.outputs.subnet_ids }}],securityGroups=[${{ steps.vpc_info.outputs.security_group_id }}],assignPublicIp=DISABLED}"; then
+              --task-definition ${{ steps.task_def.outputs.task_def_arn }}; then
               log "ERROR" "Failed to update ECS service"
               exit 1
             fi
@@ -2189,8 +2187,7 @@ jobs:
             if ! aws ecs update-service \
               --cluster ${{ env.cluster_name }} \
               --service ${{ env.service_name }} \
-              --task-definition ${{ steps.task_def.outputs.task_def_arn }} \
-              --network-configuration "awsvpcConfiguration={subnets=[${{ steps.vpc_info.outputs.subnet_ids }}],securityGroups=[${{ steps.vpc_info.outputs.security_group_id }}],assignPublicIp=DISABLED}"; then
+              --task-definition ${{ steps.task_def.outputs.task_def_arn }}; then
               log "ERROR" "Failed to update ECS service"
               exit 1
             fi
