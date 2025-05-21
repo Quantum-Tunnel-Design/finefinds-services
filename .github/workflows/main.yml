@@ -406,7 +406,7 @@ jobs:
 
   deploy-dev:
     needs: build-and-push
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'dev' && !inputs.skip_deploy }}
+    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/dev' || github.event.pull_request.base.ref == 'dev' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'dev' && !inputs.skip_deploy)) }}
     runs-on: ubuntu-latest
     environment: dev
     permissions:
@@ -956,7 +956,7 @@ jobs:
 
   deploy-qa:
     needs: build-and-push
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'qa' && !inputs.skip_deploy }}
+    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/qa' || github.event.pull_request.base.ref == 'qa' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'qa' && !inputs.skip_deploy)) }}
     runs-on: ubuntu-latest
     environment: qa
     permissions:
@@ -1549,7 +1549,7 @@ jobs:
 
   deploy-staging:
     needs: build-and-push
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'staging' && !inputs.skip_deploy }}
+    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/staging' || github.event.pull_request.base.ref == 'staging' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging' && !inputs.skip_deploy)) }}
     runs-on: ubuntu-latest
     environment: staging
     permissions:
@@ -2113,7 +2113,7 @@ jobs:
 
   deploy-prod:
     needs: build-and-push
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'prod' && !inputs.skip_deploy }}
+    if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/main' || github.event.pull_request.base.ref == 'main' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'prod' && !inputs.skip_deploy)) }}
     runs-on: ubuntu-latest
     environment: prod
     permissions:
