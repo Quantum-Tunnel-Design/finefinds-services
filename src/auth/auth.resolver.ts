@@ -10,6 +10,7 @@ import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { AuthResponse } from './models/auth-response.model';
+import { CurrentToken } from './decorators/current-token.decorator';
 
 @Resolver()
 export class AuthResolver {
@@ -38,6 +39,12 @@ export class AuthResolver {
   @Mutation(() => AuthResponse)
   async resetPassword(@Args('input') input: ResetPasswordInput): Promise<AuthResponse> {
     return this.authService.resetPassword(input);
+  }
+
+  @Mutation(() => AuthResponse)
+  @UseGuards(JwtAuthGuard)
+  async logout(@CurrentToken() token: string): Promise<AuthResponse> {
+    return this.authService.logout(token);
   }
 
   @Query(() => User)

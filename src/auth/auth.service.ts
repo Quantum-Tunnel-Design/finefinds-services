@@ -8,6 +8,7 @@ import {
   ForgotPasswordCommand,
   ConfirmForgotPasswordCommand,
   GetUserCommand,
+  GlobalSignOutCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { UsersService } from '../users/users.service';
 import { SignUpInput } from './dto/sign-up.input';
@@ -18,6 +19,7 @@ import { ResetPasswordInput } from './dto/reset-password.input';
 import { ParentSignUpInput } from './dto/parent-sign-up.input';
 import { UserRole } from '@prisma/client';
 import { AuthResponse } from './models/auth-response.model';
+import { SessionService } from './session.service';
 
 @Injectable()
 export class AuthService {
@@ -28,6 +30,7 @@ export class AuthService {
   constructor(
     private configService: ConfigService,
     private usersService: UsersService,
+    private sessionService: SessionService,
   ) {
     this.cognitoClient = new CognitoIdentityProviderClient({
       region: this.configService.get('AWS_REGION'),
@@ -92,14 +95,56 @@ export class AuthService {
       const response = await this.cognitoClient.send(authCommand);
       const user = await this.usersService.findByEmail(input.email);
 
+      if (!response.AuthenticationResult?.AccessToken) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+
+      // Calculate token expiration based on remember me
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + (input.rememberMe ? 30 : 1)); // 30 days for remember me, 1 day otherwise
+
+      // Create session
+      await this.sessionService.createSession(
+        user.id,
+        response.AuthenticationResult.AccessToken,
+        expiresAt
+      );
+
       return {
-        accessToken: response.AuthenticationResult?.AccessToken,
-        idToken: response.AuthenticationResult?.IdToken,
-        refreshToken: response.AuthenticationResult?.RefreshToken,
+        accessToken: response.AuthenticationResult.AccessToken,
+        idToken: response.AuthenticationResult.IdToken,
+        refreshToken: response.AuthenticationResult.RefreshToken,
         user,
       };
     } catch (error) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+  }
+
+  async logout(token: string): Promise<AuthResponse> {
+    try {
+      // Get user from token
+      const getUserCommand = new GetUserCommand({
+        AccessToken: token,
+      });
+
+      const user = await this.cognitoClient.send(getUserCommand);
+
+      // Sign out from Cognito
+      const signOutCommand = new GlobalSignOutCommand({
+        AccessToken: token,
+      });
+
+      await this.cognitoClient.send(signOutCommand);
+
+      // Delete session
+      await this.sessionService.deleteSession(token);
+
+      return {
+        message: 'Logged out successfully',
+      };
+    } catch (error) {
+      throw new UnauthorizedException('Invalid token');
     }
   }
 
