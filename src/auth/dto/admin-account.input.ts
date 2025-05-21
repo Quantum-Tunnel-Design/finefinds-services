@@ -2,7 +2,7 @@ import { Field, InputType } from '@nestjs/graphql';
 import { IsEmail, IsNotEmpty, IsString, Matches, MinLength, MaxLength } from 'class-validator';
 
 @InputType()
-export class ResetPasswordInput {
+export class AdminAccountInput {
   @Field()
   @IsEmail()
   @IsNotEmpty()
@@ -11,11 +11,6 @@ export class ResetPasswordInput {
   @Field()
   @IsString()
   @IsNotEmpty()
-  code: string;
-
-  @Field()
-  @IsString()
-  @IsNotEmpty()
   @MinLength(8)
   @MaxLength(16)
   @Matches(
@@ -24,18 +19,15 @@ export class ResetPasswordInput {
       message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
     },
   )
-  newPassword: string;
+  password: string;
 
   @Field()
   @IsString()
   @IsNotEmpty()
-  @MinLength(8)
-  @MaxLength(16)
-  @Matches(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+{}[\]|\\:;"'<>,.?/])[A-Za-z\d!@#$%^&*()\-_=+{}[\]|\\:;"'<>,.?/]{8,16}$/,
-    {
-      message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
-    },
-  )
-  confirmNewPassword: string;
+  firstName: string;
+
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  lastName: string;
 } 

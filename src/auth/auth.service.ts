@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   CognitoIdentityProviderClient,
@@ -10,6 +10,9 @@ import {
   GetUserCommand,
   GlobalSignOutCommand,
   AdminAddUserToGroupCommand,
+  AdminCreateUserCommand,
+  AdminSetUserPasswordCommand,
+  AdminInitiateAuthCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { UsersService } from '../users/users.service';
 import { SignUpInput } from './dto/sign-up.input';
@@ -18,6 +21,8 @@ import { ConfirmSignUpInput } from './dto/confirm-sign-up.input';
 import { ForgotPasswordInput } from './dto/forgot-password.input';
 import { ResetPasswordInput } from './dto/reset-password.input';
 import { ParentSignUpInput } from './dto/parent-sign-up.input';
+import { AdminSignInInput } from './dto/admin-sign-in.input';
+import { AdminAccountInput } from './dto/admin-account.input';
 import { UserRole } from '@prisma/client';
 import { AuthResponse } from './models/auth-response.model';
 import { SessionService } from './session.service';
@@ -25,8 +30,10 @@ import { SessionService } from './session.service';
 @Injectable()
 export class AuthService {
   private cognitoClient: CognitoIdentityProviderClient;
-  private userPoolId: string;
+  private clientUserPoolId: string;
   private clientId: string;
+  private adminUserPoolId: string;
+  private adminClientId: string;
 
   constructor(
     private configService: ConfigService,
@@ -36,8 +43,10 @@ export class AuthService {
     this.cognitoClient = new CognitoIdentityProviderClient({
       region: this.configService.get('AWS_REGION'),
     });
-    this.userPoolId = this.configService.get('COGNITO_CLIENT_USER_POOL_ID');
+    this.clientUserPoolId = this.configService.get('COGNITO_CLIENT_USER_POOL_ID');
     this.clientId = this.configService.get('COGNITO_CLIENT_CLIENT_ID');
+    this.adminUserPoolId = this.configService.get('COGNITO_ADMIN_USER_POOL_ID');
+    this.adminClientId = this.configService.get('COGNITO_ADMIN_CLIENT_ID');
   }
 
   async signUp(input: SignUpInput): Promise<AuthResponse> {
@@ -165,6 +174,19 @@ export class AuthService {
 
   async forgotPassword(input: ForgotPasswordInput): Promise<AuthResponse> {
     try {
+      const user = await this.usersService.findByEmail(input.email);
+      if (user?.role === UserRole.ADMIN) {
+        throw new ForbiddenException('Password reset is not allowed for admin accounts');
+      }
+
+      // Check if user exists
+      if (!user) {
+        // Return success even if user doesn't exist for security
+        return {
+          message: 'If an account exists with this email, you will receive a password reset code.',
+        };
+      }
+
       const forgotPasswordCommand = new ForgotPasswordCommand({
         ClientId: this.clientId,
         Username: input.email,
@@ -173,15 +195,31 @@ export class AuthService {
       await this.cognitoClient.send(forgotPasswordCommand);
 
       return {
-        message: 'Verification code sent to your email.',
+        message: 'If an account exists with this email, you will receive a password reset code.',
       };
     } catch (error) {
-      throw new UnauthorizedException(error.message);
+      if (error instanceof ForbiddenException) {
+        throw error;
+      }
+      return {
+        message: 'If an account exists with this email, you will receive a password reset code.',
+      };
     }
   }
 
   async resetPassword(input: ResetPasswordInput): Promise<AuthResponse> {
     try {
+      // Validate password match
+      if (input.newPassword !== input.confirmNewPassword) {
+        throw new BadRequestException('Passwords do not match');
+      }
+
+      // Check if user exists
+      const user = await this.usersService.findByEmail(input.email);
+      if (!user) {
+        throw new BadRequestException('Invalid reset code or email');
+      }
+
       const confirmForgotPasswordCommand = new ConfirmForgotPasswordCommand({
         ClientId: this.clientId,
         Username: input.email,
@@ -191,11 +229,17 @@ export class AuthService {
 
       await this.cognitoClient.send(confirmForgotPasswordCommand);
 
+      // Delete any existing sessions for this user
+      await this.sessionService.deleteUserSessions(user.id);
+
       return {
         message: 'Password reset successfully. You can now sign in with your new password.',
       };
     } catch (error) {
-      throw new UnauthorizedException(error.message);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Invalid reset code or email');
     }
   }
 
@@ -248,7 +292,7 @@ export class AuthService {
 
       // Add user to parent group
       const addToGroupCommand = new AdminAddUserToGroupCommand({
-        UserPoolId: this.userPoolId,
+        UserPoolId: this.clientUserPoolId,
         Username: input.email,
         GroupName: 'parent',
       });
@@ -279,6 +323,141 @@ export class AuthService {
         throw error;
       }
       throw new UnauthorizedException(error.message);
+    }
+  }
+
+  async adminSignIn(input: AdminSignInInput): Promise<AuthResponse> {
+    try {
+      const authCommand = new AdminInitiateAuthCommand({
+        UserPoolId: this.adminUserPoolId,
+        ClientId: this.adminClientId,
+        AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
+        AuthParameters: {
+          USERNAME: input.username,
+          PASSWORD: input.password,
+        },
+      });
+
+      const response = await this.cognitoClient.send(authCommand);
+      const user = await this.usersService.findByEmail(input.username);
+
+      if (!response.AuthenticationResult?.AccessToken) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+
+      // Create session
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 1); // Admin sessions expire in 1 day
+
+      await this.sessionService.createSession(
+        user.id,
+        response.AuthenticationResult.AccessToken,
+        expiresAt
+      );
+
+      return {
+        accessToken: response.AuthenticationResult.AccessToken,
+        idToken: response.AuthenticationResult.IdToken,
+        refreshToken: response.AuthenticationResult.RefreshToken,
+        user,
+      };
+    } catch (error) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+  }
+
+  async createAdminAccount(input: AdminAccountInput): Promise<AuthResponse> {
+    try {
+      // Check if admin already exists
+      const existingAdmin = await this.usersService.findByEmail(input.email);
+      if (existingAdmin) {
+        throw new BadRequestException('Admin account already exists');
+      }
+
+      // Create admin user in Cognito
+      const createUserCommand = new AdminCreateUserCommand({
+        UserPoolId: this.adminUserPoolId,
+        Username: input.email,
+        UserAttributes: [
+          { Name: 'email', Value: input.email },
+          { Name: 'email_verified', Value: 'true' },
+          { Name: 'given_name', Value: input.firstName },
+          { Name: 'family_name', Value: input.lastName },
+          { Name: 'custom:role', Value: UserRole.ADMIN },
+        ],
+        MessageAction: 'SUPPRESS', // Don't send welcome email
+      });
+
+      await this.cognitoClient.send(createUserCommand);
+
+      // Set admin password
+      const setPasswordCommand = new AdminSetUserPasswordCommand({
+        UserPoolId: this.adminUserPoolId,
+        Username: input.email,
+        Password: input.password,
+        Permanent: true,
+      });
+
+      await this.cognitoClient.send(setPasswordCommand);
+
+      // Add to admin group
+      const addToGroupCommand = new AdminAddUserToGroupCommand({
+        UserPoolId: this.adminUserPoolId,
+        Username: input.email,
+        GroupName: 'admin',
+      });
+
+      await this.cognitoClient.send(addToGroupCommand);
+
+      // Create admin in database
+      await this.usersService.create({
+        email: input.email,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        role: UserRole.ADMIN,
+        cognitoSub: input.email, // Using email as cognitoSub for admin
+      });
+
+      return {
+        message: 'Admin account created successfully',
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new UnauthorizedException(error.message);
+    }
+  }
+
+  async resetAdminPassword(adminEmail: string, newPassword: string): Promise<AuthResponse> {
+    try {
+      // Verify admin exists
+      const admin = await this.usersService.findByEmail(adminEmail);
+      if (!admin || admin.role !== UserRole.ADMIN) {
+        throw new ForbiddenException('Admin account not found');
+      }
+
+      // Set new password
+      const setPasswordCommand = new AdminSetUserPasswordCommand({
+        UserPoolId: this.adminUserPoolId,
+        Username: adminEmail,
+        Password: newPassword,
+        Permanent: true,
+      });
+
+      await this.cognitoClient.send(setPasswordCommand);
+
+      // Delete all sessions
+      await this.sessionService.deleteUserSessions(admin.id);
+
+      return {
+        message: 'Admin password reset successfully',
+      };
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Failed to reset admin password');
     }
   }
 } 

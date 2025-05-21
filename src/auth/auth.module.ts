@@ -10,6 +10,8 @@ import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { SessionService } from './session.service';
 import cognitoConfig from './cognito.config';
+import { PrismaModule } from '../prisma/prisma.module';
+import { RolesGuard } from './guards/roles.guard';
 
 @Module({
   imports: [
@@ -17,6 +19,7 @@ import cognitoConfig from './cognito.config';
     PassportModule.register({ defaultStrategy: 'cognito-client' }),
     ScheduleModule.forRoot(),
     UsersModule,
+    PrismaModule,
   ],
   providers: [
     AuthService,
@@ -24,8 +27,9 @@ import cognitoConfig from './cognito.config';
     CognitoClientStrategy,
     CognitoAdminStrategy,
     SessionService,
+    RolesGuard,
   ],
   controllers: [AuthController],
-  exports: [AuthService],
+  exports: [AuthService, SessionService],
 })
 export class AuthModule {} 
