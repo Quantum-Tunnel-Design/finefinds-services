@@ -140,7 +140,7 @@ model Child {
   firstName     String
   lastName      String
   dateOfBirth   DateTime
-  gender        String // Consider Enum: MALE, FEMALE, OTHER for future
+  gender        Gender // Changed from String to Gender enum
   userId        String
   user          User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt     DateTime                 @default(now())
@@ -363,4 +363,14 @@ enum BookingStatus {
 enum PaymentType {
   CARD
   // OTHER // Future consideration
+}
+
+// Gender Enum (if not already defined elsewhere, define it here)
+// If it's defined in code first approach (e.g. TypeGraphQL and used in Prisma with /// comments) ensure consistency.
+// For Prisma-first, defining it here is standard.
+
+enum Gender {
+  MALE
+  FEMALE
+  // OTHER // Optional, based on requirements
 }
