@@ -7,6 +7,11 @@ import { UpdateClassPackageInput } from './dto/update-class-package.input';
 import { ClassPackage, CancellationPolicyType, ClassPackageStatus, UserRole } from '@prisma/client';
 import { ScheduleSlotInput } from './dto/schedule-slot.input';
 import { Prisma } from '@prisma/client';
+import { SchedulingType } from './dto/scheduling-type.enum';
+import { CustomDatesRecurrenceInput } from './dto/custom-date-slot.input';
+import { DailyRecurrenceInput } from './dto/daily-recurrence.input';
+import { WeeklyRecurrenceInput } from './dto/weekly-recurrence.input';
+import { DayOfWeek } from './dto/day-of-week.enum';
 
 @Injectable()
 export class ClassPackagesService {
@@ -36,7 +41,25 @@ export class ClassPackagesService {
         input.rescheduleDaysBefore = null; 
     }
 
-    this.validateScheduleSlots(input.scheduleSlots);
+    let generatedSlots: ScheduleSlotInput[];
+    switch (input.schedulingType) {
+      case SchedulingType.CUSTOM_DATES:
+        if (!input.customDatesInput) throw new BadRequestException('customDatesInput is required for CUSTOM_DATES scheduling type.');
+        generatedSlots = this.generateSlotsFromCustomDates(input.customDatesInput);
+        break;
+      case SchedulingType.DAILY:
+        if (!input.dailyRecurrenceInput) throw new BadRequestException('dailyRecurrenceInput is required for DAILY scheduling type.');
+        generatedSlots = this.generateSlotsFromDailyRecurrence(input.dailyRecurrenceInput);
+        break;
+      case SchedulingType.WEEKLY:
+        if (!input.weeklyRecurrenceInput) throw new BadRequestException('weeklyRecurrenceInput is required for WEEKLY scheduling type.');
+        generatedSlots = this.generateSlotsFromWeeklyRecurrence(input.weeklyRecurrenceInput);
+        break;
+      default:
+        throw new BadRequestException('Invalid scheduling type provided.');
+    }
+
+    this.validateScheduleSlots(generatedSlots);
 
     const now = new Date();
     const twoMonthsLater = new Date();
@@ -46,21 +69,6 @@ export class ClassPackagesService {
         twoMonthsLater.setFullYear(now.getFullYear() + Math.floor((now.getMonth() + 2) / 12));
         twoMonthsLater.setMonth((now.getMonth() + 2) % 12);
     }
-
-    input.scheduleSlots.forEach(slot => {
-      const startTime = new Date(slot.startTime);
-      const endTime = new Date(slot.endTime);
-
-      if (endTime <= startTime) {
-        throw new BadRequestException('Schedule slot end time must be after start time.');
-      }
-      if (startTime < now) {
-        throw new BadRequestException('Schedule slot start time cannot be in the past.');
-      }
-      if (startTime > twoMonthsLater) {
-        throw new BadRequestException('Schedule slot start time cannot be more than 2 months in the future.');
-      }
-    });
 
     let coverImageUrl: string | null = null;
     if (coverImageFile) {
@@ -83,7 +91,7 @@ export class ClassPackagesService {
         ageGroups: { connect: input.ageGroupIds.map(id => ({ id })) },
         tags: input.tags,
         scheduleSlots: {
-          create: input.scheduleSlots.map(slot => ({
+          create: generatedSlots.map(slot => ({
             startTime: slot.startTime,
             endTime: slot.endTime,
             availableSlots: slot.availableSlots,
@@ -139,16 +147,63 @@ export class ClassPackagesService {
         twoMonthsLater.setMonth((now.getMonth() + 2) % 12);
     }
 
-    if (input.scheduleSlots) {
-        // Rule: Schedule structure can only be changed if the package is DRAFT
+    let newScheduleSlots: ScheduleSlotInput[] | undefined = undefined;
+
+    if (input.schedulingType) { // If a new scheduling type is explicitly set
         if (existingPackage.status !== ClassPackageStatus.DRAFT) {
-            throw new ForbiddenException('Schedules can only be modified for DRAFT packages. To make changes to a published package, please create a new version or unpublish it first.');
+            throw new ForbiddenException('Scheduling type can only be changed for DRAFT packages.');
         }
-        // Rule: Cannot update schedules if there are active enrollments (existing rule)
         if (existingPackage.enrollments && existingPackage.enrollments.length > 0) {
-            throw new ForbiddenException('Cannot update schedules for a class package with active enrollments.');
+            throw new ForbiddenException('Cannot change scheduling type for a class package with active enrollments.');
         }
-        this.validateScheduleSlots(input.scheduleSlots);
+
+        switch (input.schedulingType) {
+            case SchedulingType.CUSTOM_DATES:
+                if (!input.customDatesInput) throw new BadRequestException('customDatesInput is required for CUSTOM_DATES scheduling type.');
+                newScheduleSlots = this.generateSlotsFromCustomDates(input.customDatesInput);
+                break;
+            case SchedulingType.DAILY:
+                if (!input.dailyRecurrenceInput) throw new BadRequestException('dailyRecurrenceInput is required for DAILY scheduling type.');
+                newScheduleSlots = this.generateSlotsFromDailyRecurrence(input.dailyRecurrenceInput);
+                break;
+            case SchedulingType.WEEKLY:
+                if (!input.weeklyRecurrenceInput) throw new BadRequestException('weeklyRecurrenceInput is required for WEEKLY scheduling type.');
+                newScheduleSlots = this.generateSlotsFromWeeklyRecurrence(input.weeklyRecurrenceInput);
+                break;
+            default:
+                throw new BadRequestException('Invalid scheduling type provided.');
+        }
+    } else {
+        // If schedulingType is not changing, but its parameters might be (e.g. updating dailyRecurrenceInput)
+        // This assumes the package already has a schedulingType set implicitly by its existing slots or a previous definition.
+        // For simplicity, we regenerate based on the potentially updated DTO for the *current* (or inferred) scheduling type.
+        // A more robust solution might involve storing schedulingType on ClassPackage model.
+        if (input.customDatesInput) {
+             if (existingPackage.status !== ClassPackageStatus.DRAFT && /* check if customDatesInput is different from current */ true) {
+                throw new ForbiddenException('Schedules can only be modified for DRAFT packages or if only adding new custom dates without altering existing ones for published packages.');
+            }
+            newScheduleSlots = this.generateSlotsFromCustomDates(input.customDatesInput);
+        }
+        // Similar checks and generation for dailyRecurrenceInput and weeklyRecurrenceInput if they are provided
+        else if (input.dailyRecurrenceInput) {
+            if (existingPackage.status !== ClassPackageStatus.DRAFT) {
+                throw new ForbiddenException('Schedules can only be modified for DRAFT packages.');
+            }
+            newScheduleSlots = this.generateSlotsFromDailyRecurrence(input.dailyRecurrenceInput);
+        }
+        else if (input.weeklyRecurrenceInput) {
+             if (existingPackage.status !== ClassPackageStatus.DRAFT) {
+                throw new ForbiddenException('Schedules can only be modified for DRAFT packages.');
+            }
+            newScheduleSlots = this.generateSlotsFromWeeklyRecurrence(input.weeklyRecurrenceInput);
+        }
+    }
+
+    if (newScheduleSlots) {
+        if (existingPackage.status !== ClassPackageStatus.DRAFT && (existingPackage.enrollments && existingPackage.enrollments.length > 0)) {
+             throw new ForbiddenException('Cannot update schedules for a class package with active enrollments if not in DRAFT status.');
+        }
+        this.validateScheduleSlots(newScheduleSlots);
     }
 
     let coverImageUrl: string | undefined | null = existingPackage.coverImageUrl;
@@ -178,10 +233,10 @@ export class ClassPackagesService {
       updateData.ageGroups = { set: input.ageGroupIds.map(id => ({ id })) };
     }
 
-    if (input.scheduleSlots) {
+    if (newScheduleSlots) { // Changed from input.scheduleSlots
         await this.prisma.scheduleSlot.deleteMany({ where: { classPackageId } });
         updateData.scheduleSlots = {
-            create: input.scheduleSlots.map(slot => ({
+            create: newScheduleSlots.map(slot => ({ // Changed from input.scheduleSlots
                 startTime: slot.startTime,
                 endTime: slot.endTime,
                 availableSlots: slot.availableSlots,
@@ -305,6 +360,135 @@ export class ClassPackagesService {
         }
       }
     }
+  }
+
+  private generateSlotsFromCustomDates(input: CustomDatesRecurrenceInput): ScheduleSlotInput[] {
+    if (!input || !input.slots || input.slots.length === 0) {
+      throw new BadRequestException('Custom dates input must contain at least one slot.');
+    }
+    return input.slots.map(slot => {
+      // Combine date and time parts. Assuming startTime and endTime on CustomDateSlotInput are full Date objects
+      // where only the time part is relevant and should be combined with the specific `date`.
+      const baseDate = new Date(slot.date);
+      const startTime = new Date(slot.startTime);
+      const endTime = new Date(slot.endTime);
+
+      const finalStartTime = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), 
+                                    startTime.getHours(), startTime.getMinutes(), startTime.getSeconds());
+      const finalEndTime = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), 
+                                  endTime.getHours(), endTime.getMinutes(), endTime.getSeconds());
+      
+      if (finalEndTime <= finalStartTime) {
+        throw new BadRequestException(`For date ${baseDate.toISOString().split('T')[0]}, end time must be after start time.`);
+      }
+
+      return {
+        startTime: finalStartTime,
+        endTime: finalEndTime,
+        availableSlots: slot.availableSlots,
+      };
+    });
+  }
+
+  private generateSlotsFromDailyRecurrence(input: DailyRecurrenceInput): ScheduleSlotInput[] {
+    const slots: ScheduleSlotInput[] = [];
+    const { recurrenceStartDate, recurrenceEndDate, slotStartTime, slotEndTime, availableSlotsPerOccurrence } = input;
+    
+    const sTime = new Date(slotStartTime);
+    const eTime = new Date(slotEndTime);
+
+    if (eTime.getTime() <= sTime.getTime()) {
+        throw new BadRequestException('Slot end time must be after slot start time for daily recurrence.');
+    }
+
+    let currentDay = new Date(recurrenceStartDate);
+    const R_END_DATE_EXCLUSIVE_MAX = new Date();
+    R_END_DATE_EXCLUSIVE_MAX.setMonth(R_END_DATE_EXCLUSIVE_MAX.getMonth() + 2); // System max of 2 months for recurrence
+    R_END_DATE_EXCLUSIVE_MAX.setDate(R_END_DATE_EXCLUSIVE_MAX.getDate() + 1); // Make it exclusive for the loop
+
+    const endDate = recurrenceEndDate ? new Date(recurrenceEndDate) : R_END_DATE_EXCLUSIVE_MAX;
+    // Ensure recurrenceEndDate is not beyond system max
+    const finalEndDate = endDate > R_END_DATE_EXCLUSIVE_MAX ? R_END_DATE_EXCLUSIVE_MAX : endDate;
+
+    if (finalEndDate <= currentDay) {
+        throw new BadRequestException('Recurrence end date must be after start date.');
+    }
+
+    while (currentDay < finalEndDate) {
+        const newStartTime = new Date(currentDay.getFullYear(), currentDay.getMonth(), currentDay.getDate(), 
+                                    sTime.getHours(), sTime.getMinutes(), sTime.getSeconds());
+        const newEndTime = new Date(currentDay.getFullYear(), currentDay.getMonth(), currentDay.getDate(), 
+                                  eTime.getHours(), eTime.getMinutes(), eTime.getSeconds());
+        slots.push({
+            startTime: newStartTime,
+            endTime: newEndTime,
+            availableSlots: availableSlotsPerOccurrence
+        });
+        currentDay.setDate(currentDay.getDate() + 1);
+    }
+    if(slots.length === 0) {
+      throw new BadRequestException('Daily recurrence settings did not generate any valid slots within the allowed date range.')
+    }
+    return slots;
+  }
+
+  private generateSlotsFromWeeklyRecurrence(input: WeeklyRecurrenceInput): ScheduleSlotInput[] {
+    const slots: ScheduleSlotInput[] = [];
+    const { recurrenceStartDate, recurrenceEndDate, daysOfWeek, slotStartTime, slotEndTime, availableSlotsPerOccurrence } = input;
+
+    const sTime = new Date(slotStartTime);
+    const eTime = new Date(slotEndTime);
+
+    if (eTime.getTime() <= sTime.getTime()) {
+        throw new BadRequestException('Slot end time must be after slot start time for weekly recurrence.');
+    }
+    if (!daysOfWeek || daysOfWeek.length === 0) {
+        throw new BadRequestException('At least one day of the week must be selected for weekly recurrence.');
+    }
+    // Convert Prisma DayOfWeek enum to 0 (Sunday) - 6 (Saturday) numbers
+    const targetDays = daysOfWeek.map(day => {
+        switch(day) {
+            case DayOfWeek.SUNDAY: return 0 as const;
+            case DayOfWeek.MONDAY: return 1 as const;
+            case DayOfWeek.TUESDAY: return 2 as const;
+            case DayOfWeek.WEDNESDAY: return 3 as const;
+            case DayOfWeek.THURSDAY: return 4 as const;
+            case DayOfWeek.FRIDAY: return 5 as const;
+            case DayOfWeek.SATURDAY: return 6 as const;
+            default: throw new Error('Invalid day of week');
+        }
+    });
+
+    let currentDay = new Date(recurrenceStartDate);
+    const R_END_DATE_EXCLUSIVE_MAX = new Date();
+    R_END_DATE_EXCLUSIVE_MAX.setMonth(R_END_DATE_EXCLUSIVE_MAX.getMonth() + 2); 
+    R_END_DATE_EXCLUSIVE_MAX.setDate(R_END_DATE_EXCLUSIVE_MAX.getDate() + 1); 
+
+    const endDate = recurrenceEndDate ? new Date(recurrenceEndDate) : R_END_DATE_EXCLUSIVE_MAX;
+    const finalEndDate = endDate > R_END_DATE_EXCLUSIVE_MAX ? R_END_DATE_EXCLUSIVE_MAX : endDate;
+    
+    if (finalEndDate <= currentDay) {
+        throw new BadRequestException('Recurrence end date must be after start date.');
+    }
+
+    while (currentDay < finalEndDate) {
+        if (targetDays.includes(currentDay.getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6)) {
+            const newStartTime = new Date(currentDay.getFullYear(), currentDay.getMonth(), currentDay.getDate(), 
+                                        sTime.getHours(), sTime.getMinutes(), sTime.getSeconds());
+            const newEndTime = new Date(currentDay.getFullYear(), currentDay.getMonth(), currentDay.getDate(), 
+                                      eTime.getHours(), eTime.getMinutes(), eTime.getSeconds());
+            slots.push({
+                startTime: newStartTime,
+                endTime: newEndTime,
+                availableSlots: availableSlotsPerOccurrence
+            });
+        }
+        currentDay.setDate(currentDay.getDate() + 1);
+    }
+    if(slots.length === 0) {
+      throw new BadRequestException('Weekly recurrence settings did not generate any valid slots within the allowed date range for the selected days.')
+    }
+    return slots;
   }
 
   private async uploadImage(

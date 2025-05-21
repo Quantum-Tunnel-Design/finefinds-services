@@ -10,10 +10,14 @@ import {
   MaxLength,
   Min,
   ValidateNested,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ScheduleSlotInput } from './schedule-slot.input';
 import { CancellationPolicyType, ClassPackageStatus } from '@prisma/client';
+import { SchedulingType } from './scheduling-type.enum';
+import { CustomDatesRecurrenceInput } from './custom-date-slot.input';
+import { DailyRecurrenceInput } from './daily-recurrence.input';
+import { WeeklyRecurrenceInput } from './weekly-recurrence.input';
 
 @InputType()
 export class UpdateClassPackageInput {
@@ -60,12 +64,31 @@ export class UpdateClassPackageInput {
   @IsNotEmpty({ each: true })
   tags?: string[];
 
-  @Field(() => [ScheduleSlotInput], { nullable: true })
+  @Field(() => SchedulingType, { nullable: true })
   @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => ScheduleSlotInput)
-  scheduleSlots?: ScheduleSlotInput[];
+  @IsEnum(SchedulingType)
+  schedulingType?: SchedulingType;
+
+  @Field(() => CustomDatesRecurrenceInput, { nullable: true })
+  @IsOptional()
+  @ValidateIf(o => o.schedulingType === SchedulingType.CUSTOM_DATES || (o.schedulingType === undefined && o.customDatesInput !== undefined))
+  @ValidateNested()
+  @Type(() => CustomDatesRecurrenceInput)
+  customDatesInput?: CustomDatesRecurrenceInput;
+
+  @Field(() => DailyRecurrenceInput, { nullable: true })
+  @IsOptional()
+  @ValidateIf(o => o.schedulingType === SchedulingType.DAILY || (o.schedulingType === undefined && o.dailyRecurrenceInput !== undefined))
+  @ValidateNested()
+  @Type(() => DailyRecurrenceInput)
+  dailyRecurrenceInput?: DailyRecurrenceInput;
+
+  @Field(() => WeeklyRecurrenceInput, { nullable: true })
+  @IsOptional()
+  @ValidateIf(o => o.schedulingType === SchedulingType.WEEKLY || (o.schedulingType === undefined && o.weeklyRecurrenceInput !== undefined))
+  @ValidateNested()
+  @Type(() => WeeklyRecurrenceInput)
+  weeklyRecurrenceInput?: WeeklyRecurrenceInput;
 
   @Field(() => String, { nullable: true })
   @IsOptional()

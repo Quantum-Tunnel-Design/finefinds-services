@@ -10,10 +10,15 @@ import {
   MaxLength,
   Min,
   ValidateNested,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ScheduleSlotInput } from './schedule-slot.input';
+// import { ScheduleSlotInput } from './schedule-slot.input'; // Replaced by new recurrence inputs
 import { CancellationPolicyType, ClassPackageStatus } from '@prisma/client';
+import { SchedulingType } from './scheduling-type.enum';
+import { CustomDatesRecurrenceInput } from './custom-date-slot.input';
+import { DailyRecurrenceInput } from './daily-recurrence.input';
+import { WeeklyRecurrenceInput } from './weekly-recurrence.input';
 
 @InputType()
 export class CreateClassPackageInput {
@@ -58,12 +63,33 @@ export class CreateClassPackageInput {
   @IsNotEmpty({ each: true })
   tags: string[];
 
-  @Field(() => [ScheduleSlotInput])
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => ScheduleSlotInput)
+  // --- Schedule related fields ---
+  @Field(() => SchedulingType)
+  @IsEnum(SchedulingType)
   @IsNotEmpty()
-  scheduleSlots: ScheduleSlotInput[];
+  schedulingType: SchedulingType;
+
+  @Field(() => CustomDatesRecurrenceInput, { nullable: true })
+  @IsOptional()
+  @ValidateIf(o => o.schedulingType === SchedulingType.CUSTOM_DATES)
+  @ValidateNested()
+  @Type(() => CustomDatesRecurrenceInput)
+  customDatesInput?: CustomDatesRecurrenceInput;
+
+  @Field(() => DailyRecurrenceInput, { nullable: true })
+  @IsOptional()
+  @ValidateIf(o => o.schedulingType === SchedulingType.DAILY)
+  @ValidateNested()
+  @Type(() => DailyRecurrenceInput)
+  dailyRecurrenceInput?: DailyRecurrenceInput;
+
+  @Field(() => WeeklyRecurrenceInput, { nullable: true })
+  @IsOptional()
+  @ValidateIf(o => o.schedulingType === SchedulingType.WEEKLY)
+  @ValidateNested()
+  @Type(() => WeeklyRecurrenceInput)
+  weeklyRecurrenceInput?: WeeklyRecurrenceInput;
+  // --- End Schedule related fields ---
 
   @Field(() => String)
   @IsEnum(CancellationPolicyType)
