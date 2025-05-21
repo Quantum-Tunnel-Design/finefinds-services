@@ -29,6 +29,9 @@ create_task_definition() {
     echo "Using execution role: $execution_role_arn"
     echo "Using task role: $task_role_arn"
     
+    # Get all required secret ARNs
+    echo "Getting secret ARNs..."
+    
     # Get database connection secret ARN
     local db_connection_arn=$(aws secretsmanager get-secret-value \
         --secret-id "finefinds-$env-rds-connection" \
@@ -40,8 +43,43 @@ create_task_definition() {
         return 1
     fi
     
+    # Get Redis connection secret ARN
+    local redis_connection_arn=$(aws secretsmanager get-secret-value \
+        --secret-id "finefinds-$env-redis-connection" \
+        --query 'ARN' \
+        --output text)
+    
+    if [ -z "$redis_connection_arn" ]; then
+        echo "::error::Failed to get Redis connection secret ARN"
+        return 1
+    fi
+    
+    # Get JWT secret ARN
+    local jwt_secret_arn=$(aws secretsmanager get-secret-value \
+        --secret-id "finefinds-$env-jwt-secret" \
+        --query 'ARN' \
+        --output text)
+    
+    if [ -z "$jwt_secret_arn" ]; then
+        echo "::error::Failed to get JWT secret ARN"
+        return 1
+    fi
+    
+    # Get Cognito config secret ARN
+    local cognito_config_arn=$(aws secretsmanager get-secret-value \
+        --secret-id "finefinds-$env-cognito-config" \
+        --query 'ARN' \
+        --output text)
+    
+    if [ -z "$cognito_config_arn" ]; then
+        echo "::error::Failed to get Cognito config secret ARN"
+        return 1
+    fi
+    
     echo "Using database connection secret ARN: $db_connection_arn"
-    echo "db_connection_arn=$db_connection_arn" >> $GITHUB_OUTPUT
+    echo "Using Redis connection secret ARN: $redis_connection_arn"
+    echo "Using JWT secret ARN: $jwt_secret_arn"
+    echo "Using Cognito config secret ARN: $cognito_config_arn"
     
     # Create task definition JSON
     cat > task-definition.json << EOF
@@ -108,18 +146,21 @@ create_task_definition() {
         {"name": "PORT", "value": "3000"},
         {"name": "NODE_ENV", "value": "$SERVICES_ENV"},
         {"name": "AWS_REGION", "value": "$AWS_REGION"},
-        {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/$MESH_NAME/virtualNode/$VIRTUAL_NODE_NAME"}
+        {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/$MESH_NAME/virtualNode/$VIRTUAL_NODE_NAME"},
+        {"name": "DATABASE_URL", "value": "postgresql://\${DB_USER}:\${DB_PASSWORD}@\${DB_HOST}:\${DB_PORT}/\${DB_NAME}"}
       ],
       "secrets": [
-        {"name": "DATABASE_URL", "valueFrom": "$db_connection_arn"},
-        {"name": "REDIS_URL", "valueFrom": "$REDIS_CONNECTION_ARN"},
-        {"name": "JWT_SECRET", "valueFrom": "$JWT_SECRET_ARN"}
-      ],
-      "environment": [
-        {"name": "COGNITO_CLIENT_USER_POOL_ID", "value": "$COGNITO_CLIENT_USER_POOL_ID"},
-        {"name": "COGNITO_CLIENT_CLIENT_ID", "value": "$COGNITO_CLIENT_CLIENT_ID"},
-        {"name": "COGNITO_ADMIN_USER_POOL_ID", "value": "$COGNITO_ADMIN_USER_POOL_ID"},
-        {"name": "COGNITO_ADMIN_CLIENT_ID", "value": "$COGNITO_ADMIN_CLIENT_ID"}
+        {"name": "DB_NAME", "valueFrom": "$db_connection_arn:dbName::"},
+        {"name": "DB_HOST", "valueFrom": "$db_connection_arn:host::"},
+        {"name": "DB_PORT", "valueFrom": "$db_connection_arn:port::"},
+        {"name": "DB_USER", "valueFrom": "$db_connection_arn:username::"},
+        {"name": "DB_PASSWORD", "valueFrom": "$db_connection_arn:password::"},
+        {"name": "REDIS_URL", "valueFrom": "$redis_connection_arn"},
+        {"name": "JWT_SECRET", "valueFrom": "$jwt_secret_arn"},
+        {"name": "COGNITO_CLIENT_USER_POOL_ID", "valueFrom": "$cognito_config_arn:COGNITO_CLIENT_USER_POOL_ID::"},
+        {"name": "COGNITO_CLIENT_CLIENT_ID", "valueFrom": "$cognito_config_arn:COGNITO_CLIENT_CLIENT_ID::"},
+        {"name": "COGNITO_ADMIN_USER_POOL_ID", "valueFrom": "$cognito_config_arn:COGNITO_ADMIN_USER_POOL_ID::"},
+        {"name": "COGNITO_ADMIN_CLIENT_ID", "valueFrom": "$cognito_config_arn:COGNITO_ADMIN_CLIENT_ID::"}
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
