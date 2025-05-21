@@ -36,6 +36,8 @@ export class ClassPackagesService {
         input.rescheduleDaysBefore = null; 
     }
 
+    this.validateScheduleSlots(input.scheduleSlots);
+
     const now = new Date();
     const twoMonthsLater = new Date();
     twoMonthsLater.setMonth(now.getMonth() + 2);
@@ -84,6 +86,7 @@ export class ClassPackagesService {
           create: input.scheduleSlots.map(slot => ({
             startTime: slot.startTime,
             endTime: slot.endTime,
+            availableSlots: slot.availableSlots,
           })),
         },
       },
@@ -145,19 +148,7 @@ export class ClassPackagesService {
         if (existingPackage.enrollments && existingPackage.enrollments.length > 0) {
             throw new ForbiddenException('Cannot update schedules for a class package with active enrollments.');
         }
-        input.scheduleSlots.forEach(slot => {
-            const startTime = new Date(slot.startTime);
-            const endTime = new Date(slot.endTime);
-            if (endTime <= startTime) {
-                throw new BadRequestException('Schedule slot end time must be after start time.');
-            }
-            if (startTime < now) {
-                throw new BadRequestException('Schedule slot start time cannot be in the past.');
-            }
-            if (startTime > twoMonthsLater) {
-                throw new BadRequestException('Schedule slot start time cannot be more than 2 months in the future.');
-            }
-        });
+        this.validateScheduleSlots(input.scheduleSlots);
     }
 
     let coverImageUrl: string | undefined | null = existingPackage.coverImageUrl;
@@ -193,6 +184,7 @@ export class ClassPackagesService {
             create: input.scheduleSlots.map(slot => ({
                 startTime: slot.startTime,
                 endTime: slot.endTime,
+                availableSlots: slot.availableSlots,
             })),
         };
     }
@@ -265,6 +257,53 @@ export class ClassPackagesService {
   private validateImage(file: Express.Multer.File, type: string): void {
     if (file.size > 5 * 1024 * 1024) { 
       throw new BadRequestException(`${type} size must not exceed 5MB.`);
+    }
+  }
+
+  private validateScheduleSlots(slots: ScheduleSlotInput[]): void {
+    const now = new Date();
+    const twoMonthsLater = new Date();
+    twoMonthsLater.setMonth(now.getMonth() + 2);
+    if (twoMonthsLater < now) {
+        twoMonthsLater.setFullYear(now.getFullYear() + Math.floor((now.getMonth() + 2) / 12));
+        twoMonthsLater.setMonth((now.getMonth() + 2) % 12);
+    }
+
+    if (!slots || slots.length === 0) {
+      throw new BadRequestException('At least one schedule slot is required.');
+    }
+
+    // Sort slots by start time to make overlap detection easier
+    const sortedSlots = [...slots].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+    for (let i = 0; i < sortedSlots.length; i++) {
+      const slot = sortedSlots[i];
+      const startTime = new Date(slot.startTime);
+      const endTime = new Date(slot.endTime);
+
+      if (endTime <= startTime) {
+        throw new BadRequestException(`Slot ${i + 1}: End time must be after start time.`);
+      }
+      if (startTime < now) {
+        throw new BadRequestException(`Slot ${i + 1}: Start time cannot be in the past.`);
+      }
+      if (startTime > twoMonthsLater) {
+        throw new BadRequestException(`Slot ${i + 1}: Start time cannot be more than 2 months in the future.`);
+      }
+      if (slot.availableSlots === undefined || slot.availableSlots === null || !Number.isInteger(slot.availableSlots) || slot.availableSlots <= 0) {
+        throw new BadRequestException(`Slot ${i + 1}: Available slots must be a positive integer.`);
+      }
+
+      // Check for overlap with the next slot
+      if (i < sortedSlots.length - 1) {
+        const nextSlot = sortedSlots[i+1];
+        const nextStartTime = new Date(nextSlot.startTime);
+        if (endTime > nextStartTime) {
+          throw new BadRequestException(
+            `Slot ${i + 1} (ends at ${endTime.toISOString()}) overlaps with Slot ${i + 2} (starts at ${nextStartTime.toISOString()}).`
+          );
+        }
+      }
     }
   }
 

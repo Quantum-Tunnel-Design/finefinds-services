@@ -241,6 +241,7 @@ model ScheduleSlot {
   classPackage   ClassPackage @relation(fields: [classPackageId], references: [id], onDelete: Cascade)
   startTime      DateTime
   endTime        DateTime
+  availableSlots Int
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
