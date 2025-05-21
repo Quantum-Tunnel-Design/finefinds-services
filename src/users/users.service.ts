@@ -2,7 +2,9 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { User, UserRole } from '@prisma/client';
+import { User, UserRole, Child, Gender } from '@prisma/client';
+import { CreateChildInput } from './dto/create-child.input';
+import { UpdateChildInput } from './dto/update-child.input';
 
 @Injectable()
 export class UsersService {
@@ -42,9 +44,14 @@ export class UsersService {
     children?: {
       firstName: string;
       lastName: string;
-      gender: 'male' | 'female';
+      gender: Gender;
       dateOfBirth: Date;
     }[];
+    secondaryPhoneNumber?: string;
+    isEmailVerified?: boolean;
+    isActive?: boolean;
+    termsAccepted?: boolean;
+    password?: string;
   }): Promise<User> {
     return this.prisma.user.create({
       data: {
@@ -54,6 +61,11 @@ export class UsersService {
         role: data.role,
         cognitoSub: data.cognitoSub,
         phoneNumber: data.phoneNumber,
+        secondaryPhoneNumber: data.secondaryPhoneNumber,
+        isEmailVerified: data.isEmailVerified,
+        isActive: data.isActive,
+        termsAccepted: data.termsAccepted,
+        password: data.password,
         children: data.children ? {
           create: data.children.map(child => ({
             firstName: child.firstName,
@@ -161,6 +173,90 @@ export class UsersService {
 
     return this.prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // --- Children Management --- 
+
+  async addChild(parentId: string, input: CreateChildInput): Promise<Child> {
+    // Ensure parent exists
+    const parent = await this.findById(parentId);
+    if (!parent) {
+      throw new NotFoundException(`Parent with ID "${parentId}" not found.`);
+    }
+
+    // Validate DOB - not in the future (basic validation, can be more complex)
+    if (new Date(input.dateOfBirth) > new Date()) {
+        throw new ForbiddenException("Child's Date of Birth cannot be in the future.");
+    }
+
+    return this.prisma.child.create({
+      data: {
+        ...input,
+        userId: parentId,
+      },
+    });
+  }
+
+  async listChildren(parentId: string): Promise<Child[]> {
+    const parent = await this.findById(parentId);
+    if (!parent) {
+      throw new NotFoundException(`Parent with ID "${parentId}" not found.`);
+    }
+    return this.prisma.child.findMany({
+      where: { userId: parentId },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async updateChild(parentId: string, childId: string, input: UpdateChildInput): Promise<Child> {
+    const parent = await this.findById(parentId);
+    if (!parent) {
+      throw new NotFoundException(`Parent with ID "${parentId}" not found.`);
+    }
+
+    const child = await this.prisma.child.findUnique({
+      where: { id: childId },
+    });
+
+    if (!child || child.userId !== parentId) {
+      throw new NotFoundException(`Child with ID "${childId}" not found or does not belong to this parent.`);
+    }
+
+    if (input.dateOfBirth && new Date(input.dateOfBirth) > new Date()) {
+        throw new ForbiddenException("Child's Date of Birth cannot be in the future.");
+    }
+
+    return this.prisma.child.update({
+      where: { id: childId }, 
+      data: input,
+    });
+  }
+
+  async deleteChild(parentId: string, childId: string): Promise<void> {
+    const parent = await this.findById(parentId);
+    if (!parent) {
+      throw new NotFoundException(`Parent with ID "${parentId}" not found.`);
+    }
+
+    const child = await this.prisma.child.findUnique({
+      where: { id: childId },
+      include: { enrollments: true } // Check for enrollments
+    });
+
+    if (!child || child.userId !== parentId) {
+      throw new NotFoundException(`Child with ID "${childId}" not found or does not belong to this parent.`);
+    }
+
+    // Basic check for enrollments. More complex logic might be needed based on business rules.
+    if (child.enrollments && child.enrollments.length > 0) {
+        throw new ForbiddenException (
+            'Cannot delete child with active enrollments. Please manage enrollments first.'
+        );
+    }
+
+    await this.prisma.child.delete({
+      where: { id: childId },
     });
   }
 }
