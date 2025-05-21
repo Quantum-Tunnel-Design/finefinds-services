@@ -8,30 +8,30 @@ datasource db {
 }
 
 model User {
-  id            String         @id @default(uuid())
-  cognitoSub    String         @unique
-  firstName     String
-  lastName      String
-  email         String         @unique
-  phoneNumber   String?
-  role          UserRole
-  avatarUrl     String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  children      Child[]
-  courses       Course[]       @relation("VendorCourses")
-  enrollments   Enrollment[]
-  notifications Notification[]
-  payments      Payment[]
-  reviews       Review[]
-  vendorProfile VendorProfile?
-  businessProfile BusinessProfile?
-  loginAttempts LoginAttempt[]
-  auditLogs     AuditLog[]
-  createdClassPackages ClassPackage[]
-  classPackageEnrollments ClassPackageEnrollment[]
+  id                     String                   @id @default(cuid())
+  email                  String                   @unique
+  password               String? // Nullable for Cognito-managed users where password is not stored locally
+  firstName              String
+  lastName               String
+  phoneNumber            String?
+  secondaryPhoneNumber   String? // For vendors
+  role                   UserRole                 @default(PARENT)
+  cognitoSub             String?                  @unique // For Cognito user identifier
+  isEmailVerified        Boolean                  @default(false)
+  isActive               Boolean                  @default(true)
+  termsAccepted          Boolean?                 @default(false) // For vendors
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  children               Child[]
+  sessions               Session[]
+  loginAttempts          LoginAttempt[]
+  businessProfile        BusinessProfile?
+  auditLogs              AuditLog[]
+  createdClassPackages   ClassPackage[]           @relation("VendorClassPackages")
+  enrollments            ClassPackageEnrollment[] // Parent's enrollments
 
-  @@map("users")
+  @@index([email])
+  @@index([cognitoSub])
 }
 
 model VendorProfile {
@@ -136,17 +136,18 @@ model Notification {
 }
 
 model Child {
-  id          String   @id @default(uuid())
-  firstName   String
-  lastName    String
-  gender      String
-  dateOfBirth DateTime
-  parentId    String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  parent      User     @relation(fields: [parentId], references: [id])
+  id            String                   @id @default(cuid())
+  firstName     String
+  lastName      String
+  dateOfBirth   DateTime
+  gender        String // Consider Enum: MALE, FEMALE, OTHER for future
+  userId        String
+  user          User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  enrollments   ClassPackageEnrollment[] @relation("EnrolledChildren")
 
-  @@map("children")
+  @@index([userId])
 }
 
 model Session {
@@ -236,17 +237,17 @@ model ClassPackage {
 }
 
 model ScheduleSlot {
-  id             String       @id @default(cuid())
+  id             String                   @id @default(cuid())
+  classPackage   ClassPackage             @relation(fields: [classPackageId], references: [id], onDelete: Cascade)
   classPackageId String
-  classPackage   ClassPackage @relation(fields: [classPackageId], references: [id], onDelete: Cascade)
   startTime      DateTime
   endTime        DateTime
-  availableSlots Int
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  availableSlots Int // Number of children spots
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  enrollments    ClassPackageEnrollment[] // Relation to enrollments for this slot
 
   @@index([classPackageId])
-  @@map("schedule_slots")
 }
 
 model LoginAttempt {
@@ -277,19 +278,24 @@ model AuditLog {
 }
 
 model ClassPackageEnrollment {
-  id             String   @id @default(uuid())
+  id             String        @id @default(cuid())
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade) // Parent
   userId         String
-  user           User     @relation(fields: [userId], references: [id])
+  classPackage   ClassPackage  @relation(fields: [classPackageId], references: [id], onDelete: Cascade)
   classPackageId String
-  classPackage   ClassPackage @relation(fields: [classPackageId], references: [id], onDelete: Cascade)
-  status         EnrollmentStatus @default(PENDING)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  scheduleSlot   ScheduleSlot  @relation(fields: [scheduleSlotId], references: [id], onDelete: Cascade)
+  scheduleSlotId String
+  enrolledChildren Child[]    @relation("EnrolledChildren")
+  bookingStatus  BookingStatus @default(PAID)
+  paymentType    PaymentType   @default(CARD)
+  bookedAt       DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
-  @@unique([userId, classPackageId])
+  // A user (parent) can book a specific slot once (for potentially multiple children in that booking)
+  @@unique([userId, scheduleSlotId])
   @@index([userId])
   @@index([classPackageId])
-  @@map("class_package_enrollments")
+  @@index([scheduleSlotId])
 }
 
 enum UserRole {
@@ -334,4 +340,27 @@ enum ClassPackageStatus {
 enum CancellationPolicyType {
   FIXED_COMMITMENT
   FLEXIBLE_RESCHEDULING
+}
+
+enum DayOfWeek {
+  SUNDAY
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+}
+
+// New Enums for Bookings
+enum BookingStatus {
+  PAID
+  CANCELLED
+  RESCHEDULED
+  // PENDING_PAYMENT // Future consideration
+}
+
+enum PaymentType {
+  CARD
+  // OTHER // Future consideration
 }
