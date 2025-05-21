@@ -35,6 +35,7 @@ model User {
   reviews                Review[]                 // For Review.user
   payments               Payment[]                // For Payment.user
   notifications          Notification[]           // For Notification.user
+  savedClassPackages     SavedClassPackage[] // Added for saved classes
 
   @@index([email])
   @@index([cognitoSub])
@@ -234,6 +235,7 @@ model ClassPackage {
   tags                      String[]               @db.VarChar(50)
   scheduleSlots             ScheduleSlot[]
   enrollments               ClassPackageEnrollment[]
+  savedByUsers              SavedClassPackage[] // Added for users who saved this package
 
   createdAt                 DateTime               @default(now())
   updatedAt                 DateTime               @updatedAt
@@ -303,6 +305,20 @@ model ClassPackageEnrollment {
   @@index([userId])
   @@index([classPackageId])
   @@index([scheduleSlotId])
+}
+
+model SavedClassPackage {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  classPackageId String
+  classPackage   ClassPackage @relation(fields: [classPackageId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([userId, classPackageId]) // Prevent duplicate saves
+  @@index([userId])
+  @@index([classPackageId])
+  @@map("saved_class_packages")
 }
 
 enum UserRole {
