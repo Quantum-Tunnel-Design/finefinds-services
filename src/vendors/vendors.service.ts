@@ -8,6 +8,11 @@ import { UpdateBusinessProfileInput } from './dto/update-business-profile.input'
 import { DeleteBusinessProfileInput } from './dto/delete-business-profile.input';
 import { S3Service } from '../s3/s3.service';
 import { AuditService } from '../audit/audit.service';
+import { DateRangeFilterDto } from '../admin/dto/date-range-filter.dto';
+import { VendorDashboardDataDto } from './dto/vendor-dashboard-data.dto';
+import { VendorRevenueMetricsDto } from './dto/vendor-revenue-metrics.dto';
+import { MonthlyPaymentDataDto } from '../admin/dto/monthly-payment-data.dto';
+import { PaymentStatus, Prisma, BookingStatus, ClassPackageStatus } from '@prisma/client';
 
 @Injectable()
 export class VendorsService {
@@ -257,15 +262,15 @@ export class VendorsService {
   }
 
   async deleteBusinessProfile(userId: string, input: DeleteBusinessProfileInput) {
-    // Get current profile with courses
     const currentProfile = await this.prisma.businessProfile.findUnique({
       where: { userId },
       include: {
         user: {
           include: {
-            courses: {
+            createdClassPackages: {
               include: {
                 enrollments: true,
+                scheduleSlots: true,
               },
             },
           },
@@ -277,12 +282,13 @@ export class VendorsService {
       throw new NotFoundException('Business profile not found');
     }
 
-    // Check for scheduled classes with paid registrations
-    const hasActiveEnrollments = currentProfile.user.courses.some(course => 
-      course.enrollments.some(enrollment => 
-        enrollment.status === 'ACTIVE' && 
-        new Date(course.schedules[0]?.startTime) > new Date()
-      )
+    const hasActiveEnrollments = currentProfile.user.createdClassPackages.some(pkg => 
+      pkg.enrollments.some(enrollment => {
+        if (enrollment.bookingStatus === BookingStatus.PAID) { 
+          return true; 
+        }
+        return false;
+      })
     );
 
     if (hasActiveEnrollments) {
@@ -291,14 +297,12 @@ export class VendorsService {
       );
     }
 
-    // Archive courses instead of deleting them
-    await this.prisma.course.updateMany({
+    await this.prisma.classPackage.updateMany({
       where: {
         vendorId: userId,
       },
       data: {
-        status: 'ARCHIVED',
-        isPublished: false,
+        status: ClassPackageStatus.ARCHIVED,
       },
     });
 
@@ -359,5 +363,91 @@ export class VendorsService {
   private async uploadImage(file: Express.Multer.File, type: string): Promise<string> {
     const key = `vendors/${type}/${Date.now()}-${file.originalname}`;
     return this.s3Service.uploadFile(file.buffer, key, file.mimetype);
+  }
+
+  async getVendorDashboardData(
+    vendorId: string,
+    filters?: DateRangeFilterDto,
+  ): Promise<VendorDashboardDataDto> {
+    const vendor = await this.prisma.user.findUnique({ where: { id: vendorId } });
+    if (!vendor || vendor.role !== UserRole.VENDOR) {
+      throw new NotFoundException('Vendor not found or user is not a vendor.');
+    }
+
+    // 1. Calculate Pending Payout (To-Date)
+    const pendingPayoutAggregation = await this.prisma.payment.aggregate({
+      _sum: { amount: true },
+      where: {
+        status: PaymentStatus.COMPLETED,
+        isPaidOutToVendor: false,
+        classPackageEnrollment: {
+          classPackage: {
+            vendorId: vendorId,
+          },
+        },
+      },
+    });
+    const pendingPayoutToDate = pendingPayoutAggregation._sum.amount || 0;
+
+    // 2. Calculate Total Payments (In Range)
+    const dateFilter: Prisma.DateTimeFilter = {};
+    if (filters?.startDate) {
+      dateFilter.gte = new Date(filters.startDate);
+    }
+    if (filters?.endDate) {
+      const endDate = new Date(filters.endDate);
+      endDate.setHours(23, 59, 59, 999);
+      dateFilter.lte = endDate;
+    }
+
+    const totalPaymentsInRangeAggregation = await this.prisma.payment.aggregate({
+      _sum: { amount: true },
+      where: {
+        status: PaymentStatus.COMPLETED,
+        createdAt: Object.keys(dateFilter).length > 0 ? dateFilter : undefined,
+        classPackageEnrollment: {
+          classPackage: {
+            vendorId: vendorId,
+          },
+        },
+      },
+    });
+    const totalPaymentsInRange = totalPaymentsInRangeAggregation._sum.amount || 0;
+
+    const metrics: VendorRevenueMetricsDto = {
+      pendingPayoutToDate,
+      totalPaymentsInRange,
+    };
+
+    // 3. Monthly Payment Data for Graph
+    const startDateString = filters?.startDate ? new Date(filters.startDate).toISOString() : new Date(0).toISOString();
+    const endDateString = filters?.endDate
+        ? new Date(new Date(filters.endDate).setHours(23, 59, 59, 999)).toISOString()
+        : new Date().toISOString();
+
+    const monthlyPaymentsRaw: { year_month: string; total_amount: number }[] = await this.prisma.$queryRaw`
+      SELECT
+          to_char(p."createdAt", 'YYYY-MM') as year_month,
+          SUM(p.amount) as total_amount
+      FROM "Payment" p
+      INNER JOIN "ClassPackageEnrollment" cpe ON p."classPackageEnrollmentId" = cpe.id
+      INNER JOIN "ClassPackage" cp ON cpe."classPackageId" = cp.id
+      WHERE p.status = 'COMPLETED'
+      AND cp."vendorId" = ${vendorId}
+      AND p."createdAt" >= ${new Date(startDateString)}::timestamp
+      AND p."createdAt" <= ${new Date(endDateString)}::timestamp
+      GROUP BY year_month
+      ORDER BY year_month ASC;
+    `;
+    
+    const monthlyPayments: MonthlyPaymentDataDto[] = monthlyPaymentsRaw.map(item => ({
+        month: item.year_month,
+        totalAmount: Number(item.total_amount) || 0,
+    }));
+
+    return {
+      metrics,
+      monthlyPayments,
+    };
   }
 } 

@@ -1,4 +1,4 @@
-import { Controller, Post, Put, Delete, Body, UseGuards, Req, UseInterceptors, UploadedFiles } from '@nestjs/common';
+import { Controller, Post, Put, Delete, Body, UseGuards, Req, UseInterceptors, UploadedFiles, Get, Query } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { VendorsService } from './vendors.service';
 import { CreateBusinessProfileInput } from './dto/create-business-profile.input';
@@ -8,14 +8,19 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { DateRangeFilterDto } from '../../admin/dto/date-range-filter.dto';
+import { VendorDashboardDataDto } from './dto/vendor-dashboard-data.dto';
 
+@ApiTags('Vendors')
+@ApiBearerAuth()
 @Controller('vendors')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.VENDOR)
 export class VendorsController {
   constructor(private readonly vendorsService: VendorsService) {}
 
   @Post('business-profile')
+  @Roles(UserRole.VENDOR)
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'logo', maxCount: 1 },
@@ -71,5 +76,19 @@ export class VendorsController {
     @Body() input: DeleteBusinessProfileInput,
   ) {
     return this.vendorsService.deleteBusinessProfile(req.user.id, input);
+  }
+
+  @Get('me/dashboard/revenue')
+  @Roles(UserRole.VENDOR)
+  @ApiOperation({ summary: 'Get revenue dashboard data for the logged-in vendor' })
+  @ApiResponse({ status: 200, description: 'Successfully retrieved vendor revenue dashboard data.', type: VendorDashboardDataDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden resource.' })
+  async getVendorRevenueDashboard(
+    @Req() req,
+    @Query() filters: DateRangeFilterDto,
+  ): Promise<VendorDashboardDataDto> {
+    const vendorId = req.user.id;
+    return this.vendorsService.getVendorDashboardData(vendorId, filters);
   }
 } 

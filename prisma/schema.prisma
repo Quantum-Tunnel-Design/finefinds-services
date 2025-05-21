@@ -8,34 +8,34 @@ datasource db {
 }
 
 model User {
-  id                     String                   @id @default(cuid())
-  email                  String                   @unique
-  password               String? // Nullable for Cognito-managed users where password is not stored locally
-  firstName              String
-  lastName               String
-  phoneNumber            String?
-  secondaryPhoneNumber   String? // For vendors
-  role                   UserRole                 @default(PARENT)
-  cognitoSub             String?                  @unique // For Cognito user identifier
-  isEmailVerified        Boolean                  @default(false)
-  isActive               Boolean                  @default(true)
-  termsAccepted          Boolean?                 @default(false) // For vendors
-  createdAt              DateTime                 @default(now())
-  updatedAt              DateTime                 @updatedAt
-  children               Child[]
-  sessions               Session[]
-  loginAttempts          LoginAttempt[]
-  businessProfile        BusinessProfile?
-  auditLogs              AuditLog[]
-  createdClassPackages   ClassPackage[]           @relation("VendorClassPackages")
-  enrollments            ClassPackageEnrollment[] // Parent's enrollments
-  vendorProfile          VendorProfile? // For VendorProfile.user
-  courses                Course[]                 @relation("VendorCourses") // For Course.vendor
-  courseEnrollments      Enrollment[]             @relation("UserCourseEnrollments") // For old Enrollment.user
-  reviews                Review[]                 // For Review.user
-  payments               Payment[]                // For Payment.user
-  notifications          Notification[]           // For Notification.user
-  savedClassPackages     SavedClassPackage[] // Added for saved classes
+  id                   String                   @id @default(cuid())
+  email                String                   @unique
+  password             String? // Nullable for Cognito-managed users where password is not stored locally
+  firstName            String
+  lastName             String
+  phoneNumber          String?
+  secondaryPhoneNumber String? // For vendors
+  role                 UserRole                 @default(PARENT)
+  cognitoSub           String?                  @unique // For Cognito user identifier
+  isEmailVerified      Boolean                  @default(false)
+  isActive             Boolean                  @default(true)
+  termsAccepted        Boolean?                 @default(false) // For vendors
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  children             Child[]
+  sessions             Session[]
+  loginAttempts        LoginAttempt[]
+  businessProfile      BusinessProfile?
+  auditLogs            AuditLog[]
+  createdClassPackages ClassPackage[]           @relation("VendorClassPackages")
+  enrollments          ClassPackageEnrollment[] // Parent's enrollments
+  vendorProfile        VendorProfile? // For VendorProfile.user
+  courses              Course[]                 @relation("VendorCourses") // For Course.vendor
+  courseEnrollments    Enrollment[]             @relation("UserCourseEnrollments") // For old Enrollment.user
+  reviews              Review[] // For Review.user
+  payments             Payment[] // For Payment.user
+  notifications        Notification[] // For Notification.user
+  savedClassPackages   SavedClassPackage[] // Added for saved classes
 
   @@index([email])
   @@index([cognitoSub])
@@ -118,14 +118,23 @@ model Review {
 }
 
 model Payment {
-  id        String   @id @default(uuid())
-  userId    String
-  amount    Float
-  status    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                       String                  @id @default(cuid()) // Changed from uuid for consistency
+  // userId    String // Assuming payments for vendor revenue are via enrollment
+  // user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  classPackageEnrollmentId String?                 @unique // Each enrollment has one primary payment record, made optional if some payments are not enrollment based
+  classPackageEnrollment   ClassPackageEnrollment? @relation(fields: [classPackageEnrollmentId], references: [id], onDelete: SetNull)
 
+  amount            Float
+  status            PaymentStatus
+  paymentMethod     String? // e.g., "card", "paypal"
+  transactionId     String?       @unique // From payment gateway
+  isPaidOutToVendor Boolean       @default(false) // New field
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  User              User?         @relation(fields: [userId], references: [id])
+  userId            String?
+
+  @@index([classPackageEnrollmentId])
   @@map("payments")
 }
 
@@ -143,16 +152,16 @@ model Notification {
 }
 
 model Child {
-  id            String                   @id @default(cuid())
-  firstName     String
-  lastName      String
-  dateOfBirth   DateTime
-  gender        Gender // Changed from String to Gender enum
-  userId        String
-  user          User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt     DateTime                 @default(now())
-  updatedAt     DateTime                 @updatedAt
-  enrollments   ClassPackageEnrollment[] @relation("EnrolledChildren")
+  id          String                   @id @default(cuid())
+  firstName   String
+  lastName    String
+  dateOfBirth DateTime
+  gender      Gender // Changed from String to Gender enum
+  userId      String
+  user        User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  enrollments ClassPackageEnrollment[] @relation("EnrolledChildren")
 
   @@index([userId])
 }
@@ -229,16 +238,16 @@ model ClassPackage {
   cancellationPolicyType    CancellationPolicyType
   rescheduleDaysBefore      Int?
 
-  categoryId                String
-  category                  Category               @relation(fields: [categoryId], references: [id])
-  ageGroups                 AgeGroup[]             @relation("ClassPackageAgeGroups")
-  tags                      String[]               @db.VarChar(50)
-  scheduleSlots             ScheduleSlot[]
-  enrollments               ClassPackageEnrollment[]
-  savedByUsers              SavedClassPackage[] // Added for users who saved this package
+  categoryId    String
+  category      Category                 @relation(fields: [categoryId], references: [id])
+  ageGroups     AgeGroup[]               @relation("ClassPackageAgeGroups")
+  tags          String[]                 @db.VarChar(50)
+  scheduleSlots ScheduleSlot[]
+  enrollments   ClassPackageEnrollment[]
+  savedByUsers  SavedClassPackage[] // Added for users who saved this package
 
-  createdAt                 DateTime               @default(now())
-  updatedAt                 DateTime               @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([vendorId])
   @@index([categoryId])
@@ -287,24 +296,26 @@ model AuditLog {
 }
 
 model ClassPackageEnrollment {
-  id             String        @id @default(cuid())
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade) // Parent
-  userId         String
-  classPackage   ClassPackage  @relation(fields: [classPackageId], references: [id], onDelete: Cascade)
-  classPackageId String
-  scheduleSlot   ScheduleSlot  @relation(fields: [scheduleSlotId], references: [id], onDelete: Cascade)
-  scheduleSlotId String
-  enrolledChildren Child[]    @relation("EnrolledChildren")
-  bookingStatus  BookingStatus @default(PAID)
-  paymentType    PaymentType   @default(CARD)
-  bookedAt       DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id               String        @id @default(cuid())
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade) // Parent
+  userId           String
+  classPackage     ClassPackage  @relation(fields: [classPackageId], references: [id], onDelete: Cascade)
+  classPackageId   String
+  scheduleSlot     ScheduleSlot  @relation(fields: [scheduleSlotId], references: [id], onDelete: Cascade)
+  scheduleSlotId   String
+  enrolledChildren Child[]       @relation("EnrolledChildren")
+  bookingStatus    BookingStatus @default(PAID)
+  paymentType      PaymentType   @default(CARD) // This might be redundant if Payment model has paymentMethod
+  bookedAt         DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  payment          Payment? // Relation to the payment record for this enrollment
 
   // A user (parent) can book a specific slot once (for potentially multiple children in that booking)
   @@unique([userId, scheduleSlotId])
   @@index([userId])
   @@index([classPackageId])
   @@index([scheduleSlotId])
+  @@map("class_package_enrollments")
 }
 
 model SavedClassPackage {
