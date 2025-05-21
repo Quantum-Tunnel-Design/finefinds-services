@@ -4,12 +4,13 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { User, UserRole, Child } from '@prisma/client';
+import { User, UserRole, Child, Gender as PrismaGender } from '@prisma/client';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CreateChildInput } from './dto/create-child.input';
 import { UpdateChildInput } from './dto/update-child.input';
 import { ChildDto } from './dto/child.dto';
+import { Gender as DtoGender } from './dto/gender.enum';
 
 @ApiTags('users')
 @Controller('users')
@@ -25,7 +26,8 @@ export class UsersController {
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all users' })
   @ApiResponse({ status: 200, description: 'Return all users.' })
@@ -35,7 +37,8 @@ export class UsersController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get a user by id' })
   @ApiResponse({ status: 200, description: 'Return the user.' })
@@ -142,7 +145,7 @@ export class UsersController {
       id: child.id,
       firstName: child.firstName,
       lastName: child.lastName,
-      gender: child.gender,
+      gender: child.gender === PrismaGender.MALE ? DtoGender.MALE : DtoGender.FEMALE,
       dateOfBirth: child.dateOfBirth,
     };
   }
