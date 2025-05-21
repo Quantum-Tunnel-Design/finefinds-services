@@ -34,19 +34,18 @@ export class BookingsService {
     }
 
     if (filters.startDate || filters.endDate) {
-      whereClause.scheduleSlot = {
-        startTime: {},
-      };
+      const startTimeFilter: Prisma.DateTimeFilter = {};
       if (filters.startDate) {
-        // Ensure startTime on or after the beginning of startDate
-        whereClause.scheduleSlot.startTime.gte = new Date(filters.startDate);
+        startTimeFilter.gte = new Date(filters.startDate);
       }
       if (filters.endDate) {
-        // Ensure startTime on or before the end of endDate
         const endDate = new Date(filters.endDate);
         endDate.setHours(23, 59, 59, 999); // Set to end of day
-        whereClause.scheduleSlot.startTime.lte = endDate;
+        startTimeFilter.lte = endDate;
       }
+      whereClause.scheduleSlot = {
+        startTime: startTimeFilter,
+      };
     }
 
     const enrollments = await this.prisma.classPackageEnrollment.findMany({
@@ -99,10 +98,12 @@ export class BookingsService {
         where: { id: scheduleSlotId },
         include: {
             _count: {
-                select: { enrollments: true } // Counts total enrollment records for this slot
+                select: { enrollments: true } // Total enrollment records for this slot
             },
-            enrollments: { // Fetches all enrollments to sum up children
-                select: { enrolledChildren: { select: { _count: true } } }
+            enrollments: { // Fetches all enrollments to sum up children for this slot
+                select: {
+                    _count: { select: { enrolledChildren: true } } // Count of children for each enrollment
+                }
             }
         }
     });
@@ -113,7 +114,7 @@ export class BookingsService {
 
     let currentlyBookedChildren = 0;
     slot.enrollments.forEach(enrollment => {
-        currentlyBookedChildren += enrollment.enrolledChildren._count;
+        currentlyBookedChildren += enrollment._count.enrolledChildren;
     });
 
     const availableSpots = slot.availableSlots - currentlyBookedChildren;

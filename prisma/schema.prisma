@@ -280,19 +280,38 @@ model LoginAttempt {
 }
 
 model AuditLog {
-  id             String   @id @default(uuid())
+  id             String             @id @default(uuid())
   userId         String
-  action         String
-  entityType     String
+  action         AuditLogAction
+  entityType     AuditLogEntityType
   entityId       String
   changes        Json
   previousValues Json
-  createdAt      DateTime @default(now())
-  user           User     @relation(fields: [userId], references: [id])
+  createdAt      DateTime           @default(now())
+  user           User               @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+enum AuditLogAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  VIEW // Example action
+}
+
+enum AuditLogEntityType {
+  USER
+  VENDOR_PROFILE
+  BUSINESS_PROFILE
+  CLASS_PACKAGE
+  ORDER
+  PAYMENT
+  // Add other relevant entity types
 }
 
 model ClassPackageEnrollment {

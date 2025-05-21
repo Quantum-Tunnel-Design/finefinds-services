@@ -35,6 +35,7 @@ export class AuditService {
         action: AuditLogAction.DELETE,
         entityType: AuditLogEntityType.BUSINESS_PROFILE,
         entityId,
+        changes: {},
         previousValues: deletedData,
       },
     });
