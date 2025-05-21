@@ -6,6 +6,7 @@ import * as compression from 'compression';
 import { WinstonModule } from 'nest-winston';
 import * as winston from 'winston';
 import { ConfigService } from '@nestjs/config';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -50,9 +51,32 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api');
 
+  // Swagger configuration
+  const config = new DocumentBuilder()
+    .setTitle('FineFinds API')
+    .setDescription('The FineFinds Education Platform API documentation')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .addTag('auth', 'Authentication endpoints')
+    .addTag('users', 'User management endpoints')
+    .addTag('courses', 'Course management endpoints')
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      docExpansion: 'none',
+      filter: true,
+      showRequestDuration: true,
+    },
+    customSiteTitle: 'FineFinds API Documentation',
+  });
+
   const port = configService.get('PORT', 3000);
   await app.listen(port);
   logger.log(`Application is running on: http://localhost:${port}`);
+  logger.log(`Swagger documentation is available at: http://localhost:${port}/api/docs`);
 }
 
 bootstrap(); 
