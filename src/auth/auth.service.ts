@@ -9,6 +9,7 @@ import {
   ConfirmForgotPasswordCommand,
   GetUserCommand,
   GlobalSignOutCommand,
+  AdminAddUserToGroupCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { UsersService } from '../users/users.service';
 import { SignUpInput } from './dto/sign-up.input';
@@ -110,6 +111,20 @@ export class AuthService {
         expiresAt
       );
 
+      // Get user groups from Cognito
+      const getUserCommand = new GetUserCommand({
+        AccessToken: response.AuthenticationResult.AccessToken,
+      });
+
+      const cognitoUser = await this.cognitoClient.send(getUserCommand);
+      const groups = cognitoUser.UserAttributes?.find(attr => attr.Name === 'custom:groups')?.Value?.split(',') || [];
+
+      // Update user role if needed
+      if (groups.includes('parent') && user.role !== UserRole.PARENT) {
+        await this.usersService.update(user.id, { role: UserRole.PARENT });
+        user.role = UserRole.PARENT;
+      }
+
       return {
         accessToken: response.AuthenticationResult.AccessToken,
         idToken: response.AuthenticationResult.IdToken,
@@ -191,14 +206,14 @@ export class AuthService {
         throw new BadRequestException('Passwords do not match');
       }
 
-      // Validate terms acceptance
-      if (!input.termsAccepted) {
-        throw new BadRequestException('Terms and conditions must be accepted');
-      }
-
       // Validate at least one child
       if (!input.children || input.children.length === 0) {
         throw new BadRequestException('At least one child is required');
+      }
+
+      // Validate maximum number of children
+      if (input.children.length > 10) {
+        throw new BadRequestException('Maximum 10 children allowed');
       }
 
       // Validate date of birth is not in the future
@@ -207,6 +222,12 @@ export class AuthService {
         if (child.dateOfBirth > now) {
           throw new BadRequestException('Date of birth cannot be in the future');
         }
+      }
+
+      // Check if email already exists
+      const existingUser = await this.usersService.findByEmail(input.email);
+      if (existingUser) {
+        throw new BadRequestException('Email already registered');
       }
 
       // Create Cognito user
@@ -225,6 +246,15 @@ export class AuthService {
 
       const cognitoResponse = await this.cognitoClient.send(signUpCommand);
 
+      // Add user to parent group
+      const addToGroupCommand = new AdminAddUserToGroupCommand({
+        UserPoolId: this.userPoolId,
+        Username: input.email,
+        GroupName: 'parent',
+      });
+
+      await this.cognitoClient.send(addToGroupCommand);
+
       // Create user in database with children
       await this.usersService.create({
         email: input.email,
@@ -232,6 +262,7 @@ export class AuthService {
         lastName: input.lastName,
         role: UserRole.PARENT,
         cognitoSub: cognitoResponse.UserSub,
+        phoneNumber: input.phoneNumber,
         children: input.children.map(child => ({
           firstName: child.firstName,
           lastName: child.lastName,

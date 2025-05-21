@@ -6,6 +6,7 @@ import { SignInInput } from './dto/sign-in.input';
 import { ConfirmSignUpInput } from './dto/confirm-sign-up.input';
 import { ForgotPasswordInput } from './dto/forgot-password.input';
 import { ResetPasswordInput } from './dto/reset-password.input';
+import { ParentSignUpInput } from './dto/parent-sign-up.input';
 import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -19,6 +20,11 @@ export class AuthResolver {
   @Mutation(() => AuthResponse)
   async signUp(@Args('input') input: SignUpInput): Promise<AuthResponse> {
     return this.authService.signUp(input);
+  }
+
+  @Mutation(() => AuthResponse)
+  async parentSignUp(@Args('input') input: ParentSignUpInput): Promise<AuthResponse> {
+    return this.authService.parentSignUp(input);
   }
 
   @Mutation(() => AuthResponse)

@@ -37,7 +37,8 @@ export class UsersService {
     firstName: string;
     lastName: string;
     role: UserRole;
-    cognitoSub: string; // Changed from cognitoId
+    cognitoSub: string;
+    phoneNumber?: string;
     children?: {
       firstName: string;
       lastName: string;
@@ -52,6 +53,7 @@ export class UsersService {
         lastName: data.lastName,
         role: data.role,
         cognitoSub: data.cognitoSub,
+        phoneNumber: data.phoneNumber,
         children: data.children ? {
           create: data.children.map(child => ({
             firstName: child.firstName,
