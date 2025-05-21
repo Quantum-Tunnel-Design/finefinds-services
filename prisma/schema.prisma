@@ -29,6 +29,7 @@ model User {
   loginAttempts LoginAttempt[]
   auditLogs     AuditLog[]
   createdClassPackages ClassPackage[]
+  classPackageEnrollments ClassPackageEnrollment[]
 
   @@map("users")
 }
@@ -224,6 +225,7 @@ model ClassPackage {
   ageGroups                 AgeGroup[]             @relation("ClassPackageAgeGroups")
   tags                      String[]               @db.VarChar(50)
   scheduleSlots             ScheduleSlot[]
+  enrollments               ClassPackageEnrollment[]
 
   createdAt                 DateTime               @default(now())
   updatedAt                 DateTime               @updatedAt
@@ -271,6 +273,22 @@ model AuditLog {
   @@index([userId])
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+model ClassPackageEnrollment {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  classPackageId String
+  classPackage   ClassPackage @relation(fields: [classPackageId], references: [id], onDelete: Cascade)
+  status         EnrollmentStatus @default(PENDING)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, classPackageId])
+  @@index([userId])
+  @@index([classPackageId])
+  @@map("class_package_enrollments")
 }
 
 enum UserRole {

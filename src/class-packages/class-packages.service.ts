@@ -83,7 +83,7 @@ export class ClassPackagesService {
   ): Promise<ClassPackage> {
     const existingPackage = await this.prisma.classPackage.findUnique({
       where: { id: classPackageId },
-      include: { vendor: true, scheduleSlots: true, category: true, ageGroups: true },
+      include: { vendor: true, scheduleSlots: true, category: true, ageGroups: true, enrollments: true },
     });
 
     if (!existingPackage) {
@@ -110,6 +110,9 @@ export class ClassPackagesService {
     }
 
     if (input.scheduleSlots) {
+        if (existingPackage.enrollments && existingPackage.enrollments.length > 0) {
+            throw new ForbiddenException('Cannot update schedules for a class package with active enrollments.');
+        }
         input.scheduleSlots.forEach(slot => {
             if (new Date(slot.endTime) <= new Date(slot.startTime)) {
                 throw new BadRequestException('Schedule slot end time must be after start time.');
@@ -198,7 +201,7 @@ export class ClassPackagesService {
   async deleteClassPackage(vendorId: string, classPackageId: string): Promise<{ message: string }> {
     const classPackage = await this.prisma.classPackage.findUnique({
       where: { id: classPackageId },
-      include: { vendor: true }, 
+      include: { vendor: true, enrollments: true },
     });
 
     if (!classPackage) {
@@ -209,6 +212,11 @@ export class ClassPackagesService {
       throw new ForbiddenException('You are not authorized to delete this class package.');
     }
 
+    if (classPackage.enrollments && classPackage.enrollments.length > 0) {
+      throw new ForbiddenException('Cannot delete class package with active enrollments. Please contact support if you need to archive it.');
+    }
+
+    await this.prisma.scheduleSlot.deleteMany({ where: { classPackageId } });
     await this.prisma.classPackage.delete({ where: { id: classPackageId } });
     
     return { message: 'Class package deleted successfully' };
