@@ -489,59 +489,6 @@ jobs:
           aws-region: ${{ env.aws_region }}
           role-duration-seconds: 3600
 
-      - name: Get VPC and Subnet Information
-        id: vpc_info
-        run: |
-          echo "::group::Fetching VPC and Subnet Information"
-          
-          # Get the VPC ID for the environment
-          vpc_id=$(aws ec2 describe-vpcs \
-            --filters "Name=tag:Environment,Values=${{ env.services_env }}" \
-            --query 'Vpcs[0].VpcId' \
-            --output text)
-            
-          if [ -z "$vpc_id" ] || [ "$vpc_id" == "None" ]; then
-            echo "::error::Could not find VPC for environment ${{ env.services_env }}"
-            exit 1
-          fi
-          
-          echo "Found VPC: $vpc_id"
-          
-          # Get private subnets in the VPC
-          subnet_ids=$(aws ec2 describe-subnets \
-            --filters "Name=vpc-id,Values=$vpc_id" "Name=tag:Type,Values=private" \
-            --query 'Subnets[*].SubnetId' \
-            --output text)
-            
-          if [ -z "$subnet_ids" ]; then
-            echo "::error::Could not find private subnets in VPC $vpc_id"
-            exit 1
-          fi
-          
-          # Convert space-separated list to comma-separated
-          subnet_ids=$(echo $subnet_ids | tr ' ' ',')
-          echo "Found subnets: $subnet_ids"
-          
-          # Get security group for the ECS service
-          security_group_id=$(aws ec2 describe-security-groups \
-            --filters "Name=vpc-id,Values=$vpc_id" "Name=tag:Name,Values=finefinds-${{ env.services_env }}-ecs-sg" \
-            --query 'SecurityGroups[0].GroupId' \
-            --output text)
-            
-          if [ -z "$security_group_id" ] || [ "$security_group_id" == "None" ]; then
-            echo "::error::Could not find security group for environment ${{ env.services_env }}"
-            exit 1
-          fi
-          
-          echo "Found security group: $security_group_id"
-          
-          # Output the values for use in subsequent steps
-          echo "subnet_ids=$subnet_ids" >> $GITHUB_OUTPUT
-          echo "security_group_id=$security_group_id" >> $GITHUB_OUTPUT
-          
-          echo "✓ Successfully retrieved VPC and subnet information"
-          echo "::endgroup::"
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -810,7 +757,6 @@ jobs:
               --task-definition "$task_def" \
               --desired-count 1 \
               --launch-type FARGATE \
-              --network-configuration "awsvpcConfiguration={subnets=[${{ steps.vpc_info.outputs.subnet_ids }}],securityGroups=[${{ steps.vpc_info.outputs.security_group_id }}],assignPublicIp=DISABLED}" \
               --service-registries "registryArn=arn:aws:servicediscovery:${{ env.aws_region }}:${{ secrets.AWS_ACCOUNT_ID }}:service/${{ env.services_env }}-service-discovery" || {
                 log "ERROR" "Failed to create ECS service"
                 return 1
@@ -934,59 +880,6 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }}
           aws-region: ${{ env.aws_region }}
           role-duration-seconds: 3600
-
-      - name: Get VPC and Subnet Information
-        id: vpc_info
-        run: |
-          echo "::group::Fetching VPC and Subnet Information"
-          
-          # Get the VPC ID for the environment
-          vpc_id=$(aws ec2 describe-vpcs \
-            --filters "Name=tag:Environment,Values=${{ env.services_env }}" \
-            --query 'Vpcs[0].VpcId' \
-            --output text)
-            
-          if [ -z "$vpc_id" ] || [ "$vpc_id" == "None" ]; then
-            echo "::error::Could not find VPC for environment ${{ env.services_env }}"
-            exit 1
-          fi
-          
-          echo "Found VPC: $vpc_id"
-          
-          # Get private subnets in the VPC
-          subnet_ids=$(aws ec2 describe-subnets \
-            --filters "Name=vpc-id,Values=$vpc_id" "Name=tag:Type,Values=private" \
-            --query 'Subnets[*].SubnetId' \
-            --output text)
-            
-          if [ -z "$subnet_ids" ]; then
-            echo "::error::Could not find private subnets in VPC $vpc_id"
-            exit 1
-          fi
-          
-          # Convert space-separated list to comma-separated
-          subnet_ids=$(echo $subnet_ids | tr ' ' ',')
-          echo "Found subnets: $subnet_ids"
-          
-          # Get security group for the ECS service
-          security_group_id=$(aws ec2 describe-security-groups \
-            --filters "Name=vpc-id,Values=$vpc_id" "Name=tag:Name,Values=finefinds-${{ env.services_env }}-ecs-sg" \
-            --query 'SecurityGroups[0].GroupId' \
-            --output text)
-            
-          if [ -z "$security_group_id" ] || [ "$security_group_id" == "None" ]; then
-            echo "::error::Could not find security group for environment ${{ env.services_env }}"
-            exit 1
-          fi
-          
-          echo "Found security group: $security_group_id"
-          
-          # Output the values for use in subsequent steps
-          echo "subnet_ids=$subnet_ids" >> $GITHUB_OUTPUT
-          echo "security_group_id=$security_group_id" >> $GITHUB_OUTPUT
-          
-          echo "✓ Successfully retrieved VPC and subnet information"
-          echo "::endgroup::"
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -1461,7 +1354,6 @@ jobs:
               --task-definition "$task_def" \
               --desired-count 1 \
               --launch-type FARGATE \
-              --network-configuration "awsvpcConfiguration={subnets=[${{ steps.vpc_info.outputs.subnet_ids }}],securityGroups=[${{ steps.vpc_info.outputs.security_group_id }}],assignPublicIp=DISABLED}" \
               --service-registries "registryArn=arn:aws:servicediscovery:${{ env.aws_region }}:${{ secrets.AWS_ACCOUNT_ID }}:service/${{ env.services_env }}-service-discovery" || {
                 log "ERROR" "Failed to create ECS service"
                 return 1
@@ -1586,59 +1478,6 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }}
           aws-region: ${{ env.aws_region }}
           role-duration-seconds: 3600
-
-      - name: Get VPC and Subnet Information
-        id: vpc_info
-        run: |
-          echo "::group::Fetching VPC and Subnet Information"
-          
-          # Get the VPC ID for the environment
-          vpc_id=$(aws ec2 describe-vpcs \
-            --filters "Name=tag:Environment,Values=${{ env.services_env }}" \
-            --query 'Vpcs[0].VpcId' \
-            --output text)
-            
-          if [ -z "$vpc_id" ] || [ "$vpc_id" == "None" ]; then
-            echo "::error::Could not find VPC for environment ${{ env.services_env }}"
-            exit 1
-          fi
-          
-          echo "Found VPC: $vpc_id"
-          
-          # Get private subnets in the VPC
-          subnet_ids=$(aws ec2 describe-subnets \
-            --filters "Name=vpc-id,Values=$vpc_id" "Name=tag:Type,Values=private" \
-            --query 'Subnets[*].SubnetId' \
-            --output text)
-            
-          if [ -z "$subnet_ids" ]; then
-            echo "::error::Could not find private subnets in VPC $vpc_id"
-            exit 1
-          fi
-          
-          # Convert space-separated list to comma-separated
-          subnet_ids=$(echo $subnet_ids | tr ' ' ',')
-          echo "Found subnets: $subnet_ids"
-          
-          # Get security group for the ECS service
-          security_group_id=$(aws ec2 describe-security-groups \
-            --filters "Name=vpc-id,Values=$vpc_id" "Name=tag:Name,Values=finefinds-${{ env.services_env }}-ecs-sg" \
-            --query 'SecurityGroups[0].GroupId' \
-            --output text)
-            
-          if [ -z "$security_group_id" ] || [ "$security_group_id" == "None" ]; then
-            echo "::error::Could not find security group for environment ${{ env.services_env }}"
-            exit 1
-          fi
-          
-          echo "Found security group: $security_group_id"
-          
-          # Output the values for use in subsequent steps
-          echo "subnet_ids=$subnet_ids" >> $GITHUB_OUTPUT
-          echo "security_group_id=$security_group_id" >> $GITHUB_OUTPUT
-          
-          echo "✓ Successfully retrieved VPC and subnet information"
-          echo "::endgroup::"
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -2113,7 +1952,6 @@ jobs:
               --task-definition "$task_def" \
               --desired-count 1 \
               --launch-type FARGATE \
-              --network-configuration "awsvpcConfiguration={subnets=[${{ steps.vpc_info.outputs.subnet_ids }}],securityGroups=[${{ steps.vpc_info.outputs.security_group_id }}],assignPublicIp=DISABLED}" \
               --service-registries "registryArn=arn:aws:servicediscovery:${{ env.aws_region }}:${{ secrets.AWS_ACCOUNT_ID }}:service/${{ env.services_env }}-service-discovery" || {
                 log "ERROR" "Failed to create ECS service"
                 return 1
@@ -2529,59 +2367,6 @@ jobs:
           fi
           
           echo "Deployment completed successfully"
-
-      - name: Get VPC and Subnet Information
-        id: vpc_info
-        run: |
-          echo "::group::Fetching VPC and Subnet Information"
-          
-          # Get the VPC ID for the environment
-          vpc_id=$(aws ec2 describe-vpcs \
-            --filters "Name=tag:Environment,Values=${{ env.services_env }}" \
-            --query 'Vpcs[0].VpcId' \
-            --output text)
-            
-          if [ -z "$vpc_id" ] || [ "$vpc_id" == "None" ]; then
-            echo "::error::Could not find VPC for environment ${{ env.services_env }}"
-            exit 1
-          fi
-          
-          echo "Found VPC: $vpc_id"
-          
-          # Get private subnets in the VPC
-          subnet_ids=$(aws ec2 describe-subnets \
-            --filters "Name=vpc-id,Values=$vpc_id" "Name=tag:Type,Values=private" \
-            --query 'Subnets[*].SubnetId' \
-            --output text)
-            
-          if [ -z "$subnet_ids" ]; then
-            echo "::error::Could not find private subnets in VPC $vpc_id"
-            exit 1
-          fi
-          
-          # Convert space-separated list to comma-separated
-          subnet_ids=$(echo $subnet_ids | tr ' ' ',')
-          echo "Found subnets: $subnet_ids"
-          
-          # Get security group for the ECS service
-          security_group_id=$(aws ec2 describe-security-groups \
-            --filters "Name=vpc-id,Values=$vpc_id" "Name=tag:Name,Values=finefinds-${{ env.services_env }}-ecs-sg" \
-            --query 'SecurityGroups[0].GroupId' \
-            --output text)
-            
-          if [ -z "$security_group_id" ] || [ "$security_group_id" == "None" ]; then
-            echo "::error::Could not find security group for environment ${{ env.services_env }}"
-            exit 1
-          fi
-          
-          echo "Found security group: $security_group_id"
-          
-          # Output the values for use in subsequent steps
-          echo "subnet_ids=$subnet_ids" >> $GITHUB_OUTPUT
-          echo "security_group_id=$security_group_id" >> $GITHUB_OUTPUT
-          
-          echo "✓ Successfully retrieved VPC and subnet information"
-          echo "::endgroup::"
 
   notify:
     needs: [deploy-sandbox, deploy-dev, deploy-qa, deploy-staging, deploy-prod]
