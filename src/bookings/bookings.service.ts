@@ -3,8 +3,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BookingFilterInput } from './dto/booking-filter.input';
 import { BookingDetailsDto } from './dto/booking-details.dto';
 import { ChildBookingDetailDto } from './dto/child-booking-detail.dto';
-import { UserRole, Prisma } from '@prisma/client'; // Prisma might be needed for types
+import { UserRole, Prisma } from '@prisma/client'; // Removed BookingStatus, PaymentType
 import { format } from 'date-fns'; // For date and time formatting
+import { ParentBookingDetailsDto } from './dto/parent-booking-details.dto'; // Added
 
 @Injectable()
 export class BookingsService {
@@ -117,5 +118,81 @@ export class BookingsService {
 
     const availableSpots = slot.availableSlots - currentlyBookedChildren;
     return availableSpots >= numberOfChildrenToBook;
+  }
+
+  async getParentBookings(
+    parentId: string,
+    filterType: 'upcoming' | 'past',
+  ): Promise<ParentBookingDetailsDto[]> {
+    const parent = await this.prisma.user.findUnique({
+      where: { id: parentId },
+    });
+
+    if (!parent || parent.role !== UserRole.PARENT) {
+      throw new NotFoundException('Parent not found or user is not a parent.');
+    }
+
+    const now = new Date();
+    const whereClause: Prisma.ClassPackageEnrollmentWhereInput = {
+      userId: parentId,
+      scheduleSlot: {
+        startTime: filterType === 'upcoming' ? { gte: now } : { lt: now },
+      },
+    };
+
+    const enrollments = await this.prisma.classPackageEnrollment.findMany({
+      where: whereClause,
+      include: {
+        classPackage: {
+          include: {
+            vendor: {
+              include: {
+                businessProfile: true, // To get vendor name and location
+              },
+            },
+          },
+        },
+        scheduleSlot: true,
+        enrolledChildren: true,
+      },
+      orderBy: {
+        scheduleSlot: {
+          startTime: filterType === 'upcoming' ? 'asc' : 'desc',
+        },
+      },
+    });
+
+    return enrollments.map((enrollment) => {
+      const classPackage = enrollment.classPackage;
+      const vendor = classPackage.vendor;
+      const scheduleSlot = enrollment.scheduleSlot;
+
+      const childrenDetails: ChildBookingDetailDto[] =
+        enrollment.enrolledChildren.map((child) => ({
+          firstName: child.firstName,
+          lastName: child.lastName,
+          dateOfBirth: child.dateOfBirth,
+        }));
+      
+      let vendorName = `${vendor.firstName} ${vendor.lastName}`;
+      if (vendor.businessProfile && vendor.businessProfile.businessName) {
+        vendorName = vendor.businessProfile.businessName;
+      }
+
+      return {
+        bookingId: enrollment.id,
+        classPackageName: classPackage.name,
+        classPackageId: classPackage.id,
+        vendorName: vendorName,
+        vendorId: vendor.id,
+        enrolledChildren: childrenDetails,
+        bookedDate: format(new Date(scheduleSlot.startTime), 'yyyy-MM-dd'),
+        bookedTimeSlot: `${format(new Date(scheduleSlot.startTime), 'p')} - ${format(new Date(scheduleSlot.endTime), 'p')}`,
+        location: vendor.businessProfile?.location || 'Location not available',
+        bookingStatus: enrollment.bookingStatus,
+        paymentType: enrollment.paymentType,
+        scheduleSlotId: scheduleSlot.id,
+      };
+    });
   }
 } 

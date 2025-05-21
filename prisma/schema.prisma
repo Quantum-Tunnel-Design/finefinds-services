@@ -29,6 +29,12 @@ model User {
   auditLogs              AuditLog[]
   createdClassPackages   ClassPackage[]           @relation("VendorClassPackages")
   enrollments            ClassPackageEnrollment[] // Parent's enrollments
+  vendorProfile          VendorProfile? // For VendorProfile.user
+  courses                Course[]                 @relation("VendorCourses") // For Course.vendor
+  courseEnrollments      Enrollment[]             @relation("UserCourseEnrollments") // For old Enrollment.user
+  reviews                Review[]                 // For Review.user
+  payments               Payment[]                // For Payment.user
+  notifications          Notification[]           // For Notification.user
 
   @@index([email])
   @@index([cognitoSub])
@@ -44,7 +50,7 @@ model VendorProfile {
   approved      Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  user          User     @relation(fields: [userId], references: [id])
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("vendor_profiles")
 }
@@ -61,7 +67,7 @@ model Course {
   vendorId    String
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
-  vendor      User         @relation("VendorCourses", fields: [vendorId], references: [id])
+  vendor      User         @relation("VendorCourses", fields: [vendorId], references: [id], onDelete: Cascade)
   enrollments Enrollment[]
   reviews     Review[]
   schedules   Schedule[]
@@ -76,8 +82,8 @@ model Enrollment {
   status    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  course    Course   @relation(fields: [courseId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user      User     @relation("UserCourseEnrollments", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, courseId])
   @@map("enrollments")
@@ -103,8 +109,8 @@ model Review {
   comment   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  course    Course   @relation(fields: [courseId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, courseId])
   @@map("reviews")
@@ -117,7 +123,7 @@ model Payment {
   status    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("payments")
 }
@@ -130,7 +136,7 @@ model Notification {
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
 }
@@ -157,6 +163,7 @@ model Session {
   expiresAt DateTime
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([token])
@@ -211,7 +218,7 @@ model Category {
 model ClassPackage {
   id                        String                 @id @default(cuid())
   vendorId                  String
-  vendor                    User                   @relation(fields: [vendorId], references: [id])
+  vendor                    User                   @relation("VendorClassPackages", fields: [vendorId], references: [id], onDelete: Cascade)
   name                      String                 @db.VarChar(100)
   description               String                 @db.Text
   beforeYouComeInstructions String                 @db.Text

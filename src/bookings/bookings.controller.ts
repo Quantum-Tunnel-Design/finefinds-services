@@ -1,5 +1,5 @@
-import { Controller, Get, Query, UseGuards, Req } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, Query, UseGuards, Req, ValidationPipe, ParseEnumPipe } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { BookingsService } from './bookings.service';
 import { BookingFilterInput } from './dto/booking-filter.input';
 import { BookingDetailsDto } from './dto/booking-details.dto';
@@ -7,6 +7,13 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; // Assuming you have a JWT guard
+import { ParentBookingDetailsDto } from './dto/parent-booking-details.dto'; // Added
+
+// Enum for query param validation
+export enum ParentBookingType {
+  UPCOMING = 'upcoming',
+  PAST = 'past',
+}
 
 @ApiTags('Bookings')
 @ApiBearerAuth()
@@ -27,5 +34,20 @@ export class BookingsController {
   ): Promise<BookingDetailsDto[]> {
     const vendorId = req.user.id; // Assuming user ID is stored in req.user by JwtAuthGuard
     return this.bookingsService.getVendorBookings(vendorId, filters);
+  }
+
+  @Get('my-bookings')
+  @Roles(UserRole.PARENT)
+  @ApiOperation({ summary: 'Get bookings for the logged-in parent' })
+  @ApiQuery({ name: 'type', enum: ParentBookingType, required: true, description: "Filter for 'upcoming' or 'past' bookings" })
+  @ApiResponse({ status: 200, description: 'Successfully retrieved parent bookings.', type: [ParentBookingDetailsDto] })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden resource. Only parents can access their bookings.' })
+  async getParentBookings(
+    @Req() req,
+    @Query('type', new ParseEnumPipe(ParentBookingType)) type: ParentBookingType,
+  ): Promise<ParentBookingDetailsDto[]> {
+    const parentId = req.user.id;
+    return this.bookingsService.getParentBookings(parentId, type);
   }
 } 
