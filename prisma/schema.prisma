@@ -28,6 +28,7 @@ model User {
   businessProfile BusinessProfile?
   loginAttempts LoginAttempt[]
   auditLogs     AuditLog[]
+  createdClassPackages ClassPackage[]
 
   @@map("users")
 }
@@ -185,6 +186,66 @@ model BusinessProfile {
   @@index([userId])
 }
 
+model AgeGroup {
+  id            String         @id @default(cuid())
+  name          String         @unique @db.VarChar(50)
+  classPackages ClassPackage[] @relation("ClassPackageAgeGroups")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@map("age_groups")
+}
+
+model Category {
+  id            String         @id @default(cuid())
+  name          String         @unique @db.VarChar(100)
+  classPackages ClassPackage[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@map("categories")
+}
+
+model ClassPackage {
+  id                        String                 @id @default(cuid())
+  vendorId                  String
+  vendor                    User                   @relation(fields: [vendorId], references: [id])
+  name                      String                 @db.VarChar(100)
+  description               String                 @db.Text
+  beforeYouComeInstructions String                 @db.Text
+  pricePerChild             Float
+  coverImageUrl             String?                @db.VarChar(255)
+  status                    ClassPackageStatus     @default(DRAFT)
+  cancellationPolicyType    CancellationPolicyType
+  rescheduleDaysBefore      Int?
+
+  categoryId                String
+  category                  Category               @relation(fields: [categoryId], references: [id])
+  ageGroups                 AgeGroup[]             @relation("ClassPackageAgeGroups")
+  tags                      String[]               @db.VarChar(50)
+  scheduleSlots             ScheduleSlot[]
+
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
+
+  @@index([vendorId])
+  @@index([categoryId])
+  @@map("class_packages")
+}
+
+model ScheduleSlot {
+  id             String       @id @default(cuid())
+  classPackageId String
+  classPackage   ClassPackage @relation(fields: [classPackageId], references: [id], onDelete: Cascade)
+  startTime      DateTime
+  endTime        DateTime
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([classPackageId])
+  @@map("schedule_slots")
+}
+
 model LoginAttempt {
   id        String   @id @default(uuid())
   userId    String
@@ -243,4 +304,15 @@ enum CourseLevel {
   BEGINNER
   INTERMEDIATE
   ADVANCED
+}
+
+enum ClassPackageStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum CancellationPolicyType {
+  FIXED_COMMITMENT
+  FLEXIBLE_RESCHEDULING
 }
