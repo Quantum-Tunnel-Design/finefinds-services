@@ -5,10 +5,14 @@ import { VendorProfile } from './models/vendor-profile.model';
 import { CreateVendorProfileDto } from './dto/create-vendor-profile.dto';
 import { UpdateVendorProfileDto } from './dto/update-vendor-profile.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from './guards/roles.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User, UserRole } from '@prisma/client';
-import { Roles } from './guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { VendorDashboardDataDto } from './dto/vendor-dashboard-data.dto';
+import { DateRangeFilterDto } from '../admin/dto/date-range-filter.dto';
+import { DeleteBusinessProfileInput } from './dto/delete-business-profile.input';
+import { OperationStatusDto } from '../common/dto/operation-status.dto';
 
 @Resolver(() => VendorProfile)
 export class VendorsResolver {
@@ -56,5 +60,27 @@ export class VendorsResolver {
   @Roles(UserRole.ADMIN)
   async listVendors(@CurrentUser() user: User) {
     return this.vendorsService.listVendorProfiles(user);
+  }
+
+  @Query(() => VendorDashboardDataDto, { name: 'myVendorDashboardRevenue' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR)
+  async getMyVendorDashboardRevenue(
+    @CurrentUser() user: User,
+    @Args('filters', { type: () => DateRangeFilterDto, nullable: true })
+    filters?: DateRangeFilterDto,
+  ): Promise<VendorDashboardDataDto> {
+    return this.vendorsService.getVendorDashboardData(user.id, filters);
+  }
+
+  @Mutation(() => OperationStatusDto, { name: 'deleteMyBusinessProfile' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR)
+  async deleteMyBusinessProfile(
+    @CurrentUser() user: User,
+    @Args('input') input: DeleteBusinessProfileInput,
+  ): Promise<OperationStatusDto> {
+    await this.vendorsService.deleteBusinessProfile(user.id, input);
+    return { success: true, message: 'Business profile deleted successfully.' };
   }
 } 

@@ -59,30 +59,9 @@ export class ClassPackagesController {
     );
   }
 
-  @Get('vendor') // Get all packages for the logged-in vendor
-  @Roles(UserRole.VENDOR)
-  async getVendorClassPackages(@Req() req): Promise<ClassPackage[]> {
-    return this.classPackagesService.findVendorClassPackages(req.user.id);
-  }
+  // Removed getVendorClassPackages (GET /vendor) - Migrated to GraphQL query myClassPackages
 
-  @Get(':id') // Get a specific package, accessible by owner vendor or any authenticated user (for public view)
-  @UseGuards(JwtAuthGuard) // Ensures user is authenticated, role check is inside service if needed
-  async getClassPackage(
-    @Req() req,
-    @Param('id', ParseUUIDPipe) id: string
-): Promise<ClassPackage> {
-    // If the user is a vendor, we pass their ID to check ownership for potentially sensitive data
-    // Otherwise, for public viewing, vendorId might be undefined or handled in service
-    const vendorId = req.user.role === UserRole.VENDOR ? req.user.id : undefined;
-    return this.classPackagesService.findOneClassPackage(id, vendorId);
-  }
-
-  @Delete(':id')
-  @Roles(UserRole.VENDOR)
-  async deleteClassPackage(
-    @Req() req,
-    @Param('id', ParseUUIDPipe) classPackageId: string,
-  ): Promise<{ message: string }> {
-    return this.classPackagesService.deleteClassPackage(req.user.id, classPackageId);
-  }
+  // Removed getClassPackage (GET /:id) - Migrated to GraphQL query classPackage(id)
+  
+  // Removed deleteClassPackage (DELETE /:id) - Migrated to GraphQL mutation deleteMyClassPackage(id)
 } 

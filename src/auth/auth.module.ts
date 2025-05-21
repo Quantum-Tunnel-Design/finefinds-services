@@ -10,7 +10,8 @@ import { AuthResolver } from './auth.resolver';
 import { CognitoClientStrategy } from './strategies/cognito-client.strategy';
 import { CognitoAdminStrategy } from './strategies/cognito-admin.strategy';
 import { UsersModule } from '../users/users.module';
-import { AuthController } from './auth.controller';
+// AuthController is no longer used and can be removed or its import commented out
+// import { AuthController } from './auth.controller'; 
 import { SessionService } from './session.service';
 import cognitoConfig from './cognito.config';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -56,7 +57,7 @@ import { RolesGuard } from './guards/roles.guard';
     SessionService,
     RolesGuard,
   ],
-  controllers: [AuthController],
+  // controllers: [AuthController], // AuthController removed as it's now empty
   exports: [AuthService, SessionService],
 })
 export class AuthModule {} 

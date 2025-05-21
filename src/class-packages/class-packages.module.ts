@@ -5,11 +5,12 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { S3Module } from '../s3/s3.module';
 import { AuthModule } from '../auth/auth.module';
 import { AuditModule } from '../audit/audit.module';
+import { ClassPackagesResolver } from './class-packages.resolver';
 
 @Module({
   imports: [PrismaModule, S3Module, AuthModule, AuditModule],
   controllers: [ClassPackagesController],
-  providers: [ClassPackagesService],
+  providers: [ClassPackagesService, ClassPackagesResolver],
   exports: [ClassPackagesService],
 })
 export class ClassPackagesModule {} 

@@ -5,7 +5,6 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { TransactionsService } from './transactions.service';
-import { TransactionViewDto } from './dto/transaction-view.dto';
 import { Response } from 'express';
 
 @ApiTags('Parent Transactions')
@@ -15,15 +14,6 @@ import { Response } from 'express';
 @Roles(UserRole.PARENT) // Ensure only PARENT role can access
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
-
-  @Get('me')
-  @ApiOperation({ summary: 'Get logged-in parent\'s transaction history' })
-  @ApiResponse({ status: 200, description: 'Successfully retrieved transaction history.', type: [TransactionViewDto] })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 403, description: 'Forbidden resource.' })
-  async getMyTransactionHistory(@Req() req): Promise<TransactionViewDto[]> {
-    return this.transactionsService.getParentTransactionHistory(req.user.id);
-  }
 
   @Get('me/:paymentId/invoice')
   @ApiOperation({ summary: 'Download invoice PDF for a specific transaction' })

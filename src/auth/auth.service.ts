@@ -26,7 +26,7 @@ import { ResetPasswordInput } from './dto/reset-password.input';
 import { ParentSignUpInput } from './dto/parent-sign-up.input';
 import { AdminSignInInput } from './dto/admin-sign-in.input';
 import { AdminAccountInput } from './dto/admin-account.input';
-import { UserRole } from '@prisma/client';
+import { UserRole, Gender } from '@prisma/client';
 import { AuthResponse } from './models/auth-response.model';
 import { SessionService } from './session.service';
 import { UpdateParentProfileInput } from './dto/update-parent-profile.input';
@@ -323,7 +323,7 @@ export class AuthService {
         children: input.children.map(child => ({
           firstName: child.firstName,
           lastName: child.lastName,
-          gender: child.gender,
+          gender: child.gender === 'male' ? Gender.MALE : Gender.FEMALE,
           dateOfBirth: child.dateOfBirth,
         })),
       });
