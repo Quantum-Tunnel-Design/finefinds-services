@@ -30,6 +30,8 @@ import { AuthResponse } from './models/auth-response.model';
 import { SessionService } from './session.service';
 import { UpdateParentProfileInput } from './dto/update-parent-profile.input';
 import { UpdateParentPasswordInput } from './dto/update-parent-password.input';
+import { VendorSignUpInput } from './dto/vendor-sign-up.input';
+import { MailerService } from '@nestjs-modules/mailer';
 
 @Injectable()
 export class AuthService {
@@ -43,6 +45,7 @@ export class AuthService {
     private configService: ConfigService,
     private usersService: UsersService,
     private sessionService: SessionService,
+    private mailerService: MailerService,
   ) {
     this.cognitoClient = new CognitoIdentityProviderClient({
       region: this.configService.get('AWS_REGION'),
@@ -552,6 +555,125 @@ export class AuthService {
         throw error;
       }
       throw new UnauthorizedException('Failed to update password');
+    }
+  }
+
+  async vendorSignUp(input: VendorSignUpInput): Promise<AuthResponse> {
+    try {
+      // Validate password match
+      if (input.password !== input.confirmPassword) {
+        throw new BadRequestException('Passwords do not match');
+      }
+
+      // Validate terms acceptance
+      if (!input.termsAccepted) {
+        throw new BadRequestException('Terms and conditions must be accepted');
+      }
+
+      // Check if email already exists
+      const existingUser = await this.usersService.findByEmail(input.email);
+      if (existingUser) {
+        throw new BadRequestException('Email already registered');
+      }
+
+      // Create Cognito user
+      const signUpCommand = new SignUpCommand({
+        ClientId: this.clientId,
+        Username: input.email,
+        Password: input.password,
+        UserAttributes: [
+          { Name: 'email', Value: input.email },
+          { Name: 'given_name', Value: input.firstName },
+          { Name: 'family_name', Value: input.lastName },
+          { Name: 'phone_number', Value: input.phoneNumber },
+          { Name: 'custom:secondary_phone', Value: input.secondaryPhoneNumber },
+          { Name: 'custom:role', Value: UserRole.VENDOR },
+        ],
+      });
+
+      const cognitoResponse = await this.cognitoClient.send(signUpCommand);
+
+      // Add user to vendor group
+      const addToGroupCommand = new AdminAddUserToGroupCommand({
+        UserPoolId: this.clientUserPoolId,
+        Username: input.email,
+        GroupName: 'vendor',
+      });
+
+      await this.cognitoClient.send(addToGroupCommand);
+
+      // Create user in database
+      const user = await this.usersService.create({
+        email: input.email,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        role: UserRole.VENDOR,
+        cognitoSub: cognitoResponse.UserSub,
+        phoneNumber: input.phoneNumber,
+        secondaryPhoneNumber: input.secondaryPhoneNumber,
+      });
+
+      // Send confirmation email to vendor
+      await this.mailerService.sendMail({
+        to: input.email,
+        subject: 'Welcome to FineFinds - Vendor Registration',
+        template: 'vendor-welcome',
+        context: {
+          firstName: input.firstName,
+          lastName: input.lastName,
+        },
+      });
+
+      // Send notification to admin
+      const adminEmail = this.configService.get('ADMIN_EMAIL');
+      await this.mailerService.sendMail({
+        to: adminEmail,
+        subject: 'New Vendor Registration',
+        template: 'vendor-registration-notification',
+        context: {
+          vendorName: `${input.firstName} ${input.lastName}`,
+          vendorEmail: input.email,
+          vendorPhone: input.phoneNumber,
+        },
+      });
+
+      return {
+        message: 'Vendor registered successfully. Please check your email for verification code.',
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new UnauthorizedException(error.message);
+    }
+  }
+
+  async bulkCreateVendors(vendors: Partial<VendorSignUpInput>[]): Promise<AuthResponse> {
+    try {
+      for (const vendor of vendors) {
+        // Generate placeholder values for missing fields
+        const email = vendor.email || `vendor_${Date.now()}_${Math.random().toString(36).substr(2, 9)}@placeholder.com`;
+        const phoneNumber = vendor.phoneNumber || `+94${Math.floor(Math.random() * 1000000000).toString().padStart(9, '0')}`;
+        const secondaryPhoneNumber = vendor.secondaryPhoneNumber || `+94${Math.floor(Math.random() * 1000000000).toString().padStart(9, '0')}`;
+        const password = `Vendor${Math.random().toString(36).substr(2, 8)}!1`;
+
+        // Create vendor with generated values
+        await this.vendorSignUp({
+          ...vendor,
+          email,
+          phoneNumber,
+          secondaryPhoneNumber,
+          password,
+          confirmPassword: password,
+          termsAccepted: true,
+        } as VendorSignUpInput);
+      }
+
+      return {
+        message: 'Vendors created successfully',
+      };
+    } catch (error) {
+      throw new UnauthorizedException('Failed to create vendors');
     }
   }
 } 

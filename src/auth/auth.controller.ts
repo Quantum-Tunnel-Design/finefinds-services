@@ -10,6 +10,7 @@ import { AdminSignInInput } from './dto/admin-sign-in.input';
 import { AdminAccountInput } from './dto/admin-account.input';
 import { UpdateParentProfileInput } from './dto/update-parent-profile.input';
 import { UpdateParentPasswordInput } from './dto/update-parent-password.input';
+import { VendorSignUpInput } from './dto/vendor-sign-up.input';
 import { AuthResponse } from './models/auth-response.model';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
@@ -65,5 +66,17 @@ export class AuthController {
     @Body() input: UpdateParentPasswordInput,
   ): Promise<AuthResponse> {
     return this.authService.updateParentPassword(req.user.id, input);
+  }
+
+  @Post('vendor/signup')
+  async vendorSignUp(@Body() input: VendorSignUpInput): Promise<AuthResponse> {
+    return this.authService.vendorSignUp(input);
+  }
+
+  @Post('vendor/bulk-create')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async bulkCreateVendors(@Body('vendors') vendors: Partial<VendorSignUpInput>[]): Promise<AuthResponse> {
+    return this.authService.bulkCreateVendors(vendors);
   }
 }
