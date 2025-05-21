@@ -434,14 +434,6 @@ jobs:
         run: |
           echo "::group::Fetching RDS Connection Details"
           
-          # Get RDS endpoint from AWS Systems Manager Parameter Store
-          rds_endpoint=$(aws ssm get-parameter --name "/finefinds/${{ env.environment }}/rds/endpoint" --query "Parameter.Value" --output text)
-          if [ $? -ne 0 ]; then
-            echo "::error::Failed to get RDS endpoint from Parameter Store"
-            exit 1
-          fi
-          echo "RDS endpoint: $rds_endpoint"
-          
           # Get database credentials from Secrets Manager
           db_creds=$(aws secretsmanager get-secret-value \
             --secret-id "finefinds-${{ env.services_env }}-rds-connection" \
@@ -453,13 +445,14 @@ jobs:
           fi
           
           # Parse credentials from JSON
+          rds_endpoint=$(echo $db_creds | jq -r '.host')
           db_user=$(echo $db_creds | jq -r '.username')
           db_password=$(echo $db_creds | jq -r '.password')
           db_name=$(echo $db_creds | jq -r '.dbName')
           db_port=$(echo $db_creds | jq -r '.port')
           
           # Validate required fields
-          if [ -z "$db_user" ] || [ -z "$db_password" ] || [ -z "$db_name" ] || [ -z "$db_port" ]; then
+          if [ -z "$rds_endpoint" ] || [ -z "$db_user" ] || [ -z "$db_password" ] || [ -z "$db_name" ] || [ -z "$db_port" ]; then
             echo "::error::Missing required database credentials"
             exit 1
           fi
@@ -1155,36 +1148,6 @@ jobs:
           }
           
           create_all_log_groups
-          echo "::endgroup::"
-
-      - name: Get Cognito Configuration
-        id: cognito_config
-        run: |
-          echo "::group::Fetching Cognito Configuration"
-          
-          # Get Cognito configuration from CloudFormation outputs
-          cognito_config=$(aws cloudformation describe-stacks \
-            --stack-name "FineFinds-${{ env.services_env }}" \
-            --query 'Stacks[0].Outputs[?starts_with(OutputKey, `Cognito`)].{key:OutputKey,value:OutputValue}' \
-            --output json)
-            
-          if [ $? -ne 0 ]; then
-            echo "::error::Failed to get Cognito configuration from CloudFormation outputs"
-            exit 1
-          fi
-          
-          # Extract values and set as outputs
-          client_user_pool_id=$(echo "$cognito_config" | jq -r '.[] | select(.key=="CognitoClientUserPoolId") | .value')
-          client_client_id=$(echo "$cognito_config" | jq -r '.[] | select(.key=="CognitoClientClientId") | .value')
-          admin_user_pool_id=$(echo "$cognito_config" | jq -r '.[] | select(.key=="CognitoAdminUserPoolId") | .value')
-          admin_client_id=$(echo "$cognito_config" | jq -r '.[] | select(.key=="CognitoAdminClientId") | .value')
-          
-          echo "client_user_pool_id=$client_user_pool_id" >> $GITHUB_OUTPUT
-          echo "client_client_id=$client_client_id" >> $GITHUB_OUTPUT
-          echo "admin_user_pool_id=$admin_user_pool_id" >> $GITHUB_OUTPUT
-          echo "admin_client_id=$admin_client_id" >> $GITHUB_OUTPUT
-          
-          echo "✓ Successfully retrieved Cognito configuration"
           echo "::endgroup::"
 
       - name: Create Task Definition
@@ -2142,7 +2105,7 @@ jobs:
           echo "::group::Fetching RDS Connection Details"
           
           # Get RDS endpoint from AWS Systems Manager Parameter Store
-          rds_endpoint=$(aws ssm get-parameter --name "/finefinds/${{ env.environment }}/rds/endpoint" --query "Parameter.Value" --output text)
+          rds_endpoint=$(aws ssm get-parameter --name "/finefinds/${{ env.services_env }}/rds/endpoint" --query "Parameter.Value" --output text)
           if [ $? -ne 0 ]; then
             echo "::error::Failed to get RDS endpoint from Parameter Store"
             exit 1
@@ -2150,7 +2113,7 @@ jobs:
           echo "RDS endpoint: $rds_endpoint"
           
           # Get database credentials from Secrets Manager
-          db_creds=$(aws secretsmanager get-secret-value --secret-id "finefinds-${{ env.environment }}-rds-connection" --query "SecretString" --output text)
+          db_creds=$(aws secretsmanager get-secret-value --secret-id "finefinds-${{ env.services_env }}-rds-connection" --query "SecretString" --output text)
           if [ $? -ne 0 ]; then
             echo "::error::Failed to get RDS credentials from Secrets Manager"
             exit 1
