@@ -264,4 +264,21 @@ export class ClassPackagesService {
 
   private validateImage(file: Express.Multer.File, type: string): void {
     if (file.size > 5 * 1024 * 1024) { 
-      throw new BadRequestException(`${type} size must not exceed 5MB.`
+      throw new BadRequestException(`${type} size must not exceed 5MB.`);
+    }
+  }
+
+  private async uploadImage(
+    file: Express.Multer.File,
+    vendorId: string,
+    folder: string,
+    fileNamePrefix?: string,
+  ): Promise<string> {
+    const timestamp = new Date().getTime();
+    const originalName = file.originalname.split('.').slice(0, -1).join('.');
+    const extension = file.originalname.split('.').pop();
+    const fileName = `${fileNamePrefix ? fileNamePrefix + '-' : ''}${originalName}-${timestamp}.${extension}`;
+    const path = `vendors/${vendorId}/${folder}/${fileName}`;
+    return this.s3Service.uploadFile(file.buffer, path, file.mimetype);
+  }
+}
