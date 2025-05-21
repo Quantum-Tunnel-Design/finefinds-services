@@ -1,7 +1,8 @@
-import { Controller, Post, Body, UseGuards, Req, UseInterceptors, UploadedFiles } from '@nestjs/common';
+import { Controller, Post, Put, Body, UseGuards, Req, UseInterceptors, UploadedFiles } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { VendorsService } from './vendors.service';
 import { CreateBusinessProfileInput } from './dto/create-business-profile.input';
+import { UpdateBusinessProfileInput } from './dto/update-business-profile.input';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -32,6 +33,31 @@ export class VendorsController {
     },
   ) {
     return this.vendorsService.createBusinessProfile(req.user.id, input, {
+      logo: files.logo?.[0],
+      coverImage: files.coverImage?.[0],
+      gallery: files.gallery,
+    });
+  }
+
+  @Put('business-profile')
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'logo', maxCount: 1 },
+      { name: 'coverImage', maxCount: 1 },
+      { name: 'gallery', maxCount: 10 },
+    ]),
+  )
+  async updateBusinessProfile(
+    @Req() req,
+    @Body() input: UpdateBusinessProfileInput,
+    @UploadedFiles()
+    files: {
+      logo?: Express.Multer.File[];
+      coverImage?: Express.Multer.File[];
+      gallery?: Express.Multer.File[];
+    },
+  ) {
+    return this.vendorsService.updateBusinessProfile(req.user.id, input, {
       logo: files.logo?.[0],
       coverImage: files.coverImage?.[0],
       gallery: files.gallery,

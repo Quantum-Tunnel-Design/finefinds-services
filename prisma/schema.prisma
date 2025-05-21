@@ -27,6 +27,7 @@ model User {
   vendorProfile VendorProfile?
   businessProfile BusinessProfile?
   loginAttempts LoginAttempt[]
+  auditLogs     AuditLog[]
 
   @@map("users")
 }
@@ -192,6 +193,22 @@ model LoginAttempt {
   user      User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  userId         String
+  action         String
+  entityType     String
+  entityId       String
+  changes        Json
+  previousValues Json
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType, entityId])
   @@index([createdAt])
 }
 

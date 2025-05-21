@@ -4,13 +4,16 @@ import { CreateVendorProfileDto } from './dto/create-vendor-profile.dto';
 import { UpdateVendorProfileDto } from './dto/update-vendor-profile.dto';
 import { User, UserRole } from '@prisma/client';
 import { CreateBusinessProfileInput } from './dto/create-business-profile.input';
+import { UpdateBusinessProfileInput } from './dto/update-business-profile.input';
 import { S3Service } from '../s3/s3.service';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class VendorsService {
   constructor(
     private prisma: PrismaService,
     private s3Service: S3Service,
+    private auditService: AuditService,
   ) {}
 
   /**
@@ -161,6 +164,95 @@ export class VendorsService {
     });
 
     return profile;
+  }
+
+  async updateBusinessProfile(
+    userId: string,
+    input: UpdateBusinessProfileInput,
+    files?: {
+      logo?: Express.Multer.File;
+      coverImage?: Express.Multer.File;
+      gallery?: Express.Multer.File[];
+    },
+  ) {
+    // Get current profile
+    const currentProfile = await this.prisma.businessProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!currentProfile) {
+      throw new NotFoundException('Business profile not found');
+    }
+
+    // Validate image files if provided
+    if (files?.logo) {
+      this.validateImage(files.logo, 'logo');
+    }
+    if (files?.coverImage) {
+      this.validateImage(files.coverImage, 'cover image');
+    }
+    if (files?.gallery) {
+      if (files.gallery.length > 10) {
+        throw new BadRequestException('Maximum 10 gallery images allowed');
+      }
+      files.gallery.forEach(image => this.validateImage(image, 'gallery image'));
+    }
+
+    // Upload new images if provided
+    const logoUrl = files?.logo ? await this.uploadImage(files.logo, 'logo') : undefined;
+    const coverImageUrl = files?.coverImage ? await this.uploadImage(files.coverImage, 'cover') : undefined;
+    const galleryUrls = files?.gallery ? await Promise.all(
+      files.gallery.map(image => this.uploadImage(image, 'gallery'))
+    ) : undefined;
+
+    // Prepare update data
+    const updateData: any = {
+      ...input,
+      ...(logoUrl && { logoUrl }),
+      ...(coverImageUrl && { coverImageUrl }),
+      ...(galleryUrls && { galleryUrls }),
+    };
+
+    // Remove undefined values
+    Object.keys(updateData).forEach(key => 
+      updateData[key] === undefined && delete updateData[key]
+    );
+
+    // Get previous values for audit
+    const previousValues = {
+      businessName: currentProfile.businessName,
+      location: currentProfile.location,
+      description: currentProfile.description,
+      contactNumber: currentProfile.contactNumber,
+      website: currentProfile.website,
+      facebookUrl: currentProfile.facebookUrl,
+      instagramUrl: currentProfile.instagramUrl,
+      twitterUrl: currentProfile.twitterUrl,
+      bankName: currentProfile.bankName,
+      accountNumber: currentProfile.accountNumber,
+      branch: currentProfile.branch,
+      categories: currentProfile.categories,
+      tags: currentProfile.tags,
+      logoUrl: currentProfile.logoUrl,
+      coverImageUrl: currentProfile.coverImageUrl,
+      galleryUrls: currentProfile.galleryUrls,
+    };
+
+    // Update profile
+    const updatedProfile = await this.prisma.businessProfile.update({
+      where: { userId },
+      data: updateData,
+    });
+
+    // Log changes for audit
+    await this.auditService.logProfileUpdate(
+      userId,
+      updatedProfile.id,
+      updateData,
+      previousValues,
+    );
+
+    return updatedProfile;
   }
 
   private validateImage(file: Express.Multer.File, type: string): void {
