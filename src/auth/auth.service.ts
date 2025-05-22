@@ -83,6 +83,15 @@ export class AuthService {
     return hmac.digest('base64');
   }
 
+  private calculateAdminSecretHash(username: string): string | undefined {
+    if (!this.adminClientSecret) {
+      return undefined;
+    }
+    const hmac = crypto.createHmac('sha256', this.adminClientSecret);
+    hmac.update(username + this.adminClientId);
+    return hmac.digest('base64');
+  }
+
   async signUp(input: SignUpInput): Promise<AuthResponse> {
     try {
       const signUpCommand = new SignUpCommand({
@@ -373,14 +382,21 @@ export class AuthService {
 
   async adminSignIn(input: AdminSignInInput): Promise<AuthResponse> {
     try {
+      const authParameters: { [key: string]: string } = {
+        USERNAME: input.username,
+        PASSWORD: input.password,
+      };
+
+      const secretHash = this.calculateAdminSecretHash(input.username);
+      if (secretHash) {
+        authParameters.SECRET_HASH = secretHash;
+      }
+
       const authCommand = new AdminInitiateAuthCommand({
         UserPoolId: this.adminUserPoolId,
         ClientId: this.adminClientId,
-        AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
-        AuthParameters: {
-          USERNAME: input.username,
-          PASSWORD: input.password,
-        },
+        AuthFlow: 'ADMIN_USER_PASSWORD_AUTH' as AuthFlowType, // Explicitly cast to AuthFlowType
+        AuthParameters: authParameters,
       });
 
       const response = await this.cognitoClient.send(authCommand);
