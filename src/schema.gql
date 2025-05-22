@@ -9,9 +9,196 @@ input AdminAccountInput {
   password: String!
 }
 
+"""
+Basic information about a class package for admin views (e.g., under vendor details).
+"""
+type AdminClassPackageBasicInfo {
+  """Timestamp when the class package was created."""
+  createdAt: DateTime!
+
+  """Unique identifier of the class package."""
+  id: ID!
+
+  """Name of the class package."""
+  name: String!
+
+  """Price per child for the class package."""
+  pricePerChild: Float!
+
+  """Current status of the class package (e.g., DRAFT, PUBLISHED)."""
+  status: ClassPackageStatus!
+
+  """Timestamp when the class package was last updated."""
+  updatedAt: DateTime!
+}
+
+type AdminDashboardDataDto {
+  metrics: DashboardMetricsDto!
+  monthlyPayments: [MonthlyPaymentDataDto!]!
+}
+
+"""
+Basic information about a class package enrollment for admin views (e.g., under parent details).
+"""
+type AdminPackageEnrollmentBasicInfo {
+  """Timestamp when the booking was made."""
+  bookedAt: DateTime!
+
+  """Current status of the booking (e.g., PAID, CANCELLED)."""
+  bookingStatus: BookingStatus!
+
+  """Identifier of the enrolled class package."""
+  classPackageId: ID!
+
+  """Name of the enrolled class package."""
+  classPackageName: String!
+
+  """Unique identifier of the enrollment record."""
+  enrollmentId: ID!
+
+  """Identifier of the vendor for this class package."""
+  vendorId: ID!
+
+  """Name of the vendor (business name or full name)."""
+  vendorName: String!
+}
+
 input AdminSignInInput {
   password: String!
   username: String!
+}
+
+"""View model for listing transactions in the admin panel."""
+type AdminTransactionListView {
+  """Amount of the transaction."""
+  amount: Float!
+
+  """Identifier of the class package related to this transaction."""
+  classPackageId: ID!
+
+  """Name of the class package."""
+  classPackageName: String!
+
+  """Transaction ID from the payment gateway, if available."""
+  gatewayTransactionId: String
+
+  """Internal unique identifier of the payment record."""
+  id: ID!
+
+  """Identifier of the parent who made the payment."""
+  parentId: ID!
+
+  """Full name of the parent who made the payment."""
+  parentName: String!
+
+  """Date and time when the payment was recorded."""
+  paymentDate: DateTime!
+
+  """Method used for the payment (e.g., card, PayPal)."""
+  paymentMethod: String
+
+  """Current status of the payment (e.g., PENDING, COMPLETED, FAILED)."""
+  status: PaymentStatus!
+
+  """Identifier of the vendor associated with the transaction."""
+  vendorId: ID!
+
+  """Name of the vendor (business name or full name)."""
+  vendorName: String!
+}
+
+"""Input for updating a user's active or soft-deleted status by an admin."""
+input AdminUpdateUserStatusInput {
+  """Set to true to make the user account active, false to deactivate."""
+  isActive: Boolean
+
+  """
+  Set to true to soft-delete the user, or false to restore a soft-deleted user. Does not perform a hard delete.
+  """
+  setDeleted: Boolean
+}
+
+"""
+Detailed view of a user for admin panel, including role-specific information.
+"""
+type AdminUserDetails {
+  """
+  Business profile of the user, if the user is a VENDOR and has a profile.
+  """
+  businessProfile: BusinessProfile
+
+  """
+  Children of the user, if the user is a PARENT. Includes child's details.
+  """
+  children: [Child!]
+
+  """Timestamp when the user was created."""
+  createdAt: DateTime!
+
+  """Class packages created by the user, if the user is a VENDOR."""
+  createdPackages: [AdminClassPackageBasicInfo!]
+
+  """Timestamp when the user was soft-deleted. Null if not deleted."""
+  deletedAt: DateTime
+
+  """User's email address."""
+  email: String!
+
+  """Packages the user has enrolled in, if the user is a PARENT."""
+  enrolledPackages: [AdminPackageEnrollmentBasicInfo!]
+
+  """User's first name."""
+  firstName: String!
+
+  """Unique identifier of the user."""
+  id: ID!
+
+  """Indicates if the user account is currently active."""
+  isActive: Boolean!
+
+  """User's last name."""
+  lastName: String!
+
+  """Role of the user in the system."""
+  role: UserRole!
+
+  """Timestamp when the user was last updated."""
+  updatedAt: DateTime!
+
+  """
+  Vendor-specific profile details, if the user is a VENDOR and has a profile.
+  """
+  vendorProfile: VendorProfile
+}
+
+"""Basic view of a user for admin lists."""
+type AdminUserView {
+  """Timestamp when the user was created."""
+  createdAt: DateTime!
+
+  """Timestamp when the user was soft-deleted. Null if not deleted."""
+  deletedAt: DateTime
+
+  """User's email address."""
+  email: String!
+
+  """User's first name."""
+  firstName: String!
+
+  """Unique identifier of the user."""
+  id: ID!
+
+  """Indicates if the user account is currently active."""
+  isActive: Boolean!
+
+  """User's last name."""
+  lastName: String!
+
+  """Role of the user in the system."""
+  role: UserRole!
+
+  """Timestamp when the user was last updated."""
+  updatedAt: DateTime!
 }
 
 type AgeGroup {
@@ -223,6 +410,20 @@ input DailyRecurrenceInput {
   slotStartTime: DateTime!
 }
 
+type DashboardMetricsDto {
+  """Total amount from online payments."""
+  onlinePaymentsTotal: Float!
+
+  """Number of users registered as parents."""
+  parentsRegistered: Int!
+
+  """Total number of registered users."""
+  totalUsers: Int!
+
+  """Number of users registered as vendors."""
+  vendorsRegistered: Int!
+}
+
 input DateRangeFilterDto {
   endDate: String
   startDate: String
@@ -274,8 +475,25 @@ type Mutation {
   """
   addChild(input: CreateChildInput!): Child!
 
+  """Save a class package to the parent's favorites"""
+  addSavedClass(
+    """The ID of the class package to save."""
+    classPackageId: ID!
+  ): SavedClassPackage!
+
   """Authenticates an admin user and returns an access token."""
   adminSignIn(input: AdminSignInInput!): AuthResponse!
+
+  """
+  Updates the active status or soft-delete status of a user. Admin role required. Returns the updated user view.
+  """
+  adminUpdateUserStatus(
+    """The update data specifying new status flags."""
+    input: AdminUpdateUserStatusInput!
+
+    """The unique identifier of the user whose status is to be updated."""
+    userId: ID!
+  ): AdminUserView!
 
   """Approves a vendor profile. Requires ADMIN privileges."""
   approveVendor(
@@ -349,6 +567,12 @@ type Mutation {
     """Data for creating the vendor profile."""
     input: CreateVendorProfileDto!
   ): VendorProfile!
+
+  """Remove a class package from the parent's favorites"""
+  removeSavedClass(
+    """The ID of the class package to remove."""
+    classPackageId: ID!
+  ): OperationStatusDto!
 
   """Resets an admin user's password. Requires ADMIN privileges."""
   resetAdminPassword(input: ResetAdminPasswordInput!): AuthResponse!
@@ -471,6 +695,49 @@ enum PaymentType {
 
 type Query {
   """
+  Retrieves dashboard data for administrators, including metrics and monthly payment trends. Requires ADMIN privileges.
+  """
+  adminDashboardData(
+    """Optional date range (startDate, endDate) to filter data."""
+    filters: DateRangeFilterDto
+  ): AdminDashboardDataDto!
+
+  """
+  Retrieves detailed information for a specific user by ID. Admin role required.
+  """
+  adminGetUserDetails(
+    """The unique identifier of the user to retrieve details for."""
+    userId: ID!
+  ): AdminUserDetails
+
+  """
+  Retrieves revenue statistics for a specific vendor. Admin role required. Used in admin panel for vendor details view.
+  """
+  adminGetVendorRevenueStats(
+    """Optional date range to filter revenue statistics."""
+    filters: DateRangeFilterDto
+
+    """The unique identifier of the vendor to get revenue stats for."""
+    vendorId: ID!
+  ): VendorRevenueMetricsDto
+
+  """
+  Retrieves a list of all transactions. Optionally filter by date range. Requires ADMIN privileges.
+  """
+  adminListAllTransactions(
+    """Optional date range (startDate, endDate) to filter transactions."""
+    filters: DateRangeFilterDto
+  ): [AdminTransactionListView!]!
+
+  """
+  Lists all users in the platform. Admin role required. Optionally shows soft-deleted users.
+  """
+  adminListAllUsers(
+    """Set to true to include soft-deleted users in the list."""
+    showDeleted: Boolean = false
+  ): [AdminUserView!]!
+
+  """
   Retrieves a single class package by its ID. If the authenticated user is a vendor, it ensures the package belongs to them.
   """
   classPackage(
@@ -492,6 +759,9 @@ type Query {
   Retrieves all children for the authenticated parent. Restricted to PARENT role.
   """
   listChildren: [Child!]!
+
+  """List all saved class packages for the parent"""
+  listSavedClasses: [SavedClassPackage!]!
 
   """
   Retrieves a list of users. (Placeholder - typically admin-only and with pagination/filtering)
@@ -557,6 +827,14 @@ input ResetPasswordInput {
   confirmNewPassword: String!
   email: String!
   newPassword: String!
+}
+
+type SavedClassPackage {
+  classPackage: ClassPackage!
+  classPackageId: ID!
+  createdAt: DateTime!
+  id: ID!
+  userId: ID!
 }
 
 type ScheduleSlot {

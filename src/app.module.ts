@@ -14,6 +14,9 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { VendorsModule } from './vendors/vendors.module';
 import { AuditModule } from './audit/audit.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { AdminModule } from './admin/admin.module';
+import { SavedClassPackagesModule } from './saved-class-packages/saved-class-packages.module';
+import { CoursesModule } from './courses/courses.module';
 
 @Module({
   imports: [
@@ -37,6 +40,9 @@ import { UploadsModule } from './uploads/uploads.module';
     VendorsModule,
     AuditModule,
     UploadsModule,
+    AdminModule,
+    SavedClassPackagesModule,
+    CoursesModule,
   ],
   providers: [PrismaService],
 })
