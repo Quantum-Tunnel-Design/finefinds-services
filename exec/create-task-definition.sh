@@ -107,15 +107,10 @@ create_task_definition() {
       "environment": [
         {"name": "PORT", "value": "3000"},
         {"name": "NODE_ENV", "value": "$SERVICES_ENV"},
-        {"name": "AWS_REGION", "value": "$AWS_REGION"},
-        {"name": "DATABASE_URL", "value": "postgresql://\${DB_USER}:\${DB_PASSWORD}@\${DB_HOST}:\${DB_PORT}/\${DB_NAME}"}
+        {"name": "AWS_REGION", "value": "$AWS_REGION"}
       ],
       "secrets": [
-        {"name": "DB_NAME", "valueFrom": "$db_connection_arn:dbName::"},
-        {"name": "DB_HOST", "valueFrom": "$db_connection_arn:host::"},
-        {"name": "DB_PORT", "valueFrom": "$db_connection_arn:port::"},
-        {"name": "DB_USER", "valueFrom": "$db_connection_arn:username::"},
-        {"name": "DB_PASSWORD", "valueFrom": "$db_connection_arn:password::"},
+        {"name": "DATABASE_URL", "valueFrom": "$db_connection_arn:connectionString::"},
         {"name": "REDIS_URL", "valueFrom": "$redis_connection_arn"},
         {"name": "JWT_SECRET", "valueFrom": "$jwt_secret_arn"},
         {"name": "COGNITO_CLIENT_USER_POOL_ID", "valueFrom": "$cognito_config_arn:clientUserPoolId::"},
