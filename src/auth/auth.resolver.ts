@@ -114,8 +114,9 @@ export class AuthResolver {
   async updateMyParentProfile(
     @CurrentUser() user: PrismaUser,
     @Args('input') input: UpdateParentProfileInput,
-  ): Promise<PrismaUser> {
-    return this.authService.updateParentProfile(user.id, input) as unknown as PrismaUser;
+  ): Promise<User> {
+    const updatedUser = await this.authService.updateParentProfile(user.id, input);
+    return updatedUser as any as User;
   }
 
   @Mutation(() => OperationStatusDto)
@@ -138,7 +139,7 @@ export class AuthResolver {
 
   @Query(() => User)
   @UseGuards(JwtAuthGuard)
-  async me(@CurrentUser() user: PrismaUser): Promise<PrismaUser> {
-    return user;
+  async me(@CurrentUser() user: PrismaUser): Promise<User> {
+    return user as any as User;
   }
 } 

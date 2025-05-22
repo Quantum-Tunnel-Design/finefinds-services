@@ -2,9 +2,11 @@ import { Module } from '@nestjs/common';
 import { VendorsService } from './vendors.service';
 import { VendorsResolver } from './vendors.resolver';
 import { PrismaModule } from '../prisma/prisma.module';
+import { S3Module } from '../s3/s3.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, S3Module, AuditModule],
   providers: [VendorsService, VendorsResolver],
   exports: [VendorsService],
 })

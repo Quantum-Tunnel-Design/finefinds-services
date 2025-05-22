@@ -13,14 +13,16 @@ export class UsersResolver {
 
   @Query(() => User)
   @UseGuards(JwtAuthGuard)
-  async me(@CurrentUser() user: PrismaUser): Promise<PrismaUser> {
-    return this.usersService.getCurrentUser(user.id);
+  async me(@CurrentUser() user: PrismaUser): Promise<User> {
+    const prismaUser = await this.usersService.getCurrentUser(user.id);
+    return prismaUser as any as User;
   }
 
   @Query(() => [User])
   @UseGuards(JwtAuthGuard)
-  async listUsers(@CurrentUser() user: PrismaUser): Promise<PrismaUser[]> {
-    return this.usersService.listUsers(user);
+  async listUsers(@CurrentUser() user: PrismaUser): Promise<User[]> {
+    const prismaUsers = await this.usersService.listUsers(user);
+    return prismaUsers as any as User[];
   }
 
   @Mutation(() => User)
@@ -28,7 +30,8 @@ export class UsersResolver {
   async updateMyProfile(
     @CurrentUser() user: PrismaUser,
     @Args('input') dto: UpdateUserDto,
-  ): Promise<PrismaUser> {
-    return this.usersService.updateProfile(user.id, dto);
+  ): Promise<User> {
+    const prismaUser = await this.usersService.updateProfile(user.id, dto);
+    return prismaUser as any as User;
   }
 } 

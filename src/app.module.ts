@@ -8,6 +8,11 @@ import { UsersModule } from './users/users.module';
 import { PrismaService } from './prisma/prisma.service';
 import { HealthModule } from './health/health.module';
 import { TransactionsModule } from './transactions/transactions.module';
+import { ClassPackagesModule } from './class-packages/class-packages.module';
+import { BookingsModule } from './bookings/bookings.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { VendorsModule } from './vendors/vendors.module';
+import { AuditModule } from './audit/audit.module';
 
 @Module({
   imports: [
@@ -25,6 +30,11 @@ import { TransactionsModule } from './transactions/transactions.module';
     UsersModule,
     HealthModule,
     TransactionsModule,
+    ClassPackagesModule,
+    BookingsModule,
+    NotificationsModule,
+    VendorsModule,
+    AuditModule,
   ],
   providers: [PrismaService],
 })

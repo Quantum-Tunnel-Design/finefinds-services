@@ -2,6 +2,23 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+input AdminAccountInput {
+  email: String!
+  firstName: String!
+  lastName: String!
+  password: String!
+}
+
+input AdminSignInInput {
+  password: String!
+  username: String!
+}
+
+type AgeGroup {
+  id: ID!
+  name: String
+}
+
 type AuthResponse {
   accessToken: String
   idToken: String
@@ -10,9 +27,80 @@ type AuthResponse {
   user: User
 }
 
+input BulkCreateVendorsInput {
+  vendors: [VendorSignUpInput!]!
+}
+
+enum CancellationPolicyType {
+  FIXED_COMMITMENT
+  FLEXIBLE_RESCHEDULING
+}
+
+type Category {
+  id: ID!
+  name: String
+}
+
+type ChildBookingDetailDto {
+  dateOfBirth: DateTime!
+  firstName: String!
+  lastName: String!
+}
+
+input ChildInput {
+  dateOfBirth: DateTime!
+  firstName: String!
+  gender: String!
+  lastName: String!
+}
+
+type ClassPackage {
+  ageGroups: [AgeGroup!]!
+  beforeYouComeInstructions: String
+  cancellationPolicyType: CancellationPolicyType!
+  category: Category!
+  categoryId: ID!
+  coverImageUrl: String
+  createdAt: DateTime!
+  description: String
+  id: ID!
+  name: String!
+  pricePerChild: Float!
+  rescheduleDaysBefore: Float
+  scheduleSlots: [ScheduleSlot]
+  status: ClassPackageStatus!
+  tags: [String]
+  updatedAt: DateTime!
+  vendor: User!
+  vendorId: ID!
+}
+
+enum ClassPackageStatus {
+  ARCHIVED
+  DRAFT
+  PUBLISHED
+}
+
 input ConfirmSignUpInput {
   code: String!
   email: String!
+}
+
+input CreateNotificationInput {
+  message: String!
+  type: String!
+}
+
+input CreateVendorProfileDto {
+  description: String!
+  instituteName: String!
+  phoneNumber: String
+  website: String
+}
+
+input DateRangeFilterDto {
+  endDate: String
+  startDate: String
 }
 
 """
@@ -20,33 +108,120 @@ A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date
 """
 scalar DateTime
 
+input DeleteBusinessProfileInput {
+  confirmation: String!
+}
+
 input ForgotPasswordInput {
   email: String!
 }
 
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
+"""
+scalar JSON
+
+type MonthlyPaymentDataDto {
+  month: String!
+  totalAmount: Float!
+}
+
 type Mutation {
+  adminSignIn(input: AdminSignInInput!): AuthResponse!
+  approveVendor(vendorId: String!): VendorProfile!
+  bulkCreateVendors(input: BulkCreateVendorsInput!): AuthResponse!
   confirmSignUp(input: ConfirmSignUpInput!): AuthResponse!
-  forgotPassword(input: ForgotPasswordInput!): AuthResponse!
-  resetPassword(input: ResetPasswordInput!): AuthResponse!
+  createAdminAccount(input: AdminAccountInput!): AuthResponse!
+  createNotification(input: CreateNotificationInput!): Notification!
+  deleteMyBusinessProfile(input: DeleteBusinessProfileInput!): OperationStatusDto!
+  deleteMyClassPackage(id: ID!): OperationStatusDto!
+  forgotPassword(input: ForgotPasswordInput!): OperationStatusDto!
+  logout: OperationStatusDto!
+  markNotificationAsRead(id: String!): Notification!
+  parentSignUp(input: ParentSignUpInput!): AuthResponse!
+  registerVendorProfile(input: CreateVendorProfileDto!): VendorProfile!
+  resetAdminPassword(input: ResetAdminPasswordInput!): AuthResponse!
+  resetPassword(input: ResetPasswordInput!): OperationStatusDto!
   signIn(input: SignInInput!): AuthResponse!
   signUp(input: SignUpInput!): AuthResponse!
+  updateMyParentPassword(input: UpdateParentPasswordInput!): OperationStatusDto!
+  updateMyParentProfile(input: UpdateParentProfileInput!): User!
   updateMyProfile(input: UpdateUserDto!): User!
+  updateVendorProfile(input: UpdateVendorProfileDto!): VendorProfile!
+  vendorLogin(input: VendorLoginInput!): AuthResponse!
+  vendorSignUp(input: VendorSignUpInput!): AuthResponse!
+}
+
+type Notification {
+  createdAt: DateTime!
+  data: JSON!
+  id: String!
+  message: String!
+  read: Boolean!
+  title: String!
+  type: String!
+  updatedAt: DateTime!
+  userId: String!
+}
+
+type OperationStatusDto {
+  message: String
+  success: Boolean!
+}
+
+input ParentSignUpInput {
+  children: [ChildInput!]!
+  confirmPassword: String!
+  email: String!
+  firstName: String!
+  lastName: String!
+  password: String!
+  phoneNumber: String!
+}
+
+"""The status of a payment."""
+enum PaymentStatus {
+  COMPLETED
+  FAILED
+  PENDING
+  REFUNDED
 }
 
 type Query {
+  classPackage(id: ID!): ClassPackage
   listUsers: [User!]!
+  listVendors: [VendorProfile!]!
   me: User!
+  myClassPackages: [ClassPackage!]!
+  myNotifications: [Notification!]!
+  myTransactionHistory: [TransactionViewDto!]!
+  myVendorDashboardRevenue(filters: DateRangeFilterDto): VendorDashboardDataDto!
+  myVendorProfile: VendorProfile!
+}
+
+input ResetAdminPasswordInput {
+  email: String!
+  newPassword: String!
 }
 
 input ResetPasswordInput {
   code: String!
+  confirmNewPassword: String!
   email: String!
   newPassword: String!
+}
+
+type ScheduleSlot {
+  availableSlots: Float!
+  endTime: DateTime!
+  id: ID!
+  startTime: DateTime!
 }
 
 input SignInInput {
   email: String!
   password: String!
+  rememberMe: Boolean! = false
 }
 
 input SignUpInput {
@@ -57,9 +232,41 @@ input SignUpInput {
   role: UserRole!
 }
 
+type TransactionViewDto {
+  className: String!
+  classPackageId: ID!
+  id: ID!
+  paymentAmount: Float!
+  paymentDate: DateTime!
+  paymentMethod: String
+  paymentStatus: PaymentStatus!
+  scheduleDetails: String
+  transactionId: String
+  vendorName: String!
+}
+
+input UpdateParentPasswordInput {
+  confirmNewPassword: String!
+  currentPassword: String!
+  newPassword: String!
+}
+
+input UpdateParentProfileInput {
+  firstName: String!
+  lastName: String!
+  phoneNumber: String!
+}
+
 input UpdateUserDto {
   avatarUrl: String
   name: String
+}
+
+input UpdateVendorProfileDto {
+  description: String
+  instituteName: String
+  phoneNumber: String
+  website: String
 }
 
 type User {
@@ -80,4 +287,42 @@ enum UserRole {
   PARENT
   STUDENT
   VENDOR
+}
+
+type VendorDashboardDataDto {
+  metrics: VendorRevenueMetricsDto!
+  monthlyPayments: [MonthlyPaymentDataDto!]!
+}
+
+input VendorLoginInput {
+  email: String!
+  password: String!
+}
+
+type VendorProfile {
+  approved: Boolean!
+  createdAt: DateTime!
+  description: String!
+  id: ID!
+  instituteName: String!
+  phoneNumber: String
+  updatedAt: DateTime!
+  user: User!
+  website: String
+}
+
+type VendorRevenueMetricsDto {
+  pendingPayoutToDate: Float!
+  totalPaymentsInRange: Float!
+}
+
+input VendorSignUpInput {
+  confirmPassword: String!
+  email: String!
+  firstName: String!
+  lastName: String!
+  password: String!
+  phoneNumber: String!
+  secondaryPhoneNumber: String!
+  termsAccepted: Boolean!
 }

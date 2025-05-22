@@ -13,6 +13,7 @@ import { UsersModule } from '../users/users.module';
 // AuthController is no longer used and can be removed or its import commented out
 // import { AuthController } from './auth.controller'; 
 import { SessionService } from './session.service';
+import { LoginAttemptService } from './services/login-attempt.service';
 import cognitoConfig from './cognito.config';
 import { PrismaModule } from '../prisma/prisma.module';
 import { RolesGuard } from './guards/roles.guard';
@@ -55,6 +56,7 @@ import { RolesGuard } from './guards/roles.guard';
     CognitoClientStrategy,
     CognitoAdminStrategy,
     SessionService,
+    LoginAttemptService,
     RolesGuard,
   ],
   // controllers: [AuthController], // AuthController removed as it's now empty

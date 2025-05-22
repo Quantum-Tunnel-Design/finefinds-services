@@ -1,20 +1,21 @@
 import { ObjectType, Field, ID, Float, registerEnumType } from '@nestjs/graphql';
 import { ClassPackageStatus, CancellationPolicyType, UserRole } from '@prisma/client';
+import { User } from '../../users/models/user.model';
 
 // --- Placeholder for UserType ---
-@ObjectType('User') 
-export class UserType {
-  @Field(() => ID)
-  id: string;
-  @Field({nullable: true})
-  firstName?: string;
-  @Field({nullable: true})
-  lastName?: string;
-  @Field({nullable: true})
-  email?: string;
-  @Field(() => UserRole, {nullable: true}) 
-  role?: UserRole;
-}
+// @ObjectType('User') 
+// export class UserType {
+//   @Field(() => ID)
+//   id: string;
+//   @Field({nullable: true})
+//   firstName?: string;
+//   @Field({nullable: true})
+//   lastName?: string;
+//   @Field({nullable: true})
+//   email?: string;
+//   @Field(() => UserRole, {nullable: true}) 
+//   role?: UserRole;
+// }
 // --- End Placeholder for UserType ---
 
 // --- Placeholder for CategoryType ---
@@ -85,8 +86,8 @@ export class ClassPackageType {
   @Field(() => Float, { nullable: true })
   rescheduleDaysBefore?: number;
 
-  @Field(() => UserType) 
-  vendor: UserType; 
+  @Field(() => User)
+  vendor: User; 
 
   @Field(() => ID)
   vendorId: string;
