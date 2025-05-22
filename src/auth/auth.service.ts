@@ -81,58 +81,78 @@ export class AuthService {
   }
 
   async signUp(input: SignUpInput): Promise<AuthResponse> {
-    const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
-    const clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
-    const secretHash = this.computeSecretHash(input.email, clientId, clientSecret);
-    const params: any = {
-        ClientId: clientId,
+    const userPoolId = this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID');
+
+    // Basic validation
+    const existingUser = await this.usersService.findByEmail(input.email);
+    if (existingUser) {
+      throw new BadRequestException('Email already registered');
+    }
+
+    const userAttributes = [
+      { Name: 'email', Value: input.email },
+      { Name: 'email_verified', Value: 'true' },
+      { Name: 'given_name', Value: input.firstName },
+      { Name: 'family_name', Value: input.lastName },
+      { Name: 'custom:role', Value: input.role }, // Role comes from input
+    ];
+
+    try {
+      // 1. Create Cognito user
+      const adminCreateUserCmd = new AdminCreateUserCommand({
+        UserPoolId: userPoolId,
+        Username: input.email,
+        UserAttributes: userAttributes,
+        MessageAction: 'SUPPRESS',
+      });
+      const cognitoUserResponse = await this.cognitoClient.send(adminCreateUserCmd);
+      const cognitoSub = cognitoUserResponse.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value || input.email;
+
+      // 2. Set password
+      const adminSetPasswordCmd = new AdminSetUserPasswordCommand({
+        UserPoolId: userPoolId,
         Username: input.email,
         Password: input.password,
-        UserAttributes: [
-          { Name: 'email', Value: input.email },
-          { Name: 'given_name', Value: input.firstName },
-          { Name: 'family_name', Value: input.lastName },
-          { Name: 'custom:role', Value: input.role }, // Ensure role is a string
-        ],
-    };
-    if (secretHash) {
-        params.SecretHash = secretHash;
-    }
+        Permanent: true,
+      });
+      await this.cognitoClient.send(adminSetPasswordCmd);
 
-    try {
-      const signUpCommand = new SignUpCommand(params);
-      await this.cognitoClient.send(signUpCommand);
+      // 3. Add user to group based on input.role
+      // Ensure a mapping from input.role (string) to a valid Cognito group name
+      let groupName: string;
+      if (input.role === UserRole.PARENT) groupName = 'parent';
+      else if (input.role === UserRole.VENDOR) groupName = 'vendor';
+      // Add more roles/groups as needed
+      else {
+        console.warn(`[AuthService signUp] Unknown role ${input.role} for group assignment.`);
+        // Optionally, throw error or assign a default group, or no group
+      }
+
+      if (groupName) {
+        const addToGroupCommand = new AdminAddUserToGroupCommand({
+            UserPoolId: userPoolId,
+            Username: input.email,
+            GroupName: groupName,
+        });
+        await this.cognitoClient.send(addToGroupCommand);
+      }
+
+      // 4. Create user in database
+      await this.usersService.create({
+        email: input.email,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        role: input.role as UserRole, // Cast assuming input.role is a valid UserRole enum member
+        cognitoSub: cognitoSub,
+        // Add other relevant fields from SignUpInput if necessary
+      });
+
       return {
-        message: 'User registered successfully. Please check your email for verification code.',
+        message: 'User account created successfully. You can now sign in.',
       };
     } catch (error) {
-      console.error('[AuthService signUp] Error:', error);
+      console.error('[AuthService signUp Admin Flow] Error:', error);
       throw new BadRequestException(error.message || 'Could not register user');
-    }
-  }
-
-  async confirmSignUp(input: ConfirmSignUpInput): Promise<AuthResponse> {
-    const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
-    const clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
-    const secretHash = this.computeSecretHash(input.email, clientId, clientSecret);
-    const params: any = {
-        ClientId: clientId,
-        Username: input.email,
-        ConfirmationCode: input.code,
-    };
-    if (secretHash) {
-        params.SecretHash = secretHash;
-    }
-
-    try {
-      const confirmCommand = new ConfirmSignUpCommand(params);
-      await this.cognitoClient.send(confirmCommand);
-      return {
-        message: 'Email verified successfully. You can now sign in.',
-      };
-    } catch (error) {
-      console.error('[AuthService confirmSignUp] Error:', error);
-      throw new BadRequestException(error.message || 'Could not confirm sign up');
     }
   }
 
@@ -297,49 +317,75 @@ export class AuthService {
   }
 
   async parentSignUp(input: ParentSignUpInput): Promise<AuthResponse> {
-    const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
-    const clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
-    const secretHash = this.computeSecretHash(input.email, clientId, clientSecret);
+    const userPoolId = this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID');
+
+    // Validate input (e.g., password confirmation, children data) - Keep existing validations or add as needed
+    if (input.password !== input.confirmPassword) {
+      throw new BadRequestException('Passwords do not match');
+    }
+    if (!input.children || input.children.length === 0) {
+      throw new BadRequestException('At least one child is required');
+    }
+    if (input.children.length > 10) {
+      throw new BadRequestException('Maximum 10 children allowed');
+    }
+    const now = new Date();
+    for (const child of input.children) {
+      const dob = typeof child.dateOfBirth === 'string' ? new Date(child.dateOfBirth) : child.dateOfBirth;
+      if (dob > now) {
+        throw new BadRequestException('Date of birth cannot be in the future');
+      }
+    }
+    const existingUser = await this.usersService.findByEmail(input.email);
+    if (existingUser) {
+      throw new BadRequestException('Email already registered');
+    }
 
     const userAttributes = [
       { Name: 'email', Value: input.email },
+      { Name: 'email_verified', Value: 'true' }, // Auto-verify email
       { Name: 'given_name', Value: input.firstName },
       { Name: 'family_name', Value: input.lastName },
       { Name: 'phone_number', Value: input.phoneNumber },
+      // { Name: 'phone_number_verified', Value: 'true' }, // Optional: auto-verify phone if policy allows
       { Name: 'custom:role', Value: UserRole.PARENT },
     ];
 
-    const signUpParams: any = {
-      ClientId: clientId,
-      Username: input.email,
-      Password: input.password,
-      UserAttributes: userAttributes,
-    };
-    if (secretHash) {
-      signUpParams.SecretHash = secretHash;
-    }
-
     try {
-      // Create Cognito user
-      const signUpCommand = new SignUpCommand(signUpParams);
-      const cognitoUser = await this.cognitoClient.send(signUpCommand);
-
-      // Add user to parent group
-      const addToGroupCommand = new AdminAddUserToGroupCommand({
-        UserPoolId: this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID'),
+      // 1. Create Cognito user using AdminCreateUserCommand
+      const adminCreateUserCmd = new AdminCreateUserCommand({
+        UserPoolId: userPoolId,
         Username: input.email,
-        GroupName: 'parent',
+        UserAttributes: userAttributes,
+        MessageAction: 'SUPPRESS', // Suppress welcome email from Cognito
       });
+      const cognitoUserResponse = await this.cognitoClient.send(adminCreateUserCmd);
+      const cognitoSub = cognitoUserResponse.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value || input.email; // Prefer sub if available
 
+      // 2. Set password using AdminSetUserPasswordCommand
+      const adminSetPasswordCmd = new AdminSetUserPasswordCommand({
+        UserPoolId: userPoolId,
+        Username: input.email,
+        Password: input.password,
+        Permanent: true,
+      });
+      await this.cognitoClient.send(adminSetPasswordCmd);
+
+      // 3. Add user to parent group
+      const addToGroupCommand = new AdminAddUserToGroupCommand({
+        UserPoolId: userPoolId,
+        Username: input.email,
+        GroupName: 'parent', // Ensure this group exists in your User Pool
+      });
       await this.cognitoClient.send(addToGroupCommand);
 
-      // Create user in database with children
+      // 4. Create user in database with children
       await this.usersService.create({
         email: input.email,
         firstName: input.firstName,
         lastName: input.lastName,
         role: UserRole.PARENT,
-        cognitoSub: cognitoUser.UserSub,
+        cognitoSub: cognitoSub, 
         phoneNumber: input.phoneNumber,
         children: input.children.map(child => ({
           firstName: child.firstName,
@@ -350,14 +396,15 @@ export class AuthService {
       });
 
       return {
-        message: 'Parent registered successfully. Please check your email for verification code.',
+        message: 'Parent account created successfully. You can now sign in.',
+        // No tokens are returned directly from this admin flow
       };
     } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      console.error('Parent SignUp Error:', error);
-      throw new UnauthorizedException(error.message || 'Could not complete parent sign up.');
+      // More specific error handling might be needed here
+      // e.g., if AdminCreateUser fails because user already exists (should be caught by pre-check)
+      // or if other Cognito/DB operations fail.
+      console.error('[AuthService parentSignUp Admin Flow] Error:', error);
+      throw new BadRequestException(error.message || 'Could not complete parent sign up.');
     }
   }
 
@@ -600,86 +647,101 @@ export class AuthService {
   }
 
   async vendorSignUp(input: VendorSignUpInput): Promise<AuthResponse> {
-    const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
-    const clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
-    const secretHash = this.computeSecretHash(input.email, clientId, clientSecret);
+    const userPoolId = this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID');
+
+    // --- Input Validations ---
+    if (input.password !== input.confirmPassword) {
+      throw new BadRequestException('Passwords do not match');
+    }
+    if (!input.termsAccepted) {
+      throw new BadRequestException('Terms and conditions must be accepted');
+    }
+    const existingUser = await this.usersService.findByEmail(input.email);
+    if (existingUser) {
+      throw new BadRequestException('Email already registered');
+    }
+    // --- End Validations ---
 
     const userAttributes = [
       { Name: 'email', Value: input.email },
+      { Name: 'email_verified', Value: 'true' }, // Auto-verify email
       { Name: 'given_name', Value: input.firstName },
       { Name: 'family_name', Value: input.lastName },
       { Name: 'phone_number', Value: input.phoneNumber },
+      // { Name: 'phone_number_verified', Value: 'true' }, // Optional
       { Name: 'custom:role', Value: UserRole.VENDOR },
       { Name: 'custom:secondary_phone', Value: input.secondaryPhoneNumber || '' },
     ];
 
-    const signUpParams: any = {
-      ClientId: clientId,
-      Username: input.email,
-      Password: input.password,
-      UserAttributes: userAttributes,
-    };
-    if (secretHash) {
-      signUpParams.SecretHash = secretHash;
-    }
-
     try {
-      // Create Cognito user
-      const signUpCommand = new SignUpCommand(signUpParams);
-      const cognitoUser = await this.cognitoClient.send(signUpCommand);
-
-      // Add user to vendor group
-      const addToGroupCommand = new AdminAddUserToGroupCommand({
-        UserPoolId: this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID'),
+      // 1. Create Cognito user
+      const adminCreateUserCmd = new AdminCreateUserCommand({
+        UserPoolId: userPoolId,
         Username: input.email,
-        GroupName: 'vendor',
+        UserAttributes: userAttributes,
+        MessageAction: 'SUPPRESS',
       });
+      const cognitoUserResponse = await this.cognitoClient.send(adminCreateUserCmd);
+      const cognitoSub = cognitoUserResponse.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value || input.email;
 
+      // 2. Set password
+      const adminSetPasswordCmd = new AdminSetUserPasswordCommand({
+        UserPoolId: userPoolId,
+        Username: input.email,
+        Password: input.password,
+        Permanent: true,
+      });
+      await this.cognitoClient.send(adminSetPasswordCmd);
+
+      // 3. Add user to vendor group
+      const addToGroupCommand = new AdminAddUserToGroupCommand({
+        UserPoolId: userPoolId,
+        Username: input.email,
+        GroupName: 'vendor', // Ensure this group exists
+      });
       await this.cognitoClient.send(addToGroupCommand);
 
-      // Create user in database
-      const user = await this.usersService.create({
+      // 4. Create user in database
+      await this.usersService.create({
         email: input.email,
         firstName: input.firstName,
         lastName: input.lastName,
         role: UserRole.VENDOR,
-        cognitoSub: cognitoUser.UserSub,
+        cognitoSub: cognitoSub,
         phoneNumber: input.phoneNumber,
         secondaryPhoneNumber: input.secondaryPhoneNumber,
       });
 
-      // Send confirmation email to vendor
+      // Send welcome/notification emails (as they were before)
       await this.mailerService.sendMail({
         to: input.email,
-        subject: 'Welcome to FineFinds - Vendor Registration',
-        template: 'vendor-welcome',
+        subject: 'Welcome to FineFinds - Vendor Registration Complete',
+        template: 'vendor-welcome', // Ensure this template doesn't mention verification codes
         context: {
           firstName: input.firstName,
           lastName: input.lastName,
         },
       });
-
-      // Send notification to admin
       const adminEmail = this.configService.get('ADMIN_EMAIL');
-      await this.mailerService.sendMail({
-        to: adminEmail,
-        subject: 'New Vendor Registration',
-        template: 'vendor-registration-notification',
-        context: {
-          vendorName: `${input.firstName} ${input.lastName}`,
-          vendorEmail: input.email,
-          vendorPhone: input.phoneNumber,
-        },
-      });
+      if (adminEmail) {
+        await this.mailerService.sendMail({
+            to: adminEmail,
+            subject: 'New Vendor Account Created',
+            template: 'vendor-registration-notification', // Ensure this template is appropriate
+            context: {
+            vendorName: `${input.firstName} ${input.lastName}`,
+            vendorEmail: input.email,
+            vendorPhone: input.phoneNumber,
+            },
+        });
+      }
 
       return {
-        message: 'Vendor registered successfully. Please check your email for verification code.',
+        message: 'Vendor account created successfully. You can now sign in.',
       };
     } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new UnauthorizedException(error.message);
+      console.error('[AuthService vendorSignUp Admin Flow] Error:', error);
+      throw new BadRequestException(error.message || 'Could not complete vendor sign up.');
     }
   }
 
