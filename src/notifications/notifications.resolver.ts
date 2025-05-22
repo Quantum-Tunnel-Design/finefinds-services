@@ -10,7 +10,9 @@ import { CreateNotificationInput } from './dto/create-notification.input';
 export class NotificationsResolver {
   constructor(private readonly notificationsService: NotificationsService) {}
 
-  @Query(() => [Notification])
+  @Query(() => [Notification], { 
+    description: 'Retrieves all notifications for the currently authenticated user.'
+  })
   @UseGuards(JwtAuthGuard)
   async myNotifications(@Context('user') user: User): Promise<Notification[]> {
     const notifications = await this.notificationsService.getUserNotifications(user.id);
@@ -21,7 +23,9 @@ export class NotificationsResolver {
     }));
   }
 
-  @Mutation(() => Notification)
+  @Mutation(() => Notification, { 
+    description: 'Creates a new notification for the currently authenticated user.'
+  })
   @UseGuards(JwtAuthGuard)
   async createNotification(
     @Args('input') input: CreateNotificationInput,
@@ -35,7 +39,9 @@ export class NotificationsResolver {
     };
   }
 
-  @Mutation(() => Notification)
+  @Mutation(() => Notification, { 
+    description: 'Marks a notification as read for the currently authenticated user.'
+  })
   @UseGuards(JwtAuthGuard)
   async markNotificationAsRead(
     @Args('id') id: string,

@@ -154,28 +154,105 @@ type MonthlyPaymentDataDto {
 }
 
 type Mutation {
+  """Authenticates an admin user and returns an access token."""
   adminSignIn(input: AdminSignInInput!): AuthResponse!
-  approveVendor(vendorId: String!): VendorProfile!
+
+  """Approves a vendor profile. Requires ADMIN privileges."""
+  approveVendor(
+    """The ID of the vendor to approve."""
+    vendorId: String!
+  ): VendorProfile!
+
+  """Creates multiple vendor accounts in bulk. Requires ADMIN privileges."""
   bulkCreateVendors(input: BulkCreateVendorsInput!): AuthResponse!
+
+  """
+  Confirms a user's registration using the verification code sent to their email.
+  """
   confirmSignUp(input: ConfirmSignUpInput!): AuthResponse!
+
+  """Creates a new admin account. Requires ADMIN privileges."""
   createAdminAccount(input: AdminAccountInput!): AuthResponse!
+
+  """Creates a new notification for the currently authenticated user."""
   createNotification(input: CreateNotificationInput!): Notification!
-  deleteMyBusinessProfile(input: DeleteBusinessProfileInput!): OperationStatusDto!
-  deleteMyClassPackage(id: ID!): OperationStatusDto!
+
+  """
+  Deletes the business profile of the currently authenticated vendor. This also archives associated classes. Cannot be undone.
+  """
+  deleteMyBusinessProfile(
+    """Confirmation input for deleting the business profile."""
+    input: DeleteBusinessProfileInput!
+  ): OperationStatusDto!
+
+  """
+  Deletes a class package owned by the currently authenticated vendor. This operation cannot be undone.
+  """
+  deleteMyClassPackage(
+    """The ID of the class package to delete."""
+    id: ID!
+  ): OperationStatusDto!
+
+  """
+  Initiates the password reset process by sending a reset code to the user's email.
+  """
   forgotPassword(input: ForgotPasswordInput!): OperationStatusDto!
+
+  """
+  Logs out the currently authenticated user and invalidates their session.
+  """
   logout: OperationStatusDto!
+
+  """Marks a notification as read for the currently authenticated user."""
   markNotificationAsRead(id: String!): Notification!
+
+  """Registers a new parent account in the system."""
   parentSignUp(input: ParentSignUpInput!): AuthResponse!
-  registerVendorProfile(input: CreateVendorProfileDto!): VendorProfile!
+
+  """Creates or updates the profile for the currently authenticated vendor."""
+  registerVendorProfile(
+    """Data for creating the vendor profile."""
+    input: CreateVendorProfileDto!
+  ): VendorProfile!
+
+  """Resets an admin user's password. Requires ADMIN privileges."""
   resetAdminPassword(input: ResetAdminPasswordInput!): AuthResponse!
+
+  """
+  Resets a user's password using the verification code sent to their email.
+  """
   resetPassword(input: ResetPasswordInput!): OperationStatusDto!
+
+  """Authenticates a user and returns an access token."""
   signIn(input: SignInInput!): AuthResponse!
+
+  """Registers a new student account in the system."""
   signUp(input: SignUpInput!): AuthResponse!
+
+  """Updates the password of the currently authenticated parent user."""
   updateMyParentPassword(input: UpdateParentPasswordInput!): OperationStatusDto!
+
+  """Updates the profile of the currently authenticated parent user."""
   updateMyParentProfile(input: UpdateParentProfileInput!): User!
-  updateMyProfile(input: UpdateUserDto!): User!
-  updateVendorProfile(input: UpdateVendorProfileDto!): VendorProfile!
+
+  """
+  Updates the profile of the currently authenticated user. (Generic - parent-specific update is in AuthResolver)
+  """
+  updateMyProfile(
+    """The data to update for the user profile."""
+    input: UpdateUserDto!
+  ): User!
+
+  """Updates the profile for the currently authenticated vendor."""
+  updateVendorProfile(
+    """Data for updating the vendor profile."""
+    input: UpdateVendorProfileDto!
+  ): VendorProfile!
+
+  """Authenticates a vendor and returns an access token."""
   vendorLogin(input: VendorLoginInput!): AuthResponse!
+
+  """Registers a new vendor account in the system."""
   vendorSignUp(input: VendorSignUpInput!): AuthResponse!
 }
 
@@ -239,16 +316,65 @@ enum PaymentType {
 }
 
 type Query {
-  classPackage(id: ID!): ClassPackage
+  """
+  Retrieves a single class package by its ID. If the authenticated user is a vendor, it ensures the package belongs to them.
+  """
+  classPackage(
+    """The ID of the class package to retrieve."""
+    id: ID!
+  ): ClassPackage
+
+  """
+  Retrieves a list of users. (Placeholder - typically admin-only and with pagination/filtering)
+  """
   listUsers: [User!]!
+
+  """Lists all vendor profiles. Requires ADMIN privileges."""
   listVendors: [VendorProfile!]!
+
+  """
+  Retrieves the profile of the currently authenticated user. (Alias for AuthResolver.me)
+  """
   me: User!
+
+  """
+  Retrieves all class packages created by the currently authenticated vendor.
+  """
   myClassPackages: [ClassPackage!]!
+
+  """Retrieves all notifications for the currently authenticated user."""
   myNotifications: [Notification!]!
-  myParentBookings(type: ParentBookingType!): [ParentBookingDetailsDto!]!
+
+  """
+  Retrieves all bookings for the currently authenticated parent. Can be filtered by type (upcoming or past bookings).
+  """
+  myParentBookings(
+    """Specifies whether to fetch 'upcoming' or 'past' bookings."""
+    type: ParentBookingType!
+  ): [ParentBookingDetailsDto!]!
+
+  """
+  Retrieves the transaction history for the currently authenticated parent user.
+  """
   myTransactionHistory: [TransactionViewDto!]!
-  myVendorBookings(filters: BookingFilterInput): [BookingDetailsDto!]!
-  myVendorDashboardRevenue(filters: DateRangeFilterDto): VendorDashboardDataDto!
+
+  """
+  Retrieves all bookings associated with the currently authenticated vendor. Supports filtering by class package ID and date range.
+  """
+  myVendorBookings(
+    """Optional filters for class package ID, start date, and end date."""
+    filters: BookingFilterInput
+  ): [BookingDetailsDto!]!
+
+  """
+  Retrieves dashboard data, including revenue metrics, for the currently authenticated vendor. Supports date range filtering.
+  """
+  myVendorDashboardRevenue(
+    """Optional date range (startDate, endDate) to filter revenue data."""
+    filters: DateRangeFilterDto
+  ): VendorDashboardDataDto!
+
+  """Retrieves the profile of the currently authenticated vendor."""
   myVendorProfile: VendorProfile!
 }
 

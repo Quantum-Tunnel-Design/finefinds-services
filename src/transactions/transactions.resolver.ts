@@ -13,7 +13,10 @@ import { TransactionViewDto } from './dto/transaction-view.dto';
 export class TransactionsResolver {
   constructor(private readonly transactionsService: TransactionsService) {}
 
-  @Query(() => [TransactionViewDto], { name: 'myTransactionHistory' }) // Define the GraphQL Query
+  @Query(() => [TransactionViewDto], { 
+    name: 'myTransactionHistory',
+    description: 'Retrieves the transaction history for the currently authenticated parent user.'
+  })
   @Roles(UserRole.PARENT) // Restrict to PARENT role
   async getMyTransactionHistory(
     @CurrentUser() user: UserModel, // Use CurrentUser decorator to get authenticated user
