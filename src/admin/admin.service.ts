@@ -5,6 +5,7 @@ import { AdminDashboardDataDto } from './dto/admin-dashboard-data.dto';
 import { DashboardMetricsDto } from './dto/dashboard-metrics.dto';
 import { MonthlyPaymentDataDto } from './dto/monthly-payment-data.dto';
 import { DateRangeFilterDto } from './dto/date-range-filter.dto';
+import { AdminTransactionListViewDto } from './dto/admin-transaction-list-view.dto';
 
 @Injectable()
 export class AdminService {
@@ -83,5 +84,69 @@ export class AdminService {
       metrics,
       monthlyPayments,
     };
+  }
+
+  async listAllTransactions(filters?: DateRangeFilterDto): Promise<AdminTransactionListViewDto[]> {
+    const dateFilter: Prisma.DateTimeFilter = {};
+    if (filters?.startDate) {
+      dateFilter.gte = new Date(filters.startDate);
+    }
+    if (filters?.endDate) {
+      const endDate = new Date(filters.endDate);
+      endDate.setHours(23, 59, 59, 999);
+      dateFilter.lte = endDate;
+    }
+
+    const payments = await this.prisma.payment.findMany({
+      where: {
+        createdAt: Object.keys(dateFilter).length > 0 ? dateFilter : undefined,
+        // Potentially add other filters, e.g., by status, user, etc.
+      },
+      include: {
+        User: true, // Parent who made the payment
+        classPackageEnrollment: {
+          include: {
+            classPackage: {
+              include: {
+                vendor: { // User who is the vendor
+                  include: {
+                    businessProfile: true, // To get businessName
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return payments.map((payment) => {
+      const parent = payment.User;
+      const enrollment = payment.classPackageEnrollment;
+      const classPackage = enrollment?.classPackage;
+      const vendorUser = classPackage?.vendor;
+      const businessProfile = vendorUser?.businessProfile;
+
+      const parentName = parent ? `${parent.firstName} ${parent.lastName}` : 'N/A';
+      const vendorName = businessProfile?.businessName || (vendorUser ? `${vendorUser.firstName} ${vendorUser.lastName}` : 'N/A');
+      
+      return {
+        id: payment.id,
+        gatewayTransactionId: payment.transactionId,
+        paymentDate: payment.createdAt,
+        parentId: parent?.id || 'N/A',
+        parentName,
+        vendorId: vendorUser?.id || 'N/A',
+        vendorName,
+        classPackageId: classPackage?.id || 'N/A',
+        classPackageName: classPackage?.name || 'N/A',
+        amount: payment.amount,
+        paymentMethod: payment.paymentMethod,
+        status: payment.status,
+      };
+    });
   }
 } 

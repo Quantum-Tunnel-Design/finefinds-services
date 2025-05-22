@@ -6,8 +6,8 @@ export class VendorProfile {
   @Field(() => ID)
   id: string;
 
-  @Field(() => User)
-  user: User;
+  @Field(() => User, { nullable: true })
+  user?: User;
 
   @Field()
   instituteName: string;

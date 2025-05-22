@@ -6,8 +6,8 @@ export class BusinessProfile {
   @Field(() => ID)
   id: string;
 
-  @Field(() => User)
-  user: User; // Assuming you want to expose the user relation
+  @Field(() => User, { nullable: true })
+  user?: User;
 
   @Field()
   userId: string;

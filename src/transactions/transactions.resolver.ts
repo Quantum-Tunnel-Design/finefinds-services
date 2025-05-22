@@ -23,7 +23,4 @@ export class TransactionsResolver {
   ): Promise<TransactionViewDto[]> {
     return this.transactionsService.getParentTransactionHistory(user.id);
   }
-
-  // The generateInvoicePdf method will remain in TransactionsService and be called by the REST controller
-  // as it handles file streaming which is not standard in GraphQL mutations/queries.
 } 

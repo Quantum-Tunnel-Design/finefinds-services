@@ -19,6 +19,7 @@ model User {
   cognitoSub           String?                  @unique // For Cognito user identifier
   isEmailVerified      Boolean                  @default(false)
   isActive             Boolean                  @default(true)
+  deletedAt            DateTime?                // Added for soft delete
   termsAccepted        Boolean?                 @default(false) // For vendors
   createdAt            DateTime                 @default(now())
   updatedAt            DateTime                 @updatedAt

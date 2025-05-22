@@ -13,6 +13,7 @@ import { BookingsModule } from './bookings/bookings.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { VendorsModule } from './vendors/vendors.module';
 import { AuditModule } from './audit/audit.module';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { AuditModule } from './audit/audit.module';
     NotificationsModule,
     VendorsModule,
     AuditModule,
+    UploadsModule,
   ],
   providers: [PrismaService],
 })

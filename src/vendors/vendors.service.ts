@@ -13,7 +13,6 @@ import { VendorDashboardDataDto } from './dto/vendor-dashboard-data.dto';
 import { VendorRevenueMetricsDto } from './dto/vendor-revenue-metrics.dto';
 import { MonthlyPaymentDataDto } from '../admin/dto/monthly-payment-data.dto';
 import { PaymentStatus, Prisma, BookingStatus, ClassPackageStatus } from '@prisma/client';
-import { FileUpload } from 'graphql-upload-ts';
 import { BusinessProfile } from '@prisma/client';
 
 @Injectable()
@@ -193,37 +192,6 @@ export class VendorsService {
     );
 
     return updatedProfile;
-  }
-
-  async handleBusinessFileUpload(userId: string, file: FileUpload, fileType: 'logo' | 'coverImage' | 'gallery'): Promise<string> {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user || user.role !== UserRole.VENDOR) {
-      throw new ForbiddenException('User is not a vendor or does not exist.');
-    }
-
-    const { createReadStream, filename, mimetype, encoding } = await file;
-    if (!mimetype.startsWith('image/')) {
-      throw new BadRequestException(`Invalid file type for ${fileType}: ${mimetype}. Only images are allowed.`);
-    }
-
-    const stream = createReadStream();
-    const chunks = [];
-    for await (const chunk of stream) {
-      chunks.push(chunk);
-    }
-    const buffer = Buffer.concat(chunks);
-
-    // Generate a unique key for S3, e.g., using userId, fileType, and filename or a timestamp
-    const key = `vendors/${userId}/business-profile/${fileType}s/${Date.now()}-${filename}`;
-    
-    try {
-      // S3Service.uploadFile returns the URL directly
-      const fileUrl = await this.s3Service.uploadFile(buffer, key, mimetype);
-      return fileUrl;
-    } catch (error) {
-      console.error(`Failed to upload ${fileType}:`, error); // Log the actual error
-      throw new BadRequestException(`Failed to upload ${fileType}.`);
-    }
   }
 
   async deleteBusinessProfile(userId: string, input: DeleteBusinessProfileInput) {

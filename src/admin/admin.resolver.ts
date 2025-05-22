@@ -7,6 +7,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { AdminDashboardDataDto } from './dto/admin-dashboard-data.dto';
 import { DateRangeFilterDto } from './dto/date-range-filter.dto';
+import { AdminTransactionListViewDto } from './dto/admin-transaction-list-view.dto';
 
 @Resolver()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -23,5 +24,16 @@ export class AdminResolver {
     filters?: DateRangeFilterDto,
   ): Promise<AdminDashboardDataDto> {
     return this.adminService.getDashboardData(filters);
+  }
+
+  @Query(() => [AdminTransactionListViewDto], {
+    name: 'adminListAllTransactions',
+    description: 'Retrieves a list of all transactions. Optionally filter by date range. Requires ADMIN privileges.',
+  })
+  async listAllTransactions(
+    @Args('filters', { type: () => DateRangeFilterDto, nullable: true, description: 'Optional date range (startDate, endDate) to filter transactions.' })
+    filters?: DateRangeFilterDto,
+  ): Promise<AdminTransactionListViewDto[]> {
+    return this.adminService.listAllTransactions(filters);
   }
 } 

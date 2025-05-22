@@ -16,7 +16,6 @@ import { OperationStatusDto } from '../common/dto/operation-status.dto';
 import { BusinessProfile } from './models/business-profile.model';
 import { CreateBusinessProfileInput } from './dto/create-business-profile.input';
 import { UpdateBusinessProfileInput } from './dto/update-business-profile.input';
-import { GraphQLUpload, FileUpload } from 'graphql-upload-ts';
 
 @Resolver(() => VendorProfile)
 export class VendorsResolver {
@@ -120,42 +119,6 @@ export class VendorsResolver {
     @Args('input') input: UpdateBusinessProfileInput,
   ): Promise<BusinessProfile> {
     return this.vendorsService.updateBusinessProfile(user.id, input) as any as BusinessProfile;
-  }
-  
-  @Mutation(() => String, {
-    description: "Uploads a logo for the vendor's business profile. Returns the S3 URL. Requires VENDOR role."
-  })
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.VENDOR)
-  async uploadBusinessLogo(
-    @CurrentUser() user: User,
-    @Args({ name: 'file', type: () => GraphQLUpload }) file: FileUpload,
-  ): Promise<string> {
-    return this.vendorsService.handleBusinessFileUpload(user.id, file, 'logo');
-  }
-
-  @Mutation(() => String, {
-    description: "Uploads a cover image for the vendor's business profile. Returns the S3 URL. Requires VENDOR role."
-  })
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.VENDOR)
-  async uploadBusinessCoverImage(
-    @CurrentUser() user: User,
-    @Args({ name: 'file', type: () => GraphQLUpload }) file: FileUpload,
-  ): Promise<string> {
-    return this.vendorsService.handleBusinessFileUpload(user.id, file, 'coverImage');
-  }
-
-  @Mutation(() => String, {
-    description: "Uploads a gallery image for the vendor's business profile. Returns the S3 URL. Requires VENDOR role."
-  })
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.VENDOR)
-  async uploadBusinessGalleryImage(
-    @CurrentUser() user: User,
-    @Args({ name: 'file', type: () => GraphQLUpload }) file: FileUpload,
-  ): Promise<string> {
-    return this.vendorsService.handleBusinessFileUpload(user.id, file, 'gallery');
   }
   
   @Query(() => BusinessProfile, {
