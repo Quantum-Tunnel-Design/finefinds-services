@@ -54,7 +54,7 @@ async function bootstrap() {
 
   // Global prefix for all routes except health
   app.setGlobalPrefix('api', {
-    exclude: ['/health(.*)'],
+    exclude: ['/health(.*)', '/api/docs'],
   });
 
   // Swagger configuration
@@ -69,7 +69,7 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document, {
+  SwaggerModule.setup('api/docs', app, document, {
     swaggerOptions: {
       persistAuthorization: true,
       docExpansion: 'none',
