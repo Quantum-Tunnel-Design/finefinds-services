@@ -127,9 +127,9 @@ create_task_definition() {
         }
       },
       "healthCheck": {
-        "command": ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"],
-        "interval": 30,
-        "timeout": 5,
+        "command": ["CMD", "wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1"],
+        "interval": 60,
+        "timeout": 30,
         "retries": 3,
         "startPeriod": 60
       }
