@@ -1,5 +1,5 @@
 # Build stage
-FROM --platform=${BUILDPLATFORM:-linux/amd64} node:18-alpine AS builder
+FROM --platform=${BUILDPLATFORM:-linux/amd64} node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -21,7 +21,7 @@ RUN npm run build && \
     find dist/ -type f
 
 # Production stage
-FROM --platform=${TARGETPLATFORM:-linux/amd64} node:18-alpine
+FROM --platform=${TARGETPLATFORM:-linux/amd64} node:20-alpine
 
 # Install OpenSSL and other required dependencies
 RUN apk add --no-cache openssl
