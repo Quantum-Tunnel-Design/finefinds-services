@@ -1,5 +1,5 @@
-import { Field, InputType } from '@nestjs/graphql';
-import { IsNotEmpty, IsString, IsEmail, IsPhoneNumber, Matches, MaxLength, MinLength, ArrayMinSize, ArrayMaxSize, ValidateNested } from 'class-validator';
+import { Field, InputType, registerEnumType } from '@nestjs/graphql';
+import { IsNotEmpty, IsString, IsEmail, IsPhoneNumber, Matches, MaxLength, MinLength, ArrayMinSize, ArrayMaxSize, ValidateNested, IsEnum, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ChildInput } from './child.input';
 

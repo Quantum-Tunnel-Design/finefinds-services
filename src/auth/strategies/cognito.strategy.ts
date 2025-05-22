@@ -24,8 +24,8 @@ export class CognitoStrategy extends PassportStrategy(Strategy) {
 
     const userPoolId = configService.get('COGNITO_CLIENT_USER_POOL_ID');
     const clientId = configService.get('COGNITO_CLIENT_CLIENT_ID');
-
-    if (!userPoolId || !clientId) {
+    const clientSecret = configService.get('COGNITO_CLIENT_CLIENT_SECRET');
+    if (!userPoolId || !clientId || !clientSecret) {
       throw new Error('Cognito configuration is missing. Please check your environment variables.');
     }
 
@@ -33,6 +33,7 @@ export class CognitoStrategy extends PassportStrategy(Strategy) {
       userPoolId,
       tokenUse: 'access',
       clientId,
+      clientSecret,
     });
   }
 

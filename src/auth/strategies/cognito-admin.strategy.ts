@@ -24,7 +24,7 @@ export class CognitoAdminStrategy extends PassportStrategy(Strategy, 'cognito-ad
       }),
     });
 
-    if (!cognitoConfig.userPoolId || !cognitoConfig.clientId) {
+    if (!cognitoConfig.userPoolId || !cognitoConfig.clientId || !cognitoConfig.clientSecret) {
       throw new Error('Admin Cognito configuration is missing. Please check your environment variables.');
     }
 
@@ -32,6 +32,7 @@ export class CognitoAdminStrategy extends PassportStrategy(Strategy, 'cognito-ad
       userPoolId: cognitoConfig.userPoolId,
       tokenUse: 'access',
       clientId: cognitoConfig.clientId,
+      clientSecret: cognitoConfig.clientSecret,
     });
   }
 

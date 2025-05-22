@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as crypto from 'crypto';
 import {
   CognitoIdentityProviderClient,
   SignUpCommand,
@@ -14,7 +15,7 @@ import {
   AdminSetUserPasswordCommand,
   AdminInitiateAuthCommand,
   AdminUpdateUserAttributesCommand,
-  ChangePasswordCommand,
+  
   AuthFlowType,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { UsersService } from '../users/users.service';
@@ -42,9 +43,10 @@ export class AuthService {
   private cognitoClient: CognitoIdentityProviderClient;
   private clientUserPoolId: string;
   private clientId: string;
+  private clientSecret: string;
   private adminUserPoolId: string;
   private adminClientId: string;
-
+  private adminClientSecret: string;
   constructor(
     private configService: ConfigService,
     private usersService: UsersService,
@@ -54,12 +56,31 @@ export class AuthService {
     private loginAttemptService: LoginAttemptService,
   ) {
     this.cognitoClient = new CognitoIdentityProviderClient({
-      region: this.configService.get('AWS_REGION'),
+      region: this.configService.get<string>('AWS_REGION'),
     });
-    this.clientUserPoolId = this.configService.get('COGNITO_CLIENT_USER_POOL_ID');
-    this.clientId = this.configService.get('COGNITO_CLIENT_CLIENT_ID');
-    this.adminUserPoolId = this.configService.get('COGNITO_ADMIN_USER_POOL_ID');
-    this.adminClientId = this.configService.get('COGNITO_ADMIN_CLIENT_ID');
+    this.clientUserPoolId = this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID');
+    this.clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
+    this.clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
+    console.log('[AuthService Constructor] COGNITO_CLIENT_CLIENT_ID:', this.clientId);
+    console.log('[AuthService Constructor] COGNITO_CLIENT_SECRET loaded as:', this.clientSecret);
+    this.adminUserPoolId = this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID');
+    this.adminClientId = this.configService.get<string>('COGNITO_ADMIN_CLIENT_ID');
+    this.adminClientSecret = this.configService.get<string>('COGNITO_ADMIN_CLIENT_SECRET');
+    if (!this.clientSecret && this.configService.get<string>('APP_CLIENT_HAS_SECRET') === 'true') {
+        console.warn('COGNITO_CLIENT_SECRET is not set, but app client might require it.');
+    }
+    if (!this.adminClientSecret && this.configService.get<string>('ADMIN_CLIENT_HAS_SECRET') === 'true') {
+        console.warn('COGNITO_ADMIN_CLIENT_SECRET is not set, but admin client might require it.');
+    }
+  }
+
+  private calculateSecretHash(username: string): string | undefined {
+    if (!this.clientSecret) {
+      return undefined;
+    }
+    const hmac = crypto.createHmac('sha256', this.clientSecret);
+    hmac.update(username + this.clientId);
+    return hmac.digest('base64');
   }
 
   async signUp(input: SignUpInput): Promise<AuthResponse> {
@@ -276,7 +297,8 @@ export class AuthService {
       // Validate date of birth is not in the future
       const now = new Date();
       for (const child of input.children) {
-        if (child.dateOfBirth > now) {
+        const dob = typeof child.dateOfBirth === 'string' ? new Date(child.dateOfBirth) : child.dateOfBirth;
+        if (dob > now) {
           throw new BadRequestException('Date of birth cannot be in the future');
         }
       }
@@ -287,20 +309,29 @@ export class AuthService {
         throw new BadRequestException('Email already registered');
       }
 
+      const secretHash = this.calculateSecretHash(input.email);
+
+      const userAttributes = [
+        { Name: 'email', Value: input.email },
+        { Name: 'given_name', Value: input.firstName },
+        { Name: 'family_name', Value: input.lastName },
+        { Name: 'phone_number', Value: input.phoneNumber },
+        { Name: 'custom:role', Value: UserRole.PARENT },
+      ];
+
       // Create Cognito user
-      const signUpCommand = new SignUpCommand({
+      const signUpCommandInput: any = {
         ClientId: this.clientId,
         Username: input.email,
         Password: input.password,
-        UserAttributes: [
-          { Name: 'email', Value: input.email },
-          { Name: 'given_name', Value: input.firstName },
-          { Name: 'family_name', Value: input.lastName },
-          { Name: 'phone_number', Value: input.phoneNumber },
-          { Name: 'custom:role', Value: UserRole.PARENT },
-        ],
-      });
+        UserAttributes: userAttributes,
+      };
 
+      if (secretHash) {
+        signUpCommandInput.SecretHash = secretHash;
+      }
+
+      const signUpCommand = new SignUpCommand(signUpCommandInput);
       const cognitoResponse = await this.cognitoClient.send(signUpCommand);
 
       // Add user to parent group
@@ -324,7 +355,7 @@ export class AuthService {
           firstName: child.firstName,
           lastName: child.lastName,
           gender: child.gender === 'male' ? Gender.MALE : Gender.FEMALE,
-          dateOfBirth: child.dateOfBirth,
+          dateOfBirth: typeof child.dateOfBirth === 'string' ? new Date(child.dateOfBirth) : child.dateOfBirth,
         })),
       });
 
@@ -335,7 +366,8 @@ export class AuthService {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new UnauthorizedException(error.message);
+      console.error('Parent SignUp Error:', error);
+      throw new UnauthorizedException(error.message || 'Could not complete parent sign up.');
     }
   }
 
