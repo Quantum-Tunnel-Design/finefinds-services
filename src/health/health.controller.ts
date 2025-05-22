@@ -1,16 +1,18 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, HttpCode } from '@nestjs/common';
 import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('health')
 export class HealthController {
   @Public()
   @Get()
+  @HttpCode(200)
   health() {
     return { status: 'OK', timestamp: new Date().toISOString() };
   }
 
   @Public()
   @Get('debug-env')
+  @HttpCode(200)
   debugEnv() {
     // Create a sanitized version of the environment variables for debugging
     // Only include non-sensitive variables or indicate that sensitive ones are set
