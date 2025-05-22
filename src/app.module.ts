@@ -29,6 +29,8 @@ import { CoursesModule } from './courses/courses.module';
       autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
       sortSchema: true,
       context: ({ req }) => ({ req }),
+      debug: true,
+      playground: true,
     }),
     AuthModule,
     UsersModule,

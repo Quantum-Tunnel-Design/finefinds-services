@@ -26,7 +26,17 @@ async function bootstrap() {
   );
 
   // Security middleware
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+          'script-src': ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net'],
+          'img-src': ["'self'", 'data:', 'cdn.jsdelivr.net'],
+        },
+      },
+    }),
+  );
   app.use(compression());
   app.enableCors({
     origin: configService.get('CORS_ORIGIN', '*'),
