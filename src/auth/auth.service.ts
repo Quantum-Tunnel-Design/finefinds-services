@@ -41,12 +41,6 @@ import { LoginAttemptService } from './services/login-attempt.service';
 @Injectable()
 export class AuthService {
   private cognitoClient: CognitoIdentityProviderClient;
-  private clientUserPoolId: string;
-  private clientId: string;
-  private clientSecret: string;
-  private adminUserPoolId: string;
-  private adminClientId: string;
-  private adminClientSecret: string;
   constructor(
     private configService: ConfigService,
     private usersService: UsersService,
@@ -58,91 +52,107 @@ export class AuthService {
     this.cognitoClient = new CognitoIdentityProviderClient({
       region: this.configService.get<string>('AWS_REGION'),
     });
-    this.clientUserPoolId = this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID');
-    this.clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
-    this.clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
-    console.log('[AuthService Constructor] COGNITO_CLIENT_CLIENT_ID:', this.clientId);
-    console.log('[AuthService Constructor] COGNITO_CLIENT_SECRET loaded as:', this.clientSecret);
-    this.adminUserPoolId = this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID');
-    this.adminClientId = this.configService.get<string>('COGNITO_ADMIN_CLIENT_ID');
-    this.adminClientSecret = this.configService.get<string>('COGNITO_ADMIN_CLIENT_SECRET');
-    if (!this.clientSecret && this.configService.get<string>('APP_CLIENT_HAS_SECRET') === 'true') {
-        console.warn('COGNITO_CLIENT_SECRET is not set, but app client might require it.');
+    if (!this.configService.get<string>('COGNITO_APP_CLIENT_SECRET') && this.configService.get<string>('APP_CLIENT_HAS_SECRET') === 'true') {
+        console.warn('[AuthService] COGNITO_APP_CLIENT_SECRET is not set, but app client might require it based on APP_CLIENT_HAS_SECRET.');
     }
-    if (!this.adminClientSecret && this.configService.get<string>('ADMIN_CLIENT_HAS_SECRET') === 'true') {
-        console.warn('COGNITO_ADMIN_CLIENT_SECRET is not set, but admin client might require it.');
+    if (!this.configService.get<string>('COGNITO_ADMIN_CLIENT_SECRET') && this.configService.get<string>('ADMIN_CLIENT_HAS_SECRET') === 'true') {
+        console.warn('[AuthService] COGNITO_ADMIN_CLIENT_SECRET is not set, but admin client might require it based on ADMIN_CLIENT_HAS_SECRET.');
     }
   }
 
-  private calculateSecretHash(username: string): string | undefined {
-    if (!this.clientSecret) {
+  private computeSecretHash(username: string, clientId: string, clientSecret?: string): string | undefined {
+    if (!clientSecret) {
+      // console.log(`[AuthService computeSecretHash] No client secret provided for clientId: ${clientId}. Skipping SecretHash computation.`);
       return undefined;
     }
-    const hmac = crypto.createHmac('sha256', this.clientSecret);
-    hmac.update(username + this.clientId);
-    return hmac.digest('base64');
-  }
-
-  private calculateAdminSecretHash(username: string): string | undefined {
-    if (!this.adminClientSecret) {
-      return undefined;
+    // console.log(`[AuthService computeSecretHash] Computing SecretHash for username: ${username}, clientId: ${clientId}`);
+    try {
+      const hmac = crypto.createHmac('sha256', clientSecret);
+      hmac.update(username + clientId);
+      const hash = hmac.digest('base64');
+      // console.log(`[AuthService computeSecretHash] Computed hash for ${username}: ${hash}`);
+      return hash;
+    } catch (error) {
+      console.error(`[AuthService computeSecretHash] Error computing hash for ${username}:`, error);
+      // Depending on policy, you might want to throw an error or handle it such that the Cognito call proceeds without SecretHash
+      // For now, returning undefined, which means Cognito call will not include SecretHash if computation fails.
+      return undefined; 
     }
-    const hmac = crypto.createHmac('sha256', this.adminClientSecret);
-    hmac.update(username + this.adminClientId);
-    return hmac.digest('base64');
   }
 
   async signUp(input: SignUpInput): Promise<AuthResponse> {
-    try {
-      const signUpCommand = new SignUpCommand({
-        ClientId: this.clientId,
+    const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
+    const clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
+    const secretHash = this.computeSecretHash(input.email, clientId, clientSecret);
+    const params: any = {
+        ClientId: clientId,
         Username: input.email,
         Password: input.password,
         UserAttributes: [
           { Name: 'email', Value: input.email },
           { Name: 'given_name', Value: input.firstName },
           { Name: 'family_name', Value: input.lastName },
-          { Name: 'custom:role', Value: input.role },
+          { Name: 'custom:role', Value: input.role }, // Ensure role is a string
         ],
-      });
+    };
+    if (secretHash) {
+        params.SecretHash = secretHash;
+    }
 
+    try {
+      const signUpCommand = new SignUpCommand(params);
       await this.cognitoClient.send(signUpCommand);
-
       return {
         message: 'User registered successfully. Please check your email for verification code.',
       };
     } catch (error) {
-      throw new UnauthorizedException(error.message);
+      console.error('[AuthService signUp] Error:', error);
+      throw new BadRequestException(error.message || 'Could not register user');
     }
   }
 
   async confirmSignUp(input: ConfirmSignUpInput): Promise<AuthResponse> {
-    try {
-      const confirmCommand = new ConfirmSignUpCommand({
-        ClientId: this.clientId,
+    const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
+    const clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
+    const secretHash = this.computeSecretHash(input.email, clientId, clientSecret);
+    const params: any = {
+        ClientId: clientId,
         Username: input.email,
         ConfirmationCode: input.code,
-      });
+    };
+    if (secretHash) {
+        params.SecretHash = secretHash;
+    }
 
+    try {
+      const confirmCommand = new ConfirmSignUpCommand(params);
       await this.cognitoClient.send(confirmCommand);
-
       return {
         message: 'Email verified successfully. You can now sign in.',
       };
     } catch (error) {
-      throw new UnauthorizedException(error.message);
+      console.error('[AuthService confirmSignUp] Error:', error);
+      throw new BadRequestException(error.message || 'Could not confirm sign up');
     }
   }
 
   async signIn(input: SignInInput): Promise<AuthResponse> {
+    const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
+    const clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
+    const secretHash = this.computeSecretHash(input.email, clientId, clientSecret);
+    const authParameters: { [key: string]: string } = {
+        USERNAME: input.email,
+        PASSWORD: input.password,
+    };
+    if (secretHash) {
+        authParameters.SECRET_HASH = secretHash;
+    }
+
     try {
       const authCommand = new InitiateAuthCommand({
         AuthFlow: 'USER_PASSWORD_AUTH',
-        ClientId: this.clientId,
-        AuthParameters: {
-          USERNAME: input.email,
-          PASSWORD: input.password,
-        },
+        ClientId: clientId,
+        AuthParameters: authParameters,
       });
 
       const response = await this.cognitoClient.send(authCommand);
@@ -216,136 +226,107 @@ export class AuthService {
   }
 
   async forgotPassword(input: ForgotPasswordInput): Promise<AuthResponse> {
+    const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
+    const clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
+    const secretHash = this.computeSecretHash(input.email, clientId, clientSecret);
+    const params: any = {
+        ClientId: clientId,
+        Username: input.email,
+    };
+    if (secretHash) {
+        params.SecretHash = secretHash;
+    }
+
     try {
       const user = await this.usersService.findByEmail(input.email);
       if (user?.role === UserRole.ADMIN) {
-        throw new ForbiddenException('Password reset is not allowed for admin accounts');
-      }
-
-      // Check if user exists
-      if (!user) {
-        // Return success even if user doesn't exist for security
+        // Admins should use a different flow or be handled by admin console
+        console.warn(`[AuthService forgotPassword] Attempt to reset password for admin user: ${input.email}. Denying.`);
         return {
-          message: 'If an account exists with this email, you will receive a password reset code.',
+          message: 'Password reset for admin accounts should be handled via the admin console or a dedicated admin password reset flow.',
         };
       }
 
-      const forgotPasswordCommand = new ForgotPasswordCommand({
-        ClientId: this.clientId,
-        Username: input.email,
-      });
-
+      // For non-admin users, proceed with Cognito ForgotPasswordCommand
+      // We don't throw an error if the user is not found to prevent email enumeration
+      const forgotPasswordCommand = new ForgotPasswordCommand(params);
       await this.cognitoClient.send(forgotPasswordCommand);
 
       return {
-        message: 'If an account exists with this email, you will receive a password reset code.',
+        message: 'If an account with that email exists, a password reset code will be sent.',
       };
     } catch (error) {
-      if (error instanceof ForbiddenException) {
-        throw error;
-      }
+      // Log the error for server-side diagnostics but return a generic message to the client
+      console.error('[AuthService forgotPassword] Error sending forgot password command:', error);
       return {
-        message: 'If an account exists with this email, you will receive a password reset code.',
+        message: 'If an account with that email exists, a password reset code will be sent.',
       };
     }
   }
 
   async resetPassword(input: ResetPasswordInput): Promise<AuthResponse> {
-    try {
-      // Validate password match
-      if (input.newPassword !== input.confirmNewPassword) {
-        throw new BadRequestException('Passwords do not match');
-      }
-
-      // Check if user exists
-      const user = await this.usersService.findByEmail(input.email);
-      if (!user) {
-        throw new BadRequestException('Invalid reset code or email');
-      }
-
-      const confirmForgotPasswordCommand = new ConfirmForgotPasswordCommand({
-        ClientId: this.clientId,
+    const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
+    const clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
+    const secretHash = this.computeSecretHash(input.email, clientId, clientSecret);
+    const params: any = {
+        ClientId: clientId,
         Username: input.email,
         ConfirmationCode: input.code,
         Password: input.newPassword,
-      });
+    };
+    if (secretHash) {
+        params.SecretHash = secretHash;
+    }
 
+    try {
+      const confirmForgotPasswordCommand = new ConfirmForgotPasswordCommand(params);
       await this.cognitoClient.send(confirmForgotPasswordCommand);
-
-      // Delete any existing sessions for this user
-      await this.sessionService.deleteUserSessions(user.id);
+      
+      const user = await this.usersService.findByEmail(input.email);
+      if (user) {
+        await this.sessionService.deleteUserSessions(user.id);
+      }
 
       return {
-        message: 'Password reset successfully. You can now sign in with your new password.',
+        message: 'Password has been successfully reset.',
       };
     } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new UnauthorizedException('Invalid reset code or email');
+      console.error('[AuthService resetPassword] Error:', error);
+      throw new BadRequestException(error.message || 'Could not reset password');
     }
   }
 
   async parentSignUp(input: ParentSignUpInput): Promise<AuthResponse> {
+    const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
+    const clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
+    const secretHash = this.computeSecretHash(input.email, clientId, clientSecret);
+
+    const userAttributes = [
+      { Name: 'email', Value: input.email },
+      { Name: 'given_name', Value: input.firstName },
+      { Name: 'family_name', Value: input.lastName },
+      { Name: 'phone_number', Value: input.phoneNumber },
+      { Name: 'custom:role', Value: UserRole.PARENT },
+    ];
+
+    const signUpParams: any = {
+      ClientId: clientId,
+      Username: input.email,
+      Password: input.password,
+      UserAttributes: userAttributes,
+    };
+    if (secretHash) {
+      signUpParams.SecretHash = secretHash;
+    }
+
     try {
-      // Validate password match
-      if (input.password !== input.confirmPassword) {
-        throw new BadRequestException('Passwords do not match');
-      }
-
-      // Validate at least one child
-      if (!input.children || input.children.length === 0) {
-        throw new BadRequestException('At least one child is required');
-      }
-
-      // Validate maximum number of children
-      if (input.children.length > 10) {
-        throw new BadRequestException('Maximum 10 children allowed');
-      }
-
-      // Validate date of birth is not in the future
-      const now = new Date();
-      for (const child of input.children) {
-        const dob = typeof child.dateOfBirth === 'string' ? new Date(child.dateOfBirth) : child.dateOfBirth;
-        if (dob > now) {
-          throw new BadRequestException('Date of birth cannot be in the future');
-        }
-      }
-
-      // Check if email already exists
-      const existingUser = await this.usersService.findByEmail(input.email);
-      if (existingUser) {
-        throw new BadRequestException('Email already registered');
-      }
-
-      const secretHash = this.calculateSecretHash(input.email);
-
-      const userAttributes = [
-        { Name: 'email', Value: input.email },
-        { Name: 'given_name', Value: input.firstName },
-        { Name: 'family_name', Value: input.lastName },
-        { Name: 'phone_number', Value: input.phoneNumber },
-        { Name: 'custom:role', Value: UserRole.PARENT },
-      ];
-
       // Create Cognito user
-      const signUpCommandInput: any = {
-        ClientId: this.clientId,
-        Username: input.email,
-        Password: input.password,
-        UserAttributes: userAttributes,
-      };
-
-      if (secretHash) {
-        signUpCommandInput.SecretHash = secretHash;
-      }
-
-      const signUpCommand = new SignUpCommand(signUpCommandInput);
-      const cognitoResponse = await this.cognitoClient.send(signUpCommand);
+      const signUpCommand = new SignUpCommand(signUpParams);
+      const cognitoUser = await this.cognitoClient.send(signUpCommand);
 
       // Add user to parent group
       const addToGroupCommand = new AdminAddUserToGroupCommand({
-        UserPoolId: this.clientUserPoolId,
+        UserPoolId: this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID'),
         Username: input.email,
         GroupName: 'parent',
       });
@@ -358,7 +339,7 @@ export class AuthService {
         firstName: input.firstName,
         lastName: input.lastName,
         role: UserRole.PARENT,
-        cognitoSub: cognitoResponse.UserSub,
+        cognitoSub: cognitoUser.UserSub,
         phoneNumber: input.phoneNumber,
         children: input.children.map(child => ({
           firstName: child.firstName,
@@ -381,21 +362,23 @@ export class AuthService {
   }
 
   async adminSignIn(input: AdminSignInInput): Promise<AuthResponse> {
+    const adminClientId = this.configService.get<string>('COGNITO_ADMIN_CLIENT_ID');
+    const adminClientSecret = this.configService.get<string>('COGNITO_ADMIN_CLIENT_SECRET');
+    const secretHash = this.computeSecretHash(input.username, adminClientId, adminClientSecret);
+
+    const authParameters: { [key: string]: string } = {
+      USERNAME: input.username,
+      PASSWORD: input.password,
+    };
+    if (secretHash) {
+      authParameters.SECRET_HASH = secretHash;
+    }
+
     try {
-      const authParameters: { [key: string]: string } = {
-        USERNAME: input.username,
-        PASSWORD: input.password,
-      };
-
-      const secretHash = this.calculateAdminSecretHash(input.username);
-      if (secretHash) {
-        authParameters.SECRET_HASH = secretHash;
-      }
-
       const authCommand = new AdminInitiateAuthCommand({
-        UserPoolId: this.adminUserPoolId,
-        ClientId: this.adminClientId,
-        AuthFlow: 'ADMIN_USER_PASSWORD_AUTH' as AuthFlowType, // Explicitly cast to AuthFlowType
+        UserPoolId: this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID'),
+        ClientId: adminClientId,
+        AuthFlow: 'ADMIN_USER_PASSWORD_AUTH' as AuthFlowType,
         AuthParameters: authParameters,
       });
 
@@ -437,7 +420,7 @@ export class AuthService {
 
       // Create admin user in Cognito
       const createUserCommand = new AdminCreateUserCommand({
-        UserPoolId: this.adminUserPoolId,
+        UserPoolId: this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID'),
         Username: input.email,
         UserAttributes: [
           { Name: 'email', Value: input.email },
@@ -453,7 +436,7 @@ export class AuthService {
 
       // Set admin password
       const setPasswordCommand = new AdminSetUserPasswordCommand({
-        UserPoolId: this.adminUserPoolId,
+        UserPoolId: this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID'),
         Username: input.email,
         Password: input.password,
         Permanent: true,
@@ -463,7 +446,7 @@ export class AuthService {
 
       // Add to admin group
       const addToGroupCommand = new AdminAddUserToGroupCommand({
-        UserPoolId: this.adminUserPoolId,
+        UserPoolId: this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID'),
         Username: input.email,
         GroupName: 'admin',
       });
@@ -500,7 +483,7 @@ export class AuthService {
 
       // Set new password
       const setPasswordCommand = new AdminSetUserPasswordCommand({
-        UserPoolId: this.adminUserPoolId,
+        UserPoolId: this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID'),
         Username: adminEmail,
         Password: newPassword,
         Permanent: true,
@@ -531,7 +514,7 @@ export class AuthService {
 
       // Update user in Cognito
       const updateUserCommand = new AdminUpdateUserAttributesCommand({
-        UserPoolId: this.clientUserPoolId,
+        UserPoolId: this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID'),
         Username: user.email,
         UserAttributes: [
           { Name: 'given_name', Value: input.firstName },
@@ -561,36 +544,40 @@ export class AuthService {
   }
 
   async updateParentPassword(userId: string, input: UpdateParentPasswordInput): Promise<AuthResponse> {
+    const user = await this.usersService.findById(userId);
+    if (!user || !user.email) {
+      throw new BadRequestException('User not found or email missing.');
+    }
+
+    // 1. Verify current password by trying to authenticate
+    const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
+    const clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
+    const verifySecretHash = this.computeSecretHash(user.email, clientId, clientSecret);
+    const verifyAuthParams: { [key: string]: string } = {
+        USERNAME: user.email,
+        PASSWORD: input.currentPassword,
+    };
+    if (verifySecretHash) {
+        verifyAuthParams.SECRET_HASH = verifySecretHash;
+    }
+
     try {
-      const user = await this.usersService.findById(userId);
-      if (!user || user.role !== UserRole.PARENT) {
-        throw new ForbiddenException('User not found or not a parent');
-      }
+      const authCommand = new InitiateAuthCommand({
+        AuthFlow: 'USER_PASSWORD_AUTH',
+        ClientId: clientId,
+        AuthParameters: verifyAuthParams,
+      });
+      await this.cognitoClient.send(authCommand); // If this doesn't throw, current password is correct
+    } catch (error) {
+      console.error('[AuthService updateParentPassword] Current password verification failed:', error);
+      throw new UnauthorizedException('Invalid current password.');
+    }
 
-      // Validate password match
-      if (input.newPassword !== input.confirmNewPassword) {
-        throw new BadRequestException('New passwords do not match');
-      }
-
-      // Verify current password
-      try {
-        const authCommand = new InitiateAuthCommand({
-          AuthFlow: 'USER_PASSWORD_AUTH',
-          ClientId: this.clientId,
-          AuthParameters: {
-            USERNAME: user.email,
-            PASSWORD: input.currentPassword,
-          },
-        });
-
-        await this.cognitoClient.send(authCommand);
-      } catch (error) {
-        throw new UnauthorizedException('Current password is incorrect');
-      }
-
+    // 2. If current password is correct, set the new password using AdminSetUserPasswordCommand
+    try {
       // Update password in Cognito using admin API
       const setPasswordCommand = new AdminSetUserPasswordCommand({
-        UserPoolId: this.clientUserPoolId,
+        UserPoolId: this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID'),
         Username: user.email,
         Password: input.newPassword,
         Permanent: true,
@@ -613,43 +600,37 @@ export class AuthService {
   }
 
   async vendorSignUp(input: VendorSignUpInput): Promise<AuthResponse> {
+    const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
+    const clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
+    const secretHash = this.computeSecretHash(input.email, clientId, clientSecret);
+
+    const userAttributes = [
+      { Name: 'email', Value: input.email },
+      { Name: 'given_name', Value: input.firstName },
+      { Name: 'family_name', Value: input.lastName },
+      { Name: 'phone_number', Value: input.phoneNumber },
+      { Name: 'custom:role', Value: UserRole.VENDOR },
+      { Name: 'custom:secondary_phone', Value: input.secondaryPhoneNumber || '' },
+    ];
+
+    const signUpParams: any = {
+      ClientId: clientId,
+      Username: input.email,
+      Password: input.password,
+      UserAttributes: userAttributes,
+    };
+    if (secretHash) {
+      signUpParams.SecretHash = secretHash;
+    }
+
     try {
-      // Validate password match
-      if (input.password !== input.confirmPassword) {
-        throw new BadRequestException('Passwords do not match');
-      }
-
-      // Validate terms acceptance
-      if (!input.termsAccepted) {
-        throw new BadRequestException('Terms and conditions must be accepted');
-      }
-
-      // Check if email already exists
-      const existingUser = await this.usersService.findByEmail(input.email);
-      if (existingUser) {
-        throw new BadRequestException('Email already registered');
-      }
-
       // Create Cognito user
-      const signUpCommand = new SignUpCommand({
-        ClientId: this.clientId,
-        Username: input.email,
-        Password: input.password,
-        UserAttributes: [
-          { Name: 'email', Value: input.email },
-          { Name: 'given_name', Value: input.firstName },
-          { Name: 'family_name', Value: input.lastName },
-          { Name: 'phone_number', Value: input.phoneNumber },
-          { Name: 'custom:secondary_phone', Value: input.secondaryPhoneNumber },
-          { Name: 'custom:role', Value: UserRole.VENDOR },
-        ],
-      });
-
-      const cognitoResponse = await this.cognitoClient.send(signUpCommand);
+      const signUpCommand = new SignUpCommand(signUpParams);
+      const cognitoUser = await this.cognitoClient.send(signUpCommand);
 
       // Add user to vendor group
       const addToGroupCommand = new AdminAddUserToGroupCommand({
-        UserPoolId: this.clientUserPoolId,
+        UserPoolId: this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID'),
         Username: input.email,
         GroupName: 'vendor',
       });
@@ -662,7 +643,7 @@ export class AuthService {
         firstName: input.firstName,
         lastName: input.lastName,
         role: UserRole.VENDOR,
-        cognitoSub: cognitoResponse.UserSub,
+        cognitoSub: cognitoUser.UserSub,
         phoneNumber: input.phoneNumber,
         secondaryPhoneNumber: input.secondaryPhoneNumber,
       });
@@ -732,6 +713,18 @@ export class AuthService {
   }
 
   async vendorLogin(input: VendorLoginInput) {
+    const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
+    const clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
+    const secretHash = this.computeSecretHash(input.email, clientId, clientSecret);
+
+    const authParameters: { [key: string]: string } = {
+      USERNAME: input.email,
+      PASSWORD: input.password,
+    };
+    if (secretHash) {
+      authParameters.SECRET_HASH = secretHash;
+    }
+
     // Check if account is locked
     const { locked, lockedUntil } = await this.loginAttemptService.isAccountLocked(input.email);
     if (locked) {
@@ -743,13 +736,9 @@ export class AuthService {
     try {
       const command = new InitiateAuthCommand({
         AuthFlow: AuthFlowType.USER_PASSWORD_AUTH,
-        ClientId: this.clientId,
-        AuthParameters: {
-          USERNAME: input.email,
-          PASSWORD: input.password,
-        },
+        ClientId: clientId,
+        AuthParameters: authParameters,
       });
-
       const response = await this.cognitoClient.send(command);
 
       // Get user from database
