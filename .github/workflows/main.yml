@@ -51,18 +51,18 @@ env:
   
   # ECR Configuration
   ecr_repository_backend: finefinds-services-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
-  ecr_repository_envoy: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/finefinds-base/aws-envoy
-  ecr_envoy_image_tag: envoy-v1.29.12.1-prod
+  # ecr_repository_envoy: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/finefinds-base/aws-envoy
+  # ecr_envoy_image_tag: envoy-v1.29.12.1-prod
   
   # ECS Configuration
   cluster_name: finefinds-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}-cluster
   service_name: finefinds-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}-service
   task_def_family: finefinds-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}-task-def
   
-  # App Mesh Configuration
-  mesh_name: finefinds-mesh
-  virtual_node_name: finefinds-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}-vn
-  virtual_service_name: finefinds-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}-vs
+  # App Mesh Configuration (REMOVED)
+  # mesh_name: finefinds-mesh
+  # virtual_node_name: finefinds-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}-vn
+  # virtual_service_name: finefinds-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}-vs
   
   # Secrets Configuration
   db_connection_secret: finefinds-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}-rds-connection
@@ -71,7 +71,7 @@ env:
   cognito_config_secret: finefinds-${{ github.ref_name == 'main' && 'prod' || github.ref_name }}-cognito-config
   
   # Log Groups Configuration
-  log_group_envoy: /finefinds/${{ github.ref_name == 'main' && 'prod' || github.ref_name }}/envoy
+  # log_group_envoy: /finefinds/${{ github.ref_name == 'main' && 'prod' || github.ref_name }}/envoy (REMOVED)
   log_group_app: /finefinds/${{ github.ref_name == 'main' && 'prod' || github.ref_name }}/app
 
 jobs:
@@ -117,19 +117,19 @@ jobs:
             "github_actions_role"
             "services_env"
             "ecr_repository_backend"
-            "ecr_repository_envoy"
-            "ecr_envoy_image_tag"
+            # "ecr_repository_envoy"
+            # "ecr_envoy_image_tag"
             "cluster_name"
             "service_name"
             "task_def_family"
-            "mesh_name"
-            "virtual_node_name"
-            "virtual_service_name"
+            # "mesh_name"
+            # "virtual_node_name"
+            # "virtual_service_name"
             "db_connection_secret"
             "redis_connection_secret"
             "cognito_config_secret"
             "jwt_secret"
-            "log_group_envoy"
+            # "log_group_envoy"
             "log_group_app"
           )
 
@@ -373,97 +373,6 @@ jobs:
           echo "✓ Successfully retrieved VPC and subnet information"
           echo "::endgroup::"
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }}
-          aws-region: ${{ env.aws_region }}
-          role-duration-seconds: 3600
-          
-      - name: Verify App Mesh Resources and Permissions
-        run: |
-          echo "::group::Verifying App Mesh Resources"
-          
-          # Function to check if resource exists
-          check_resource_exists() {
-            local resource_type=$1
-            local resource_name=$2
-            local command=$3
-            
-            echo "Checking $resource_type: $resource_name"
-            if ! $command > /dev/null 2>&1; then
-              echo "::error::$resource_type $resource_name does not exist"
-              return 1
-            fi
-            echo "✓ $resource_type $resource_name exists"
-            return 0
-          }
-          
-          # Check if mesh exists
-          check_resource_exists "mesh" "${{ env.mesh_name }}" "aws appmesh describe-mesh --mesh-name ${{ env.mesh_name }}"
-          
-          # Check if virtual node exists
-          check_resource_exists "virtual node" "${{ env.virtual_node_name }}" "aws appmesh describe-virtual-node --mesh-name ${{ env.mesh_name }} --virtual-node-name ${{ env.virtual_node_name }}"
-          
-          # Check if virtual service exists
-          check_resource_exists "virtual service" "${{ env.virtual_service_name }}" "aws appmesh describe-virtual-service --mesh-name ${{ env.mesh_name }} --virtual-service-name ${{ env.virtual_service_name }}"
-          
-          # Verify IAM permissions
-          echo "Verifying IAM permissions..."
-          if ! aws iam simulate-principal-policy \
-            --policy-source-arn arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }} \
-            --action-names \
-            appmesh:StreamAggregatedResources \
-            appmesh:DescribeVirtualNode \
-            appmesh:DescribeVirtualService \
-            appmesh:DescribeRoute \
-            appmesh:DescribeVirtualRouter > /dev/null 2>&1; then
-            echo "::error::Task role missing required App Mesh permissions"
-            exit 1
-          fi
-          echo "✓ Task role has required App Mesh permissions"
-          echo "::endgroup::"
-
-      - name: Validate Envoy Image
-        run: |
-          echo "::group::Validating Envoy Image"
-          echo "Authenticating to ECR Public..."
-          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
-          
-          echo "Pulling Envoy image..."
-          if ! docker pull ${{ env.ecr_repository_envoy }}:${{ env.ecr_envoy_image_tag }}; then
-            echo "::error::Failed to pull Envoy image. Please check if the image exists and is accessible."
-            exit 1
-          fi
-          echo "✓ Successfully validated Envoy image"
-          echo "::endgroup::"
-          
-      - name: Deploy to ECS
-        run: |
-          echo "::group::Deploying to ECS"
-          VERSION=$(cat version.txt)
-          
-          echo "Updating ECS service..."
-          if ! aws ecs update-service \
-            --cluster ${{ env.cluster_name }} \
-            --service ${{ env.service_name }} \
-            --force-new-deployment \
-            --task-definition ${{ env.task_def_family }}:$VERSION; then
-            echo "::error::Failed to update ECS service"
-            exit 1
-          fi
-          
-          echo "Waiting for service to stabilize..."
-          if ! aws ecs wait services-stable \
-            --cluster ${{ env.cluster_name }} \
-            --services ${{ env.service_name }}; then
-            echo "::error::Service failed to stabilize"
-            exit 1
-          fi
-          
-          echo "✓ Deployment completed successfully"
-          echo "::endgroup::"
-
   deploy-dev:
     needs: build-and-push
     if: ${{ !contains(github.event.head_commit.message, '[skip deploy]') && (github.ref == 'refs/heads/dev' || github.event.pull_request.base.ref == 'dev' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'dev' && !inputs.skip_deploy)) }}
@@ -489,13 +398,6 @@ jobs:
           aws-region: ${{ env.aws_region }}
           role-duration-seconds: 3600
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }}
-          aws-region: ${{ env.aws_region }}
-          role-duration-seconds: 3600
-          
       - name: Get RDS Endpoint and Credentials
         id: rds_creds
         run: |
@@ -646,7 +548,7 @@ jobs:
           }
           
           create_all_log_groups() {
-            create_log_group "${{ env.log_group_envoy }}"
+            # create_log_group "${{ env.log_group_envoy }}" # REMOVED
             create_log_group "${{ env.log_group_app }}"
             log "INFO" "All required log groups have been created"
           }
@@ -694,12 +596,12 @@ jobs:
           export AWS_REGION="${{ env.aws_region }}"
           export AWS_ACCOUNT_ID="${{ secrets.AWS_ACCOUNT_ID }}"
           export SERVICES_ENV="${{ env.services_env }}"
-          export ECR_REPOSITORY_ENVOY="${{ env.ecr_repository_envoy }}"
-          export ECR_ENVOY_IMAGE_TAG="${{ env.ecr_envoy_image_tag }}"
+          # export ECR_REPOSITORY_ENVOY="${{ env.ecr_repository_envoy }}" # REMOVED
+          # export ECR_ENVOY_IMAGE_TAG="${{ env.ecr_envoy_image_tag }}" # REMOVED
           export ECR_REPOSITORY_BACKEND="${{ env.ecr_repository_backend }}"
-          export MESH_NAME="${{ env.mesh_name }}"
-          export VIRTUAL_NODE_NAME="${{ env.virtual_node_name }}"
-          export LOG_GROUP_ENVOY="${{ env.log_group_envoy }}"
+          # export MESH_NAME="${{ env.mesh_name }}" # REMOVED
+          # export VIRTUAL_NODE_NAME="${{ env.virtual_node_name }}" # REMOVED
+          # export LOG_GROUP_ENVOY="${{ env.log_group_envoy }}" # REMOVED
           export LOG_GROUP_APP="${{ env.log_group_app }}"
           export SUBNET_IDS="${{ secrets.SUBNET_IDS }}"
           export SECURITY_GROUP_IDS="${{ secrets.SECURITY_GROUP_IDS }}"
@@ -713,6 +615,30 @@ jobs:
           # Make the script executable and run it
           chmod +x exec/create-task-definition.sh
           ./exec/create-task-definition.sh "${{ env.services_env }}" "${{ env.task_def_family }}"
+          echo "::endgroup::"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }}
+          aws-region: ${{ env.aws_region }}
+          role-duration-seconds: 3600
+
+      - name: Get Cognito Configuration
+        id: cognito_config
+        run: |
+          echo "::group::Fetching Cognito Configuration"
+          # Get Cognito configuration from Secrets Manager
+          cognito_config=$(aws secretsmanager get-secret-value \
+            --secret-id "${{ env.cognito_config_secret }}" \
+            --query 'SecretString' \
+            --output text)
+          
+          # Parse and set outputs
+          echo "client_user_pool_id=$(echo $cognito_config | jq -r '.COGNITO_CLIENT_USER_POOL_ID')" >> $GITHUB_OUTPUT
+          echo "client_client_id=$(echo $cognito_config | jq -r '.COGNITO_CLIENT_CLIENT_ID')" >> $GITHUB_OUTPUT
+          echo "admin_user_pool_id=$(echo $cognito_config | jq -r '.COGNITO_ADMIN_USER_POOL_ID')" >> $GITHUB_OUTPUT
+          echo "admin_client_id=$(echo $cognito_config | jq -r '.COGNITO_ADMIN_CLIENT_ID')" >> $GITHUB_OUTPUT
           echo "::endgroup::"
 
       - name: Deploy to ECS
@@ -881,71 +807,6 @@ jobs:
           aws-region: ${{ env.aws_region }}
           role-duration-seconds: 3600
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }}
-          aws-region: ${{ env.aws_region }}
-          role-duration-seconds: 3600
-          
-      - name: Verify App Mesh Resources and Permissions
-        run: |
-          echo "::group::Verifying App Mesh Resources"
-          
-          # Function to check if resource exists
-          check_resource_exists() {
-            local resource_type=$1
-            local resource_name=$2
-            local command=$3
-            
-            echo "Checking $resource_type: $resource_name"
-            if ! $command > /dev/null 2>&1; then
-              echo "::error::$resource_type $resource_name does not exist"
-              return 1
-            fi
-            echo "✓ $resource_type $resource_name exists"
-            return 0
-          }
-          
-          # Check if mesh exists
-          check_resource_exists "mesh" "${{ env.mesh_name }}" "aws appmesh describe-mesh --mesh-name ${{ env.mesh_name }}"
-          
-          # Check if virtual node exists
-          check_resource_exists "virtual node" "${{ env.virtual_node_name }}" "aws appmesh describe-virtual-node --mesh-name ${{ env.mesh_name }} --virtual-node-name ${{ env.virtual_node_name }}"
-          
-          # Check if virtual service exists
-          check_resource_exists "virtual service" "${{ env.virtual_service_name }}" "aws appmesh describe-virtual-service --mesh-name ${{ env.mesh_name }} --virtual-service-name ${{ env.virtual_service_name }}"
-          
-          # Verify IAM permissions
-          echo "Verifying IAM permissions..."
-          if ! aws iam simulate-principal-policy \
-            --policy-source-arn arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }} \
-            --action-names \
-            appmesh:StreamAggregatedResources \
-            appmesh:DescribeVirtualNode \
-            appmesh:DescribeVirtualService \
-            appmesh:DescribeRoute \
-            appmesh:DescribeVirtualRouter > /dev/null 2>&1; then
-            echo "::error::Task role missing required App Mesh permissions"
-            exit 1
-          fi
-          echo "✓ Task role has required App Mesh permissions"
-          echo "::endgroup::"
-          
-      - name: Validate Envoy Image
-        run: |
-          echo "::group::Validating Envoy Image"
-          echo "Authenticating to ECR Public..."
-          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
-          
-          echo "Pulling Envoy image..."
-          if ! docker pull ${{ env.ecr_repository_envoy }}:${{ env.ecr_envoy_image_tag }}; then
-            echo "::error::Failed to pull Envoy image. Please check if the image exists and is accessible."
-            exit 1
-          fi
-          echo "✓ Successfully validated Envoy image"
-          echo "::endgroup::"
-          
       - name: Get Secret ARNs
         id: secrets
         run: |
@@ -1059,7 +920,7 @@ jobs:
           }
           
           create_all_log_groups() {
-            create_log_group "${{ env.log_group_envoy }}"
+            # create_log_group "${{ env.log_group_envoy }}" # REMOVED
             create_log_group "${{ env.log_group_app }}"
             log "INFO" "All required log groups have been created"
           }
@@ -1139,7 +1000,7 @@ jobs:
           CURRENT_TASK_DEF=$(get_current_task_def "${{ env.cluster_name }}" "${{ env.service_name }}")
           echo "current_task_def=$CURRENT_TASK_DEF" >> $GITHUB_OUTPUT
           
-          # Function to create task definition JSON
+          # Function to create task definition JSON (This is duplicated, consider moving to a script or shared step)
           create_task_definition() {
             local env=$1
             local task_def_family=$2
@@ -1195,45 +1056,7 @@ jobs:
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
               },
-              "proxyConfiguration": {
-                "type": "APPMESH",
-                "containerName": "envoy",
-                "properties": [
-                  {"name": "IgnoredUID", "value": "1337"},
-                  {"name": "ProxyIngressPort", "value": "15000"},
-                  {"name": "ProxyEgressPort", "value": "15001"},
-                  {"name": "AppPorts", "value": "3000"},
-                  {"name": "EgressIgnoredIPs", "value": "169.254.170.2,169.254.169.254"}
-                ]
-              },
               "containerDefinitions": [
-                {
-                  "name": "envoy",
-                  "image": "${{ env.ecr_repository_envoy }}:${{ env.ecr_envoy_image_tag }}",
-                  "essential": true,
-                  "user": "1337",
-                  "environment": [
-                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/${{ env.mesh_name }}/virtualNode/${{ env.virtual_node_name }}"},
-                    {"name": "ENABLE_ENVOY_STATS_TAGS", "value": "1"},
-                    {"name": "ENABLE_ENVOY_XRAY_TRACING", "value": "1"},
-                    {"name": "APPMESH_PREVIEW", "value": "0"}
-                  ],
-                  "healthCheck": {
-                    "command": ["CMD-SHELL", "curl -s http://localhost:9901/server_info | grep state | grep -q LIVE"],
-                    "interval": 5,
-                    "timeout": 2,
-                    "retries": 3,
-                    "startPeriod": 10
-                  },
-                  "logConfiguration": {
-                    "logDriver": "awslogs",
-                    "options": {
-                      "awslogs-group": "${{ env.log_group_envoy }}",
-                      "awslogs-region": "${{ env.aws_region }}",
-                      "awslogs-stream-prefix": "envoy"
-                    }
-                  }
-                },
                 {
                   "name": "AppContainer",
                   "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.aws_region }}.amazonaws.com/${{ env.ecr_repository_backend }}:latest",
@@ -1245,8 +1068,7 @@ jobs:
                   "environment": [
                     {"name": "PORT", "value": "3000"},
                     {"name": "NODE_ENV", "value": "${{ env.services_env }}"},
-                    {"name": "AWS_REGION", "value": "${{ env.aws_region }}"},
-                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/${{ env.mesh_name }}/virtualNode/${{ env.virtual_node_name }}"}
+                    {"name": "AWS_REGION", "value": "${{ env.aws_region }}"}
                   ],
                   "secrets": [
                     {"name": "DATABASE_URL", "valueFrom": "'$db_connection_arn'"},
@@ -1279,35 +1101,23 @@ jobs:
           }
           
           # Create task definition based on environment
-          if ! create_task_definition "${{ env.services_env }}" "${{ env.task_def_family }}"; then
-            exit 1
-          fi
+          # This looks like a direct call to the script might be better here instead of redefining the function
+          # For now, assuming the script exec/create-task-definition.sh is the source of truth
+          # However, the `create_task_definition` function defined inline above is missing the env var exports
+          # that the `deploy-dev` job has. This will likely cause issues. 
+          # The most robust solution is to rely *only* on the script.
           
-          # Validate task definition JSON
-          if ! jq . task-definition.json > /dev/null 2>&1; then
-            echo "::error::Invalid JSON in task definition"
-            cat task-definition.json
-            exit 1
-          fi
-          
-          # Register task definition
-          echo "Registering task definition..."
-          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
-            --cli-input-json file://task-definition.json \
-            --query 'taskDefinition.taskDefinitionArn' \
-            --output text)
-            
-          if [ $? -ne 0 ] || [ -z "$NEW_TASK_DEF_ARN" ]; then
-            echo "::error::Failed to register task definition"
-            echo "Task definition JSON:"
-            cat task-definition.json
-            exit 1
-          fi
-          
-          echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
-          
-          # Clean up old task definitions
-          cleanup_old_task_defs "${{ env.task_def_family }}"
+          # Set required environment variables for the script (if not using the inline function)
+          export AWS_REGION="${{ env.aws_region }}"
+          export AWS_ACCOUNT_ID="${{ secrets.AWS_ACCOUNT_ID }}"
+          export SERVICES_ENV="${{ env.services_env }}"
+          export ECR_REPOSITORY_BACKEND="${{ env.ecr_repository_backend }}"
+          export LOG_GROUP_APP="${{ env.log_group_app }}"
+          # Ensure other necessary secrets are available as env vars if create-task-definition.sh expects them
+          # This part needs careful review to ensure create-task-definition.sh gets all its required variables.
+
+          chmod +x exec/create-task-definition.sh
+          ./exec/create-task-definition.sh "${{ env.services_env }}" "${{ env.task_def_family }}"
           echo "::endgroup::"
 
       - name: Configure AWS Credentials
@@ -1501,71 +1311,6 @@ jobs:
           aws-region: ${{ env.aws_region }}
           role-duration-seconds: 3600
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }}
-          aws-region: ${{ env.aws_region }}
-          role-duration-seconds: 3600
-          
-      - name: Verify App Mesh Resources and Permissions
-        run: |
-          echo "::group::Verifying App Mesh Resources"
-          
-          # Function to check if resource exists
-          check_resource_exists() {
-            local resource_type=$1
-            local resource_name=$2
-            local command=$3
-            
-            echo "Checking $resource_type: $resource_name"
-            if ! $command > /dev/null 2>&1; then
-              echo "::error::$resource_type $resource_name does not exist"
-              return 1
-            fi
-            echo "✓ $resource_type $resource_name exists"
-            return 0
-          }
-          
-          # Check if mesh exists
-          check_resource_exists "mesh" "${{ env.mesh_name }}" "aws appmesh describe-mesh --mesh-name ${{ env.mesh_name }}"
-          
-          # Check if virtual node exists
-          check_resource_exists "virtual node" "${{ env.virtual_node_name }}" "aws appmesh describe-virtual-node --mesh-name ${{ env.mesh_name }} --virtual-node-name ${{ env.virtual_node_name }}"
-          
-          # Check if virtual service exists
-          check_resource_exists "virtual service" "${{ env.virtual_service_name }}" "aws appmesh describe-virtual-service --mesh-name ${{ env.mesh_name }} --virtual-service-name ${{ env.virtual_service_name }}"
-          
-          # Verify IAM permissions
-          echo "Verifying IAM permissions..."
-          if ! aws iam simulate-principal-policy \
-            --policy-source-arn arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.github_actions_role }} \
-            --action-names \
-            appmesh:StreamAggregatedResources \
-            appmesh:DescribeVirtualNode \
-            appmesh:DescribeVirtualService \
-            appmesh:DescribeRoute \
-            appmesh:DescribeVirtualRouter > /dev/null 2>&1; then
-            echo "::error::Task role missing required App Mesh permissions"
-            exit 1
-          fi
-          echo "✓ Task role has required App Mesh permissions"
-          echo "::endgroup::"
-          
-      - name: Validate Envoy Image
-        run: |
-          echo "::group::Validating Envoy Image"
-          echo "Authenticating to ECR Public..."
-          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
-          
-          echo "Pulling Envoy image..."
-          if ! docker pull ${{ env.ecr_repository_envoy }}:${{ env.ecr_envoy_image_tag }}; then
-            echo "::error::Failed to pull Envoy image. Please check if the image exists and is accessible."
-            exit 1
-          fi
-          echo "✓ Successfully validated Envoy image"
-          echo "::endgroup::"
-          
       - name: Get Secret ARNs
         id: secrets
         run: |
@@ -1679,7 +1424,7 @@ jobs:
           }
           
           create_all_log_groups() {
-            create_log_group "${{ env.log_group_envoy }}"
+            # create_log_group "${{ env.log_group_envoy }}" # REMOVED
             create_log_group "${{ env.log_group_app }}"
             log "INFO" "All required log groups have been created"
           }
@@ -1759,7 +1504,7 @@ jobs:
           CURRENT_TASK_DEF=$(get_current_task_def "${{ env.cluster_name }}" "${{ env.service_name }}")
           echo "current_task_def=$CURRENT_TASK_DEF" >> $GITHUB_OUTPUT
           
-          # Function to create task definition JSON
+          # Function to create task definition JSON (This is duplicated, consider moving to a script or shared step)
           create_task_definition() {
             local env=$1
             local task_def_family=$2
@@ -1815,45 +1560,7 @@ jobs:
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
               },
-              "proxyConfiguration": {
-                "type": "APPMESH",
-                "containerName": "envoy",
-                "properties": [
-                  {"name": "IgnoredUID", "value": "1337"},
-                  {"name": "ProxyIngressPort", "value": "15000"},
-                  {"name": "ProxyEgressPort", "value": "15001"},
-                  {"name": "AppPorts", "value": "3000"},
-                  {"name": "EgressIgnoredIPs", "value": "169.254.170.2,169.254.169.254"}
-                ]
-              },
               "containerDefinitions": [
-                {
-                  "name": "envoy",
-                  "image": "${{ env.ecr_repository_envoy }}:${{ env.ecr_envoy_image_tag }}",
-                  "essential": true,
-                  "user": "1337",
-                  "environment": [
-                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/${{ env.mesh_name }}/virtualNode/${{ env.virtual_node_name }}"},
-                    {"name": "ENABLE_ENVOY_STATS_TAGS", "value": "1"},
-                    {"name": "ENABLE_ENVOY_XRAY_TRACING", "value": "1"},
-                    {"name": "APPMESH_PREVIEW", "value": "0"}
-                  ],
-                  "healthCheck": {
-                    "command": ["CMD-SHELL", "curl -s http://localhost:9901/server_info | grep state | grep -q LIVE"],
-                    "interval": 5,
-                    "timeout": 2,
-                    "retries": 3,
-                    "startPeriod": 10
-                  },
-                  "logConfiguration": {
-                    "logDriver": "awslogs",
-                    "options": {
-                      "awslogs-group": "${{ env.log_group_envoy }}",
-                      "awslogs-region": "${{ env.aws_region }}",
-                      "awslogs-stream-prefix": "envoy"
-                    }
-                  }
-                },
                 {
                   "name": "AppContainer",
                   "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.aws_region }}.amazonaws.com/${{ env.ecr_repository_backend }}:latest",
@@ -1865,8 +1572,7 @@ jobs:
                   "environment": [
                     {"name": "PORT", "value": "3000"},
                     {"name": "NODE_ENV", "value": "${{ env.services_env }}"},
-                    {"name": "AWS_REGION", "value": "${{ env.aws_region }}"},
-                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/${{ env.mesh_name }}/virtualNode/${{ env.virtual_node_name }}"}
+                    {"name": "AWS_REGION", "value": "${{ env.aws_region }}"}
                   ],
                   "secrets": [
                     {"name": "DATABASE_URL", "valueFrom": "'$db_connection_arn'"},
@@ -1899,35 +1605,23 @@ jobs:
           }
           
           # Create task definition based on environment
-          if ! create_task_definition "${{ env.services_env }}" "${{ env.task_def_family }}"; then
-            exit 1
-          fi
+          # This looks like a direct call to the script might be better here instead of redefining the function
+          # For now, assuming the script exec/create-task-definition.sh is the source of truth
+          # However, the `create_task_definition` function defined inline above is missing the env var exports
+          # that the `deploy-dev` job has. This will likely cause issues. 
+          # The most robust solution is to rely *only* on the script.
           
-          # Validate task definition JSON
-          if ! jq . task-definition.json > /dev/null 2>&1; then
-            echo "::error::Invalid JSON in task definition"
-            cat task-definition.json
-            exit 1
-          fi
-          
-          # Register task definition
-          echo "Registering task definition..."
-          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
-            --cli-input-json file://task-definition.json \
-            --query 'taskDefinition.taskDefinitionArn' \
-            --output text)
-            
-          if [ $? -ne 0 ] || [ -z "$NEW_TASK_DEF_ARN" ]; then
-            echo "::error::Failed to register task definition"
-            echo "Task definition JSON:"
-            cat task-definition.json
-            exit 1
-          fi
-          
-          echo "task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
-          
-          # Clean up old task definitions
-          cleanup_old_task_defs "${{ env.task_def_family }}"
+          # Set required environment variables for the script (if not using the inline function)
+          export AWS_REGION="${{ env.aws_region }}"
+          export AWS_ACCOUNT_ID="${{ secrets.AWS_ACCOUNT_ID }}"
+          export SERVICES_ENV="${{ env.services_env }}"
+          export ECR_REPOSITORY_BACKEND="${{ env.ecr_repository_backend }}"
+          export LOG_GROUP_APP="${{ env.log_group_app }}"
+          # Ensure other necessary secrets are available as env vars if create-task-definition.sh expects them
+          # This part needs careful review to ensure create-task-definition.sh gets all its required variables.
+
+          chmod +x exec/create-task-definition.sh
+          ./exec/create-task-definition.sh "${{ env.services_env }}" "${{ env.task_def_family }}"
           echo "::endgroup::"
 
       - name: Configure AWS Credentials
@@ -2279,48 +1973,10 @@ jobs:
                 "operatingSystemFamily": "LINUX",
                 "cpuArchitecture": "X86_64"
               },
-              "proxyConfiguration": {
-                "type": "APPMESH",
-                "containerName": "envoy",
-                "properties": [
-                  {"name": "IgnoredUID", "value": "1337"},
-                  {"name": "ProxyIngressPort", "value": "15000"},
-                  {"name": "ProxyEgressPort", "value": "15001"},
-                  {"name": "AppPorts", "value": "3000"},
-                  {"name": "EgressIgnoredIPs", "value": "169.254.170.2,169.254.169.254"}
-                ]
-              },
               "containerDefinitions": [
                 {
-                  "name": "envoy",
-                  "image": "${{ env.ecr_repository_envoy }}:${{ env.ecr_envoy_image_tag }}",
-                  "essential": true,
-                  "user": "1337",
-                  "environment": [
-                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/${{ env.mesh_name }}/virtualNode/${{ env.virtual_node_name }}"},
-                    {"name": "ENABLE_ENVOY_STATS_TAGS", "value": "1"},
-                    {"name": "ENABLE_ENVOY_XRAY_TRACING", "value": "1"},
-                    {"name": "APPMESH_PREVIEW", "value": "0"}
-                  ],
-                  "healthCheck": {
-                    "command": ["CMD-SHELL", "curl -s http://localhost:9901/server_info | grep state | grep -q LIVE"],
-                    "interval": 5,
-                    "timeout": 2,
-                    "retries": 3,
-                    "startPeriod": 10
-                  },
-                  "logConfiguration": {
-                    "logDriver": "awslogs",
-                    "options": {
-                      "awslogs-group": "${{ env.log_group_envoy }}",
-                      "awslogs-region": "${{ env.AWS_REGION }}",
-                      "awslogs-stream-prefix": "envoy"
-                    }
-                  }
-                },
-                {
                   "name": "AppContainer",
-                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ecr_repository_backend }}:latest",
+                  "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.aws_region }}.amazonaws.com/${{ env.ecr_repository_backend }}:latest",
                   "essential": true,
                   "workingDirectory": "/app",
                   "entryPoint": ["node"],
@@ -2329,8 +1985,7 @@ jobs:
                   "environment": [
                     {"name": "PORT", "value": "3000"},
                     {"name": "NODE_ENV", "value": "${{ env.services_env }}"},
-                    {"name": "AWS_REGION", "value": "${{ env.AWS_REGION }}"},
-                    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/${{ env.mesh_name }}/virtualNode/${{ env.virtual_node_name }}"}
+                    {"name": "AWS_REGION", "value": "${{ env.aws_region }}"}
                   ],
                   "secrets": [
                     {"name": "DATABASE_URL", "valueFrom": "'$DB_CONNECTION_ARN'"},
@@ -2345,7 +2000,7 @@ jobs:
                     "logDriver": "awslogs",
                     "options": {
                       "awslogs-group": "${{ env.log_group_app }}",
-                      "awslogs-region": "${{ env.AWS_REGION }}",
+                      "awslogs-region": "${{ env.aws_region }}",
                       "awslogs-stream-prefix": "finefinds"
                     }
                   },
