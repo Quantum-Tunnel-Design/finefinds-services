@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as crypto from 'crypto';
+// import * as crypto from 'crypto'; // No longer needed
 import {
   CognitoIdentityProviderClient,
   SignUpCommand,
@@ -52,38 +52,10 @@ export class AuthService {
     this.cognitoClient = new CognitoIdentityProviderClient({
       region: this.configService.get<string>('AWS_REGION'),
     });
-    if (!this.configService.get<string>('COGNITO_APP_CLIENT_SECRET') && this.configService.get<string>('APP_CLIENT_HAS_SECRET') === 'true') {
-        console.warn('[AuthService] COGNITO_APP_CLIENT_SECRET is not set, but app client might require it based on APP_CLIENT_HAS_SECRET.');
-    }
-    if (!this.configService.get<string>('COGNITO_ADMIN_CLIENT_SECRET') && this.configService.get<string>('ADMIN_CLIENT_HAS_SECRET') === 'true') {
-        console.warn('[AuthService] COGNITO_ADMIN_CLIENT_SECRET is not set, but admin client might require it based on ADMIN_CLIENT_HAS_SECRET.');
-    }
-  }
-
-  private computeSecretHash(username: string, clientId: string, clientSecret?: string): string | undefined {
-    if (!clientSecret) {
-      // console.log(`[AuthService computeSecretHash] No client secret provided for clientId: ${clientId}. Skipping SecretHash computation.`);
-      return undefined;
-    }
-    // console.log(`[AuthService computeSecretHash] Computing SecretHash for username: ${username}, clientId: ${clientId}`);
-    try {
-      const hmac = crypto.createHmac('sha256', clientSecret);
-      hmac.update(username + clientId);
-      const hash = hmac.digest('base64');
-      // console.log(`[AuthService computeSecretHash] Computed hash for ${username}: ${hash}`);
-      return hash;
-    } catch (error) {
-      console.error(`[AuthService computeSecretHash] Error computing hash for ${username}:`, error);
-      // Depending on policy, you might want to throw an error or handle it such that the Cognito call proceeds without SecretHash
-      // For now, returning undefined, which means Cognito call will not include SecretHash if computation fails.
-      return undefined; 
-    }
   }
 
   async signUp(input: SignUpInput): Promise<AuthResponse> {
     const userPoolId = this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID');
-
-    // Basic validation
     const existingUser = await this.usersService.findByEmail(input.email);
     if (existingUser) {
       throw new BadRequestException('Email already registered');
@@ -94,10 +66,10 @@ export class AuthService {
       { Name: 'email_verified', Value: 'true' },
       { Name: 'given_name', Value: input.firstName },
       { Name: 'family_name', Value: input.lastName },
+      // Role is managed in DB, not as Cognito custom attribute
     ];
 
     try {
-      // 1. Create Cognito user
       const adminCreateUserCmd = new AdminCreateUserCommand({
         UserPoolId: userPoolId,
         Username: input.email,
@@ -107,7 +79,6 @@ export class AuthService {
       const cognitoUserResponse = await this.cognitoClient.send(adminCreateUserCmd);
       const cognitoSub = cognitoUserResponse.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value || input.email;
 
-      // 2. Set password
       const adminSetPasswordCmd = new AdminSetUserPasswordCommand({
         UserPoolId: userPoolId,
         Username: input.email,
@@ -115,18 +86,13 @@ export class AuthService {
         Permanent: true,
       });
       await this.cognitoClient.send(adminSetPasswordCmd);
-
-      // 3. Add user to group based on input.role
-      // Ensure a mapping from input.role (string) to a valid Cognito group name
+      
       let groupName: string;
       if (input.role === UserRole.PARENT) groupName = 'parent';
       else if (input.role === UserRole.VENDOR) groupName = 'vendor';
-      // Add more roles/groups as needed
       else {
-        console.warn(`[AuthService signUp] Unknown role ${input.role} for group assignment.`);
-        // Optionally, throw error or assign a default group, or no group
+        console.warn(`[AuthService signUp] Unknown role ${input.role} for group assignment for user ${input.email}.`);
       }
-
       if (groupName) {
         const addToGroupCommand = new AdminAddUserToGroupCommand({
             UserPoolId: userPoolId,
@@ -136,14 +102,12 @@ export class AuthService {
         await this.cognitoClient.send(addToGroupCommand);
       }
 
-      // 4. Create user in database
       await this.usersService.create({
         email: input.email,
         firstName: input.firstName,
         lastName: input.lastName,
-        role: input.role as UserRole, // Cast assuming input.role is a valid UserRole enum member
+        role: input.role as UserRole,
         cognitoSub: cognitoSub,
-        // Add other relevant fields from SignUpInput if necessary
       });
 
       return {
@@ -157,15 +121,13 @@ export class AuthService {
 
   async signIn(input: SignInInput): Promise<AuthResponse> {
     const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
-    const clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
-    const secretHash = this.computeSecretHash(input.email, clientId, clientSecret);
+    // No SecretHash computation or usage as client secret is not enabled
+
     const authParameters: { [key: string]: string } = {
         USERNAME: input.email,
         PASSWORD: input.password,
     };
-    if (secretHash) {
-        authParameters.SECRET_HASH = secretHash;
-    }
+    // No SecretHash to add to authParameters
 
     try {
       const authCommand = new InitiateAuthCommand({
@@ -246,15 +208,13 @@ export class AuthService {
 
   async forgotPassword(input: ForgotPasswordInput): Promise<AuthResponse> {
     const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
-    const clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
-    const secretHash = this.computeSecretHash(input.email, clientId, clientSecret);
+    // No SecretHash computation or usage
+
     const params: any = {
         ClientId: clientId,
         Username: input.email,
     };
-    if (secretHash) {
-        params.SecretHash = secretHash;
-    }
+    // No SecretHash to add to params
 
     try {
       const user = await this.usersService.findByEmail(input.email);
@@ -285,17 +245,15 @@ export class AuthService {
 
   async resetPassword(input: ResetPasswordInput): Promise<AuthResponse> {
     const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
-    const clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
-    const secretHash = this.computeSecretHash(input.email, clientId, clientSecret);
+    // No SecretHash computation or usage
+
     const params: any = {
         ClientId: clientId,
         Username: input.email,
         ConfirmationCode: input.code,
         Password: input.newPassword,
     };
-    if (secretHash) {
-        params.SecretHash = secretHash;
-    }
+    // No SecretHash to add to params
 
     try {
       const confirmForgotPasswordCommand = new ConfirmForgotPasswordCommand(params);
@@ -317,6 +275,7 @@ export class AuthService {
 
   async parentSignUp(input: ParentSignUpInput): Promise<AuthResponse> {
     const userPoolId = this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID');
+    // No SecretHash computation needed for Admin commands
 
     // Validate input (e.g., password confirmation, children data) - Keep existing validations or add as needed
     if (input.password !== input.confirmPassword) {
@@ -342,24 +301,22 @@ export class AuthService {
 
     const userAttributes = [
       { Name: 'email', Value: input.email },
-      { Name: 'email_verified', Value: 'true' }, 
+      { Name: 'email_verified', Value: 'true' },
       { Name: 'given_name', Value: input.firstName },
       { Name: 'family_name', Value: input.lastName },
       { Name: 'phone_number', Value: input.phoneNumber },
     ];
 
     try {
-      // 1. Create Cognito user using AdminCreateUserCommand
       const adminCreateUserCmd = new AdminCreateUserCommand({
         UserPoolId: userPoolId,
         Username: input.email,
         UserAttributes: userAttributes,
-        MessageAction: 'SUPPRESS', // Suppress welcome email from Cognito
+        MessageAction: 'SUPPRESS',
       });
       const cognitoUserResponse = await this.cognitoClient.send(adminCreateUserCmd);
-      const cognitoSub = cognitoUserResponse.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value || input.email; // Prefer sub if available
+      const cognitoSub = cognitoUserResponse.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value || input.email;
 
-      // 2. Set password using AdminSetUserPasswordCommand
       const adminSetPasswordCmd = new AdminSetUserPasswordCommand({
         UserPoolId: userPoolId,
         Username: input.email,
@@ -368,21 +325,19 @@ export class AuthService {
       });
       await this.cognitoClient.send(adminSetPasswordCmd);
 
-      // 3. Add user to parent group
       const addToGroupCommand = new AdminAddUserToGroupCommand({
         UserPoolId: userPoolId,
         Username: input.email,
-        GroupName: 'parent', // Ensure this group exists in your User Pool
+        GroupName: 'parent',
       });
       await this.cognitoClient.send(addToGroupCommand);
 
-      // 4. Create user in database with children
       await this.usersService.create({
         email: input.email,
         firstName: input.firstName,
         lastName: input.lastName,
         role: UserRole.PARENT,
-        cognitoSub: cognitoSub, 
+        cognitoSub: cognitoSub,
         phoneNumber: input.phoneNumber,
         children: input.children.map(child => ({
           firstName: child.firstName,
@@ -394,12 +349,8 @@ export class AuthService {
 
       return {
         message: 'Parent account created successfully. You can now sign in.',
-        // No tokens are returned directly from this admin flow
       };
     } catch (error) {
-      // More specific error handling might be needed here
-      // e.g., if AdminCreateUser fails because user already exists (should be caught by pre-check)
-      // or if other Cognito/DB operations fail.
       console.error('[AuthService parentSignUp Admin Flow] Error:', error);
       throw new BadRequestException(error.message || 'Could not complete parent sign up.');
     }
@@ -407,16 +358,13 @@ export class AuthService {
 
   async adminSignIn(input: AdminSignInInput): Promise<AuthResponse> {
     const adminClientId = this.configService.get<string>('COGNITO_ADMIN_CLIENT_ID');
-    const adminClientSecret = this.configService.get<string>('COGNITO_ADMIN_CLIENT_SECRET');
-    const secretHash = this.computeSecretHash(input.username, adminClientId, adminClientSecret);
+    // No SecretHash computation or usage
 
     const authParameters: { [key: string]: string } = {
       USERNAME: input.username,
       PASSWORD: input.password,
     };
-    if (secretHash) {
-      authParameters.SECRET_HASH = secretHash;
-    }
+    // No SecretHash to add to authParameters
 
     try {
       const authCommand = new AdminInitiateAuthCommand({
@@ -594,15 +542,13 @@ export class AuthService {
 
     // 1. Verify current password by trying to authenticate
     const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
-    const clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
-    const verifySecretHash = this.computeSecretHash(user.email, clientId, clientSecret);
+    // No SecretHash computation or usage for verification
+
     const verifyAuthParams: { [key: string]: string } = {
         USERNAME: user.email,
         PASSWORD: input.currentPassword,
     };
-    if (verifySecretHash) {
-        verifyAuthParams.SECRET_HASH = verifySecretHash;
-    }
+    // No SecretHash to add to verifyAuthParams
 
     try {
       const authCommand = new InitiateAuthCommand({
@@ -617,8 +563,8 @@ export class AuthService {
     }
 
     // 2. If current password is correct, set the new password using AdminSetUserPasswordCommand
+    // AdminSetUserPasswordCommand does not require SecretHash
     try {
-      // Update password in Cognito using admin API
       const setPasswordCommand = new AdminSetUserPasswordCommand({
         UserPoolId: this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID'),
         Username: user.email,
@@ -644,6 +590,7 @@ export class AuthService {
 
   async vendorSignUp(input: VendorSignUpInput): Promise<AuthResponse> {
     const userPoolId = this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID');
+    // No SecretHash computation needed for Admin commands
 
     // --- Input Validations ---
     if (input.password !== input.confirmPassword) {
@@ -668,7 +615,6 @@ export class AuthService {
     ];
 
     try {
-      // 1. Create Cognito user
       const adminCreateUserCmd = new AdminCreateUserCommand({
         UserPoolId: userPoolId,
         Username: input.email,
@@ -678,7 +624,6 @@ export class AuthService {
       const cognitoUserResponse = await this.cognitoClient.send(adminCreateUserCmd);
       const cognitoSub = cognitoUserResponse.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value || input.email;
 
-      // 2. Set password
       const adminSetPasswordCmd = new AdminSetUserPasswordCommand({
         UserPoolId: userPoolId,
         Username: input.email,
@@ -687,15 +632,13 @@ export class AuthService {
       });
       await this.cognitoClient.send(adminSetPasswordCmd);
 
-      // 3. Add user to vendor group
       const addToGroupCommand = new AdminAddUserToGroupCommand({
         UserPoolId: userPoolId,
         Username: input.email,
-        GroupName: 'vendor', // Ensure this group exists
+        GroupName: 'vendor',
       });
       await this.cognitoClient.send(addToGroupCommand);
 
-      // 4. Create user in database
       await this.usersService.create({
         email: input.email,
         firstName: input.firstName,
@@ -770,16 +713,13 @@ export class AuthService {
 
   async vendorLogin(input: VendorLoginInput) {
     const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
-    const clientSecret = this.configService.get<string>('COGNITO_APP_CLIENT_SECRET');
-    const secretHash = this.computeSecretHash(input.email, clientId, clientSecret);
+    // No SecretHash computation or usage
 
     const authParameters: { [key: string]: string } = {
       USERNAME: input.email,
       PASSWORD: input.password,
     };
-    if (secretHash) {
-      authParameters.SECRET_HASH = secretHash;
-    }
+    // No SecretHash to add to authParameters
 
     // Check if account is locked
     const { locked, lockedUntil } = await this.loginAttemptService.isAccountLocked(input.email);
