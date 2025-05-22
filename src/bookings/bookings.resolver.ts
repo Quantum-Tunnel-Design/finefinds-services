@@ -17,21 +17,34 @@ import { User as PrismaUser } from '@prisma/client';
 export class BookingsResolver {
   constructor(private readonly bookingsService: BookingsService) {}
 
-  @Query(() => [BookingDetailsDto], { name: 'myVendorBookings' })
+  @Query(() => [BookingDetailsDto], {
+    name: 'myVendorBookings',
+    description: 'Retrieves all bookings associated with the currently authenticated vendor. Supports filtering by class package ID and date range.',
+  })
   @Roles(UserRole.VENDOR)
   async getMyVendorBookings(
     @CurrentUser() user: PrismaUser,
-    @Args('filters', { type: () => BookingFilterInput, nullable: true })
+    @Args('filters', {
+      type: () => BookingFilterInput,
+      nullable: true,
+      description: 'Optional filters for class package ID, start date, and end date.',
+    })
     filters?: BookingFilterInput,
   ): Promise<BookingDetailsDto[]> {
     return this.bookingsService.getVendorBookings(user.id, filters);
   }
 
-  @Query(() => [ParentBookingDetailsDto], { name: 'myParentBookings' })
+  @Query(() => [ParentBookingDetailsDto], {
+    name: 'myParentBookings',
+    description: 'Retrieves all bookings for the currently authenticated parent. Can be filtered by type (upcoming or past bookings).'
+  })
   @Roles(UserRole.PARENT)
   async getMyParentBookings(
     @CurrentUser() user: PrismaUser,
-    @Args('type', { type: () => ParentBookingType })
+    @Args('type', {
+      type: () => ParentBookingType,
+      description: "Specifies whether to fetch 'upcoming' or 'past' bookings.",
+    })
     type: ParentBookingType,
   ): Promise<ParentBookingDetailsDto[]> {
     return this.bookingsService.getParentBookings(user.id, type);

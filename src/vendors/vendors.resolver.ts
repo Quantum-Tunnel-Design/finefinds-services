@@ -18,67 +18,77 @@ import { OperationStatusDto } from '../common/dto/operation-status.dto';
 export class VendorsResolver {
   constructor(private readonly vendorsService: VendorsService) {}
 
-  @Mutation(() => VendorProfile)
+  @Mutation(() => VendorProfile, { description: 'Creates or updates the profile for the currently authenticated vendor.' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.VENDOR)
   async registerVendorProfile(
     @CurrentUser() user: User,
-    @Args('input') dto: CreateVendorProfileDto,
+    @Args('input', { type: () => CreateVendorProfileDto, description: 'Data for creating the vendor profile.' }) dto: CreateVendorProfileDto,
   ) {
     return this.vendorsService.createOrUpdateVendorProfile(user.id, dto);
   }
 
-  @Mutation(() => VendorProfile)
+  @Mutation(() => VendorProfile, { description: 'Updates the profile for the currently authenticated vendor.' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.VENDOR)
   async updateVendorProfile(
     @CurrentUser() user: User,
-    @Args('input') dto: UpdateVendorProfileDto,
+    @Args('input', { type: () => UpdateVendorProfileDto, description: 'Data for updating the vendor profile.' }) dto: UpdateVendorProfileDto,
   ) {
     return this.vendorsService.createOrUpdateVendorProfile(user.id, dto);
   }
 
-  @Mutation(() => VendorProfile)
+  @Mutation(() => VendorProfile, { description: 'Approves a vendor profile. Requires ADMIN privileges.' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   async approveVendor(
     @CurrentUser() user: User,
-    @Args('vendorId') vendorId: string,
+    @Args('vendorId', { type: () => String, description: 'The ID of the vendor to approve.' }) vendorId: string,
   ) {
     return this.vendorsService.approveVendor(vendorId, user);
   }
 
-  @Query(() => VendorProfile)
+  @Query(() => VendorProfile, { description: 'Retrieves the profile of the currently authenticated vendor.' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.VENDOR)
   async myVendorProfile(@CurrentUser() user: User) {
     return this.vendorsService.getMyVendorProfile(user.id);
   }
 
-  @Query(() => [VendorProfile])
+  @Query(() => [VendorProfile], { description: 'Lists all vendor profiles. Requires ADMIN privileges.' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   async listVendors(@CurrentUser() user: User) {
     return this.vendorsService.listVendorProfiles(user);
   }
 
-  @Query(() => VendorDashboardDataDto, { name: 'myVendorDashboardRevenue' })
+  @Query(() => VendorDashboardDataDto, {
+    name: 'myVendorDashboardRevenue',
+    description: 'Retrieves dashboard data, including revenue metrics, for the currently authenticated vendor. Supports date range filtering.'
+  })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.VENDOR)
   async getMyVendorDashboardRevenue(
     @CurrentUser() user: User,
-    @Args('filters', { type: () => DateRangeFilterDto, nullable: true })
+    @Args('filters', {
+      type: () => DateRangeFilterDto,
+      nullable: true,
+      description: 'Optional date range (startDate, endDate) to filter revenue data.'
+    })
     filters?: DateRangeFilterDto,
   ): Promise<VendorDashboardDataDto> {
     return this.vendorsService.getVendorDashboardData(user.id, filters);
   }
 
-  @Mutation(() => OperationStatusDto, { name: 'deleteMyBusinessProfile' })
+  @Mutation(() => OperationStatusDto, {
+    name: 'deleteMyBusinessProfile',
+    description: 'Deletes the business profile of the currently authenticated vendor. This also archives associated classes. Cannot be undone.'
+  })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.VENDOR)
   async deleteMyBusinessProfile(
     @CurrentUser() user: User,
-    @Args('input') input: DeleteBusinessProfileInput,
+    @Args('input', { type: () => DeleteBusinessProfileInput, description: 'Confirmation input for deleting the business profile.' }) input: DeleteBusinessProfileInput,
   ): Promise<OperationStatusDto> {
     await this.vendorsService.deleteBusinessProfile(user.id, input);
     return { success: true, message: 'Business profile deleted successfully.' };

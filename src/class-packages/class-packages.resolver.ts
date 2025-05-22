@@ -13,7 +13,10 @@ import { OperationStatusDto } from '../common/dto/operation-status.dto';
 export class ClassPackagesResolver {
   constructor(private readonly classPackagesService: ClassPackagesService) {}
 
-  @Query(() => [ClassPackageType], { name: 'myClassPackages' })
+  @Query(() => [ClassPackageType], {
+    name: 'myClassPackages',
+    description: 'Retrieves all class packages created by the currently authenticated vendor.'
+  })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.VENDOR)
   async getMyClassPackages(@CurrentUser() user: UserModel): Promise<ClassPackageType[]> {
@@ -22,23 +25,30 @@ export class ClassPackagesResolver {
     return this.classPackagesService.findVendorClassPackages(user.id) as any; 
   }
 
-  @Query(() => ClassPackageType, { name: 'classPackage', nullable: true })
+  @Query(() => ClassPackageType, {
+    name: 'classPackage',
+    nullable: true,
+    description: 'Retrieves a single class package by its ID. If the authenticated user is a vendor, it ensures the package belongs to them.'
+  })
   @UseGuards(JwtAuthGuard) // Accessible by any authenticated user, service handles detailed logic
   async getClassPackage(
     @CurrentUser() user: UserModel, // Pass current user for potential role-based logic in service
-    @Args('id', { type: () => ID }) id: string,
+    @Args('id', { type: () => ID, description: 'The ID of the class package to retrieve.' }) id: string,
   ): Promise<ClassPackageType | null> {
     const vendorId = user.role === UserRole.VENDOR ? user.id : undefined;
     // Prisma's ClassPackage needs to be mapped or cast to ClassPackageType
     return this.classPackagesService.findOneClassPackage(id, vendorId) as any;
   }
 
-  @Mutation(() => OperationStatusDto, { name: 'deleteMyClassPackage' })
+  @Mutation(() => OperationStatusDto, {
+    name: 'deleteMyClassPackage',
+    description: 'Deletes a class package owned by the currently authenticated vendor. This operation cannot be undone.'
+  })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.VENDOR)
   async deleteMyClassPackage(
     @CurrentUser() user: UserModel,
-    @Args('id', { type: () => ID }) id: string,
+    @Args('id', { type: () => ID, description: 'The ID of the class package to delete.' }) id: string,
   ): Promise<OperationStatusDto> {
     await this.classPackagesService.deleteClassPackage(user.id, id);
     return { success: true, message: 'Class package deleted successfully.' };
