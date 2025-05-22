@@ -1,12 +1,15 @@
 import { Controller, Get } from '@nestjs/common';
+import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('health')
 export class HealthController {
+  @Public()
   @Get()
   health() {
     return { status: 'OK', timestamp: new Date().toISOString() };
   }
 
+  @Public()
   @Get('debug-env')
   debugEnv() {
     // Create a sanitized version of the environment variables for debugging

@@ -48,8 +48,10 @@ async function bootstrap() {
 
   app.useLogger(logger);
 
-  // Global prefix
-  app.setGlobalPrefix('api');
+  // Global prefix for all routes except health
+  app.setGlobalPrefix('api', {
+    exclude: ['/health(.*)'],
+  });
 
   // Swagger configuration
   const config = new DocumentBuilder()
