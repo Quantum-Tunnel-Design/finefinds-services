@@ -31,10 +31,10 @@ export class BookingDetailsDto {
   @Field()
   bookedTimeSlot: string; // e.g., 10:00 AM - 12:00 PM (from ScheduleSlot startTime and endTime)
 
-  @Field(() => String) // GraphQL String for Enum
+  @Field(() => BookingStatus)
   bookingStatus: BookingStatus;
 
-  @Field(() => String) // GraphQL String for Enum
+  @Field(() => PaymentType)
   paymentType: PaymentType;
 
   @Field()

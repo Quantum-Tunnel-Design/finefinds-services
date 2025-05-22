@@ -2,6 +2,8 @@ import { Field, ObjectType, ID } from '@nestjs/graphql';
 import { BookingStatus, PaymentType } from '@prisma/client';
 import { ChildBookingDetailDto } from './child-booking-detail.dto'; // Reusing existing DTO
 
+// Enum registration moved to bookings.module.ts
+
 @ObjectType()
 export class ParentBookingDetailsDto {
   @Field(() => ID)
@@ -31,10 +33,10 @@ export class ParentBookingDetailsDto {
   @Field({ nullable: true })
   location?: string; // From BusinessProfile
 
-  @Field(() => String) // GraphQL String for Enum
+  @Field(() => BookingStatus)
   bookingStatus: BookingStatus;
 
-  @Field(() => String) // GraphQL String for Enum
+  @Field(() => PaymentType)
   paymentType: PaymentType;
 
   @Field(() => ID)

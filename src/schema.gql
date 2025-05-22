@@ -27,6 +27,33 @@ type AuthResponse {
   user: User
 }
 
+type BookingDetailsDto {
+  bookedDate: String!
+  bookedTimeSlot: String!
+  bookingId: ID!
+  bookingStatus: BookingStatus!
+  children: [ChildBookingDetailDto!]!
+  classPackageId: ID!
+  classPackageName: String!
+  numberOfChildrenBooked: Float!
+  parentEmail: String!
+  parentName: String!
+  parentPhoneNumber: String!
+  paymentType: PaymentType!
+}
+
+input BookingFilterInput {
+  classPackageId: ID
+  endDate: String
+  startDate: String
+}
+
+enum BookingStatus {
+  CANCELLED
+  PAID
+  RESCHEDULED
+}
+
 input BulkCreateVendorsInput {
   vendors: [VendorSignUpInput!]!
 }
@@ -169,6 +196,26 @@ type OperationStatusDto {
   success: Boolean!
 }
 
+type ParentBookingDetailsDto {
+  bookedDate: String!
+  bookedTimeSlot: String!
+  bookingId: ID!
+  bookingStatus: BookingStatus!
+  classPackageId: ID!
+  classPackageName: String!
+  enrolledChildren: [ChildBookingDetailDto!]!
+  location: String
+  paymentType: PaymentType!
+  scheduleSlotId: ID!
+  vendorId: ID!
+  vendorName: String!
+}
+
+enum ParentBookingType {
+  PAST
+  UPCOMING
+}
+
 input ParentSignUpInput {
   children: [ChildInput!]!
   confirmPassword: String!
@@ -187,6 +234,10 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum PaymentType {
+  CARD
+}
+
 type Query {
   classPackage(id: ID!): ClassPackage
   listUsers: [User!]!
@@ -194,7 +245,9 @@ type Query {
   me: User!
   myClassPackages: [ClassPackage!]!
   myNotifications: [Notification!]!
+  myParentBookings(type: ParentBookingType!): [ParentBookingDetailsDto!]!
   myTransactionHistory: [TransactionViewDto!]!
+  myVendorBookings(filters: BookingFilterInput): [BookingDetailsDto!]!
   myVendorDashboardRevenue(filters: DateRangeFilterDto): VendorDashboardDataDto!
   myVendorProfile: VendorProfile!
 }
