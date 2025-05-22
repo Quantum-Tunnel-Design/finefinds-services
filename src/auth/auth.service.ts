@@ -94,7 +94,6 @@ export class AuthService {
       { Name: 'email_verified', Value: 'true' },
       { Name: 'given_name', Value: input.firstName },
       { Name: 'family_name', Value: input.lastName },
-      { Name: 'custom:role', Value: input.role }, // Role comes from input
     ];
 
     try {
@@ -343,12 +342,10 @@ export class AuthService {
 
     const userAttributes = [
       { Name: 'email', Value: input.email },
-      { Name: 'email_verified', Value: 'true' }, // Auto-verify email
+      { Name: 'email_verified', Value: 'true' }, 
       { Name: 'given_name', Value: input.firstName },
       { Name: 'family_name', Value: input.lastName },
       { Name: 'phone_number', Value: input.phoneNumber },
-      // { Name: 'phone_number_verified', Value: 'true' }, // Optional: auto-verify phone if policy allows
-      { Name: 'custom:role', Value: UserRole.PARENT },
     ];
 
     try {
@@ -474,7 +471,6 @@ export class AuthService {
           { Name: 'email_verified', Value: 'true' },
           { Name: 'given_name', Value: input.firstName },
           { Name: 'family_name', Value: input.lastName },
-          { Name: 'custom:role', Value: UserRole.ADMIN },
         ],
         MessageAction: 'SUPPRESS', // Don't send welcome email
       });
@@ -664,12 +660,10 @@ export class AuthService {
 
     const userAttributes = [
       { Name: 'email', Value: input.email },
-      { Name: 'email_verified', Value: 'true' }, // Auto-verify email
+      { Name: 'email_verified', Value: 'true' },
       { Name: 'given_name', Value: input.firstName },
       { Name: 'family_name', Value: input.lastName },
       { Name: 'phone_number', Value: input.phoneNumber },
-      // { Name: 'phone_number_verified', Value: 'true' }, // Optional
-      { Name: 'custom:role', Value: UserRole.VENDOR },
       { Name: 'custom:secondary_phone', Value: input.secondaryPhoneNumber || '' },
     ];
 
