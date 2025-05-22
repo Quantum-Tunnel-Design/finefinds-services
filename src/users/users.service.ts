@@ -199,14 +199,31 @@ export class UsersService {
   }
 
   async listChildren(parentId: string): Promise<Child[]> {
+    // Ensure parent exists
     const parent = await this.findById(parentId);
     if (!parent) {
       throw new NotFoundException(`Parent with ID "${parentId}" not found.`);
     }
-    return this.prisma.child.findMany({
-      where: { userId: parentId },
-      orderBy: { createdAt: 'asc' },
+    return this.prisma.child.findMany({ where: { userId: parentId } });
+  }
+
+  async getChild(parentId: string, childId: string): Promise<Child | null> {
+    // Ensure parent exists
+    const parent = await this.findById(parentId);
+    if (!parent) {
+      throw new NotFoundException(`Parent with ID "${parentId}" not found.`);
+    }
+
+    const child = await this.prisma.child.findUnique({
+      where: { id: childId, userId: parentId }, // Ensure child belongs to the parent
     });
+
+    if (!child) {
+      // Optionally throw NotFoundException if child must exist, 
+      // or return null if it's acceptable for the child not to be found.
+      return null;
+    }
+    return child;
   }
 
   async updateChild(parentId: string, childId: string, input: UpdateChildInput): Promise<Child> {

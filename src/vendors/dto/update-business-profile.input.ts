@@ -1,22 +1,27 @@
-import { PartialType } from '@nestjs/mapped-types';
+import { PartialType, InputType, Field } from '@nestjs/graphql';
 import { CreateBusinessProfileInput } from './create-business-profile.input';
 import { IsOptional, IsString, IsUrl, Matches, MaxLength, ValidateIf, ArrayMaxSize, ArrayMinSize, IsArray } from 'class-validator';
 
+@InputType()
 export class UpdateBusinessProfileInput extends PartialType(CreateBusinessProfileInput) {
+  @Field({ nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(100)
   businessName?: string;
 
+  @Field({ nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(500)
   location?: string;
 
+  @Field({ nullable: true })
   @IsOptional()
   @IsString()
   description?: string;
 
+  @Field({ nullable: true })
   @IsOptional()
   @IsString()
   // Basic E.164 format-like validation, can be more specific
@@ -25,36 +30,43 @@ export class UpdateBusinessProfileInput extends PartialType(CreateBusinessProfil
   })
   contactNumber?: string;
 
+  @Field({ nullable: true })
   @IsOptional()
   @IsUrl()
   @MaxLength(255)
   website?: string;
 
+  @Field({ nullable: true })
   @IsOptional()
   @IsUrl()
   @MaxLength(255)
   facebookUrl?: string;
 
+  @Field({ nullable: true })
   @IsOptional()
   @IsUrl()
   @MaxLength(255)
   instagramUrl?: string;
 
+  @Field({ nullable: true })
   @IsOptional()
   @IsUrl()
   @MaxLength(255)
   twitterUrl?: string;
 
+  @Field({ nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(100)
   bankName?: string;
 
+  @Field({ nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(20)
   accountNumber?: string;
 
+  @Field({ nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(100)
@@ -65,12 +77,14 @@ export class UpdateBusinessProfileInput extends PartialType(CreateBusinessProfil
   // For this DTO, we'll assume the fields are optional and actual new file uploads are handled separately.
   // If you intend to pass base64 or specific file metadata here, adjust accordingly.
 
+  @Field(() => [String], { nullable: true })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   @ArrayMaxSize(10)
   categories?: string[];
 
+  @Field(() => [String], { nullable: true })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -88,4 +102,24 @@ export class UpdateBusinessProfileInput extends PartialType(CreateBusinessProfil
   // If CreateBusinessProfileInput already has all these fields with appropriate 
   // validations, simply `export class UpdateBusinessProfileInput extends PartialType(CreateBusinessProfileInput) {}`
   // might be sufficient. However, explicit re-declaration gives more control for update-specific rules if any.
+
+  // Optional URL fields for images, to be populated by separate upload mutations
+  @Field({ nullable: true })
+  @IsString()
+  @IsOptional()
+  @IsUrl()
+  logoUrl?: string;
+
+  @Field({ nullable: true })
+  @IsString()
+  @IsOptional()
+  @IsUrl()
+  coverImageUrl?: string;
+
+  @Field(() => [String], { nullable: true })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  @IsUrl({}, { each: true })
+  galleryUrls?: string[];
 } 

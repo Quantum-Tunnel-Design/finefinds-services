@@ -58,6 +58,7 @@
     "graphql": "^16.6.0",
     "graphql-tools": "^8.0.0",
     "graphql-type-json": "^0.3.2",
+    "graphql-upload-ts": "^2.1.0",
     "handlebars": "^4.7.8",
     "helmet": "^8.1.0",
     "jwks-rsa": "^3.0.0",

@@ -7,7 +7,7 @@ import { UserRole } from '@prisma/client';
 import { TransactionsService } from './transactions.service';
 import { Response } from 'express';
 
-@ApiTags('Parent Transactions')
+@ApiTags('Parent Transactions (REST)')
 @ApiBearerAuth()
 @Controller('parent/transactions') // Changed to match common parent routes like parent/saved-classes
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -16,12 +16,12 @@ export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
 
   @Get('me/:paymentId/invoice')
-  @ApiOperation({ summary: 'Download invoice PDF for a specific transaction' })
-  @ApiParam({ name: 'paymentId', description: 'The ID of the payment transaction' })
-  @ApiResponse({ status: 200, description: 'Successfully downloaded invoice PDF.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 403, description: 'Forbidden resource.' })
-  @ApiResponse({ status: 404, description: 'Transaction not found.' })
+  @ApiOperation({ summary: 'Download invoice PDF for a specific transaction (Parent Only)', description: 'Allows a parent to download a PDF invoice for one of their transactions.' })
+  @ApiParam({ name: 'paymentId', description: 'The ID of the payment transaction.', example: 'pay_123xyzabc', type: String })
+  @ApiResponse({ status: 200, description: 'Successfully downloaded invoice PDF. The response will be a PDF file.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized. User is not logged in.' })
+  @ApiResponse({ status: 403, description: 'Forbidden. User is not a PARENT or does not own the transaction.' })
+  @ApiResponse({ status: 404, description: 'Transaction not found or invoice not available.' })
   async downloadInvoice(
     @Req() req,
     @Param('paymentId') paymentId: string,

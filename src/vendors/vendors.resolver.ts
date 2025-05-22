@@ -13,6 +13,10 @@ import { VendorDashboardDataDto } from './dto/vendor-dashboard-data.dto';
 import { DateRangeFilterDto } from '../admin/dto/date-range-filter.dto';
 import { DeleteBusinessProfileInput } from './dto/delete-business-profile.input';
 import { OperationStatusDto } from '../common/dto/operation-status.dto';
+import { BusinessProfile } from './models/business-profile.model';
+import { CreateBusinessProfileInput } from './dto/create-business-profile.input';
+import { UpdateBusinessProfileInput } from './dto/update-business-profile.input';
+import { GraphQLUpload, FileUpload } from 'graphql-upload-ts';
 
 @Resolver(() => VendorProfile)
 export class VendorsResolver {
@@ -92,5 +96,75 @@ export class VendorsResolver {
   ): Promise<OperationStatusDto> {
     await this.vendorsService.deleteBusinessProfile(user.id, input);
     return { success: true, message: 'Business profile deleted successfully.' };
+  }
+
+  @Mutation(() => BusinessProfile, {
+    description: "Creates a new business profile for the authenticated vendor. Requires VENDOR role."
+  })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR)
+  async createMyBusinessProfile(
+    @CurrentUser() user: User,
+    @Args('input') input: CreateBusinessProfileInput,
+  ): Promise<BusinessProfile> {
+    return this.vendorsService.createBusinessProfile(user.id, input) as any as BusinessProfile;
+  }
+
+  @Mutation(() => BusinessProfile, {
+    description: "Updates the business profile for the authenticated vendor. Requires VENDOR role."
+  })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR)
+  async updateMyBusinessProfile(
+    @CurrentUser() user: User,
+    @Args('input') input: UpdateBusinessProfileInput,
+  ): Promise<BusinessProfile> {
+    return this.vendorsService.updateBusinessProfile(user.id, input) as any as BusinessProfile;
+  }
+  
+  @Mutation(() => String, {
+    description: "Uploads a logo for the vendor's business profile. Returns the S3 URL. Requires VENDOR role."
+  })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR)
+  async uploadBusinessLogo(
+    @CurrentUser() user: User,
+    @Args({ name: 'file', type: () => GraphQLUpload }) file: FileUpload,
+  ): Promise<string> {
+    return this.vendorsService.handleBusinessFileUpload(user.id, file, 'logo');
+  }
+
+  @Mutation(() => String, {
+    description: "Uploads a cover image for the vendor's business profile. Returns the S3 URL. Requires VENDOR role."
+  })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR)
+  async uploadBusinessCoverImage(
+    @CurrentUser() user: User,
+    @Args({ name: 'file', type: () => GraphQLUpload }) file: FileUpload,
+  ): Promise<string> {
+    return this.vendorsService.handleBusinessFileUpload(user.id, file, 'coverImage');
+  }
+
+  @Mutation(() => String, {
+    description: "Uploads a gallery image for the vendor's business profile. Returns the S3 URL. Requires VENDOR role."
+  })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR)
+  async uploadBusinessGalleryImage(
+    @CurrentUser() user: User,
+    @Args({ name: 'file', type: () => GraphQLUpload }) file: FileUpload,
+  ): Promise<string> {
+    return this.vendorsService.handleBusinessFileUpload(user.id, file, 'gallery');
+  }
+  
+  @Query(() => BusinessProfile, {
+    nullable: true,
+    description: "Retrieves the business profile of the currently authenticated vendor. Requires VENDOR role."
+  })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR)
+  async getMyBusinessProfile(@CurrentUser() user: User): Promise<BusinessProfile | null> {
+    return this.vendorsService.getBusinessProfileByUserId(user.id) as any;
   }
 } 

@@ -84,4 +84,24 @@ export class CreateBusinessProfileInput {
   @IsString({ each: true })
   @IsNotEmpty()
   tags: string[];
+
+  // Fields for image URLs, to be populated by separate upload mutations
+  @Field({ nullable: true })
+  @IsString()
+  @IsOptional()
+  @IsUrl()
+  logoUrl?: string;
+
+  @Field({ nullable: true })
+  @IsString()
+  @IsOptional()
+  @IsUrl()
+  coverImageUrl?: string;
+
+  @Field(() => [String], { nullable: true })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  @IsUrl({}, { each: true })
+  galleryUrls?: string[];
 } 

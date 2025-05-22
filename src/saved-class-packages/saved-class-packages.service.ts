@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole, SavedClassPackage } from '@prisma/client';
-import { SavedClassPackageDto } from './dto/saved-class-package.dto';
 
 @Injectable()
 export class SavedClassPackagesService {
@@ -31,6 +30,9 @@ export class SavedClassPackagesService {
         userId: parentId,
         classPackageId: classPackageId,
       },
+      include: {
+        classPackage: true,
+      },
     });
   }
 
@@ -52,48 +54,20 @@ export class SavedClassPackagesService {
     }
   }
 
-  async listSavedClasses(parentId: string): Promise<SavedClassPackageDto[]> {
+  async listSavedClasses(parentId: string): Promise<SavedClassPackage[]> {
     const parent = await this.prisma.user.findUnique({ where: { id: parentId } });
     if (!parent || parent.role !== UserRole.PARENT) {
       throw new NotFoundException('Parent not found or user is not a parent.');
     }
 
-    const savedEntries = await this.prisma.savedClassPackage.findMany({
+    return this.prisma.savedClassPackage.findMany({
       where: { userId: parentId },
       include: {
-        classPackage: {
-          include: {
-            vendor: {
-              include: {
-                businessProfile: true,
-              },
-            },
-          },
-        },
+        classPackage: true,
       },
       orderBy: {
         createdAt: 'desc',
       },
-    });
-
-    return savedEntries.map(entry => {
-      const pkg = entry.classPackage;
-      const vendorUser = pkg.vendor;
-      let vendorName = `${vendorUser.firstName} ${vendorUser.lastName}`;
-      if (vendorUser.businessProfile?.businessName) {
-        vendorName = vendorUser.businessProfile.businessName;
-      }
-
-      return {
-        savedId: entry.id,
-        classPackageId: pkg.id,
-        classPackageName: pkg.name,
-        classPackageDescription: pkg.description.substring(0, 150) + (pkg.description.length > 150 ? '...' : ''), // Snippet
-        coverImageUrl: pkg.coverImageUrl,
-        vendorId: vendorUser.id,
-        vendorName: vendorName,
-        savedAt: entry.createdAt,
-      };
     });
   }
 } 

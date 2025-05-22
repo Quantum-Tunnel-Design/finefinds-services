@@ -1,12 +1,11 @@
 import { Module } from '@nestjs/common';
 import { SavedClassPackagesService } from './saved-class-packages.service';
-import { SavedClassPackagesController } from './saved-class-packages.controller';
+import { SavedClassPackagesResolver } from './saved-class-packages.resolver';
 import { PrismaModule } from '../prisma/prisma.module';
-import { AuthModule } from '../auth/auth.module'; // For guards and decorators
 
 @Module({
-  imports: [PrismaModule, AuthModule],
-  controllers: [SavedClassPackagesController],
-  providers: [SavedClassPackagesService],
+  imports: [PrismaModule],
+  providers: [SavedClassPackagesService, SavedClassPackagesResolver],
+  exports: [SavedClassPackagesService],
 })
 export class SavedClassPackagesModule {} 

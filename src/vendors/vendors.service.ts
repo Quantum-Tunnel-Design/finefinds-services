@@ -13,6 +13,8 @@ import { VendorDashboardDataDto } from './dto/vendor-dashboard-data.dto';
 import { VendorRevenueMetricsDto } from './dto/vendor-revenue-metrics.dto';
 import { MonthlyPaymentDataDto } from '../admin/dto/monthly-payment-data.dto';
 import { PaymentStatus, Prisma, BookingStatus, ClassPackageStatus } from '@prisma/client';
+import { FileUpload } from 'graphql-upload-ts';
+import { BusinessProfile } from '@prisma/client';
 
 @Injectable()
 export class VendorsService {
@@ -45,7 +47,7 @@ export class VendorsService {
       where: { userId },
       update: dto,
       create: {
-        ...dto as CreateVendorProfileDto,
+        ...(dto as CreateVendorProfileDto),
         userId,
       },
       include: { user: true },
@@ -85,32 +87,31 @@ export class VendorsService {
   /**
    * Approves a vendor profile (admin only)
    */
-  async approveVendor(vendorId: string, currentUser: User) {
-    if (currentUser.role !== UserRole.ADMIN) {
-      throw new ForbiddenException('Only admins can approve vendors');
+  async approveVendor(vendorId: string, adminUser: User) {
+    if (adminUser.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Only admins can approve vendors.');
     }
-
-    const profile = await this.prisma.vendorProfile.findUnique({
+    const vendorProfile = await this.prisma.vendorProfile.findUnique({
       where: { id: vendorId },
     });
-
-    if (!profile) {
-      throw new NotFoundException('Vendor profile not found');
+    if (!vendorProfile) {
+      throw new NotFoundException(`Vendor profile with ID ${vendorId} not found.`);
     }
-
     return this.prisma.vendorProfile.update({
       where: { id: vendorId },
       data: { approved: true },
+      include: {user: true}
+    });
+  }
+
+  async getBusinessProfileByUserId(userId: string): Promise<BusinessProfile | null> {
+    return this.prisma.businessProfile.findUnique({
+      where: { userId },
       include: { user: true },
     });
   }
 
-  async createBusinessProfile(userId: string, input: CreateBusinessProfileInput, files: {
-    logo?: Express.Multer.File;
-    coverImage?: Express.Multer.File;
-    gallery?: Express.Multer.File[];
-  }): Promise<any> {
-    // Check if user is a vendor
+  async createBusinessProfile(userId: string, input: CreateBusinessProfileInput): Promise<BusinessProfile> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { businessProfile: true },
@@ -120,34 +121,11 @@ export class VendorsService {
       throw new ForbiddenException('Only vendors can create business profiles');
     }
 
-    // Check if profile already exists
     if (user.businessProfile) {
       throw new BadRequestException('Business profile already exists');
     }
 
-    // Validate image files
-    if (files.logo) {
-      this.validateImage(files.logo, 'logo');
-    }
-    if (files.coverImage) {
-      this.validateImage(files.coverImage, 'cover image');
-    }
-    if (files.gallery) {
-      if (files.gallery.length > 10) {
-        throw new BadRequestException('Maximum 10 gallery images allowed');
-      }
-      files.gallery.forEach(image => this.validateImage(image, 'gallery image'));
-    }
-
-    // Upload images to S3
-    const logoUrl = files.logo ? await this.uploadImage(files.logo, 'logo') : null;
-    const coverImageUrl = files.coverImage ? await this.uploadImage(files.coverImage, 'cover') : null;
-    const galleryUrls = files.gallery ? await Promise.all(
-      files.gallery.map(image => this.uploadImage(image, 'gallery'))
-    ) : [];
-
-    // Create business profile
-    const profile = await this.prisma.businessProfile.create({
+    return this.prisma.businessProfile.create({
       data: {
         userId,
         businessName: input.businessName,
@@ -161,27 +139,16 @@ export class VendorsService {
         bankName: input.bankName,
         accountNumber: input.accountNumber,
         branch: input.branch,
-        logoUrl,
-        coverImageUrl,
-        galleryUrls,
+        logoUrl: input.logoUrl,
+        coverImageUrl: input.coverImageUrl,
+        galleryUrls: input.galleryUrls,
         categories: input.categories,
         tags: input.tags,
       },
     });
-
-    return profile;
   }
 
-  async updateBusinessProfile(
-    userId: string,
-    input: UpdateBusinessProfileInput,
-    files?: {
-      logo?: Express.Multer.File;
-      coverImage?: Express.Multer.File;
-      gallery?: Express.Multer.File[];
-    },
-  ) {
-    // Get current profile
+  async updateBusinessProfile(userId: string, input: UpdateBusinessProfileInput): Promise<BusinessProfile> {
     const currentProfile = await this.prisma.businessProfile.findUnique({
       where: { userId },
     });
@@ -190,67 +157,34 @@ export class VendorsService {
       throw new NotFoundException('Business profile not found');
     }
 
-    // Validate image files if provided
-    if (files?.logo) {
-      this.validateImage(files.logo, 'logo');
-    }
-    if (files?.coverImage) {
-      this.validateImage(files.coverImage, 'cover image');
-    }
-    if (files?.gallery) {
-      if (files.gallery.length > 10) {
-        throw new BadRequestException('Maximum 10 gallery images allowed');
-      }
-      files.gallery.forEach(image => this.validateImage(image, 'gallery image'));
-    }
-
-    // Upload new images if provided
-    const logoUrl = files?.logo ? await this.uploadImage(files.logo, 'logo') : undefined;
-    const coverImageUrl = files?.coverImage ? await this.uploadImage(files.coverImage, 'cover') : undefined;
-    const galleryUrls = files?.gallery ? await Promise.all(
-      files.gallery.map(image => this.uploadImage(image, 'gallery'))
-    ) : undefined;
-
-    // Prepare update data
-    const updateData: any = {
-      ...input,
-      ...(logoUrl && { logoUrl }),
-      ...(coverImageUrl && { coverImageUrl }),
-      ...(galleryUrls && { galleryUrls }),
+    const updateData: Prisma.BusinessProfileUpdateInput = {
+      businessName: input.businessName,
+      location: input.location,
+      description: input.description,
+      contactNumber: input.contactNumber,
+      website: input.website,
+      facebookUrl: input.facebookUrl,
+      instagramUrl: input.instagramUrl,
+      twitterUrl: input.twitterUrl,
+      bankName: input.bankName,
+      accountNumber: input.accountNumber,
+      branch: input.branch,
+      logoUrl: input.logoUrl,
+      coverImageUrl: input.coverImageUrl,
+      galleryUrls: input.galleryUrls,
+      categories: input.categories,
+      tags: input.tags,
     };
+    
+    Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
 
-    // Remove undefined values
-    Object.keys(updateData).forEach(key => 
-      updateData[key] === undefined && delete updateData[key]
-    );
+    const previousValues = { ...currentProfile };
 
-    // Get previous values for audit
-    const previousValues = {
-      businessName: currentProfile.businessName,
-      location: currentProfile.location,
-      description: currentProfile.description,
-      contactNumber: currentProfile.contactNumber,
-      website: currentProfile.website,
-      facebookUrl: currentProfile.facebookUrl,
-      instagramUrl: currentProfile.instagramUrl,
-      twitterUrl: currentProfile.twitterUrl,
-      bankName: currentProfile.bankName,
-      accountNumber: currentProfile.accountNumber,
-      branch: currentProfile.branch,
-      categories: currentProfile.categories,
-      tags: currentProfile.tags,
-      logoUrl: currentProfile.logoUrl,
-      coverImageUrl: currentProfile.coverImageUrl,
-      galleryUrls: currentProfile.galleryUrls,
-    };
-
-    // Update profile
     const updatedProfile = await this.prisma.businessProfile.update({
       where: { userId },
       data: updateData,
     });
 
-    // Log changes for audit
     await this.auditService.logProfileUpdate(
       userId,
       updatedProfile.id,
@@ -259,6 +193,37 @@ export class VendorsService {
     );
 
     return updatedProfile;
+  }
+
+  async handleBusinessFileUpload(userId: string, file: FileUpload, fileType: 'logo' | 'coverImage' | 'gallery'): Promise<string> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.role !== UserRole.VENDOR) {
+      throw new ForbiddenException('User is not a vendor or does not exist.');
+    }
+
+    const { createReadStream, filename, mimetype, encoding } = await file;
+    if (!mimetype.startsWith('image/')) {
+      throw new BadRequestException(`Invalid file type for ${fileType}: ${mimetype}. Only images are allowed.`);
+    }
+
+    const stream = createReadStream();
+    const chunks = [];
+    for await (const chunk of stream) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
+
+    // Generate a unique key for S3, e.g., using userId, fileType, and filename or a timestamp
+    const key = `vendors/${userId}/business-profile/${fileType}s/${Date.now()}-${filename}`;
+    
+    try {
+      // S3Service.uploadFile returns the URL directly
+      const fileUrl = await this.s3Service.uploadFile(buffer, key, mimetype);
+      return fileUrl;
+    } catch (error) {
+      console.error(`Failed to upload ${fileType}:`, error); // Log the actual error
+      throw new BadRequestException(`Failed to upload ${fileType}.`);
+    }
   }
 
   async deleteBusinessProfile(userId: string, input: DeleteBusinessProfileInput) {
@@ -283,12 +248,7 @@ export class VendorsService {
     }
 
     const hasActiveEnrollments = currentProfile.user.createdClassPackages.some(pkg => 
-      pkg.enrollments.some(enrollment => {
-        if (enrollment.bookingStatus === BookingStatus.PAID) { 
-          return true; 
-        }
-        return false;
-      })
+      pkg.enrollments.some(enrollment => enrollment.bookingStatus === BookingStatus.PAID)
     );
 
     if (hasActiveEnrollments) {
@@ -298,71 +258,24 @@ export class VendorsService {
     }
 
     await this.prisma.classPackage.updateMany({
-      where: {
-        vendorId: userId,
-      },
-      data: {
-        status: ClassPackageStatus.ARCHIVED,
-      },
+      where: { vendorId: userId, status: { not: ClassPackageStatus.ARCHIVED } },
+      data: { status: ClassPackageStatus.ARCHIVED },
     });
 
-    // Get profile data for audit log
-    const profileData = {
-      businessName: currentProfile.businessName,
-      location: currentProfile.location,
-      description: currentProfile.description,
-      contactNumber: currentProfile.contactNumber,
-      website: currentProfile.website,
-      facebookUrl: currentProfile.facebookUrl,
-      instagramUrl: currentProfile.instagramUrl,
-      twitterUrl: currentProfile.twitterUrl,
-      bankName: currentProfile.bankName,
-      accountNumber: currentProfile.accountNumber,
-      branch: currentProfile.branch,
-      categories: currentProfile.categories,
-      tags: currentProfile.tags,
-      logoUrl: currentProfile.logoUrl,
-      coverImageUrl: currentProfile.coverImageUrl,
-      galleryUrls: currentProfile.galleryUrls,
-    };
+    const profileDataForAudit = { ...currentProfile };
+    delete profileDataForAudit.user;
 
-    // Delete profile
     await this.prisma.businessProfile.delete({
       where: { userId },
     });
 
-    // Log deletion for audit
     await this.auditService.logProfileDeletion(
       userId,
       currentProfile.id,
-      profileData
+      profileDataForAudit
     );
 
-    return {
-      message: 'Business profile deleted successfully',
-    };
-  }
-
-  private validateImage(file: Express.Multer.File, type: string): void {
-    // Check file size (5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      throw new BadRequestException(`${type} size must not exceed 5MB`);
-    }
-
-    // Check file type
-    const allowedTypes = ['image/jpeg', 'image/png'];
-    if (!allowedTypes.includes(file.mimetype)) {
-      throw new BadRequestException(`${type} must be a valid image format (JPG, PNG)`);
-    }
-
-    // Check dimensions
-    // Note: This would require additional image processing library
-    // For now, we'll rely on client-side validation for dimensions
-  }
-
-  private async uploadImage(file: Express.Multer.File, type: string): Promise<string> {
-    const key = `vendors/${type}/${Date.now()}-${file.originalname}`;
-    return this.s3Service.uploadFile(file.buffer, key, file.mimetype);
+    return { message: 'Business profile deleted successfully' };
   }
 
   async getVendorDashboardData(

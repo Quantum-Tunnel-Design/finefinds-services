@@ -24,7 +24,6 @@ export class ClassPackagesService {
   async createClassPackage(
     vendorId: string,
     input: CreateClassPackageInput,
-    coverImageFile?: Express.Multer.File,
   ): Promise<ClassPackage> {
     if (
       input.cancellationPolicyType === CancellationPolicyType.FLEXIBLE_RESCHEDULING &&
@@ -70,12 +69,6 @@ export class ClassPackagesService {
         twoMonthsLater.setMonth((now.getMonth() + 2) % 12);
     }
 
-    let coverImageUrl: string | null = null;
-    if (coverImageFile) {
-      this.validateImage(coverImageFile, 'cover image');
-      coverImageUrl = await this.uploadImage(coverImageFile, vendorId, 'class-package-cover');
-    }
-
     const createdClassPackage = await this.prisma.classPackage.create({
       data: {
         vendor: { connect: { id: vendorId } },
@@ -83,7 +76,7 @@ export class ClassPackagesService {
         description: input.description,
         beforeYouComeInstructions: input.beforeYouComeInstructions,
         pricePerChild: input.pricePerChild,
-        coverImageUrl,
+        coverImageUrl: input.coverImageUrl || null,
         status: input.status || ClassPackageStatus.DRAFT,
         cancellationPolicyType: input.cancellationPolicyType,
         rescheduleDaysBefore: input.rescheduleDaysBefore,
@@ -108,7 +101,6 @@ export class ClassPackagesService {
     vendorId: string,
     classPackageId: string,
     input: UpdateClassPackageInput,
-    coverImageFile?: Express.Multer.File,
   ): Promise<ClassPackage> {
     const existingPackage = await this.prisma.classPackage.findUnique({
       where: { id: classPackageId },
@@ -206,11 +198,7 @@ export class ClassPackagesService {
         this.validateScheduleSlots(newScheduleSlots);
     }
 
-    let coverImageUrl: string | undefined | null = existingPackage.coverImageUrl;
-    if (coverImageFile) {
-      this.validateImage(coverImageFile, 'cover image');
-      coverImageUrl = await this.uploadImage(coverImageFile, vendorId, 'class-package-cover', existingPackage.id);
-    }
+    let coverImageUrl: string | undefined | null = input.coverImageUrl;
 
     const updateData: Prisma.ClassPackageUpdateInput = {
       name: input.name,
@@ -218,7 +206,7 @@ export class ClassPackagesService {
       beforeYouComeInstructions: input.beforeYouComeInstructions,
       pricePerChild: input.pricePerChild,
       status: input.status,
-      cancellationPolicyType: input.cancellationPolicyType,
+      cancellationPolicyType: input.cancellationPolicyType !== undefined ? input.cancellationPolicyType : existingPackage.cancellationPolicyType,
       rescheduleDaysBefore: rescheduleDays,
       tags: input.tags,
     };
@@ -307,12 +295,6 @@ export class ClassPackagesService {
     await this.prisma.classPackage.delete({ where: { id: classPackageId } });
     
     return { message: 'Class package deleted successfully' };
-  }
-
-  private validateImage(file: Express.Multer.File, type: string): void {
-    if (file.size > 5 * 1024 * 1024) { 
-      throw new BadRequestException(`${type} size must not exceed 5MB.`);
-    }
   }
 
   private validateScheduleSlots(slots: ScheduleSlotInput[]): void {
@@ -489,19 +471,5 @@ export class ClassPackagesService {
       throw new BadRequestException('Weekly recurrence settings did not generate any valid slots within the allowed date range for the selected days.')
     }
     return slots;
-  }
-
-  private async uploadImage(
-    file: Express.Multer.File,
-    vendorId: string,
-    folder: string,
-    fileNamePrefix?: string,
-  ): Promise<string> {
-    const timestamp = new Date().getTime();
-    const originalName = file.originalname.split('.').slice(0, -1).join('.');
-    const extension = file.originalname.split('.').pop();
-    const fileName = `${fileNamePrefix ? fileNamePrefix + '-' : ''}${originalName}-${timestamp}.${extension}`;
-    const path = `vendors/${vendorId}/${folder}/${fileName}`;
-    return this.s3Service.uploadFile(file.buffer, path, file.mimetype);
   }
 }

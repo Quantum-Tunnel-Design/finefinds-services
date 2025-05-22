@@ -7,10 +7,14 @@ import { WinstonModule } from 'nest-winston';
 import * as winston from 'winston';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { graphqlUploadExpress } from 'graphql-upload-ts';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
+
+  // Middleware for GraphQL file uploads
+  app.use(graphqlUploadExpress({ maxFileSize: 10000000, maxFiles: 10 }));
 
   // Global pipes
   app.useGlobalPipes(
@@ -65,7 +69,7 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document, {
+  SwaggerModule.setup('docs', app, document, {
     swaggerOptions: {
       persistAuthorization: true,
       docExpansion: 'none',

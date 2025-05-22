@@ -1,18 +1,14 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ObjectType, Field } from '@nestjs/graphql';
 import { DashboardMetricsDto } from './dashboard-metrics.dto';
 import { MonthlyPaymentDataDto } from './monthly-payment-data.dto';
-import { Type } from 'class-transformer';
-import { ValidateNested } from 'class-validator';
+// Type and ValidateNested are for class-validator, not directly needed for GraphQL schema generation
+// but can remain for input validation if this DTO were used as an input elsewhere.
 
-
+@ObjectType()
 export class AdminDashboardDataDto {
-  @ApiProperty({ type: () => DashboardMetricsDto })
-  @ValidateNested()
-  @Type(() => DashboardMetricsDto)
+  @Field(() => DashboardMetricsDto)
   metrics: DashboardMetricsDto;
 
-  @ApiProperty({ type: () => [MonthlyPaymentDataDto] })
-  @ValidateNested({ each: true })
-  @Type(() => MonthlyPaymentDataDto)
+  @Field(() => [MonthlyPaymentDataDto])
   monthlyPayments: MonthlyPaymentDataDto[];
 } 

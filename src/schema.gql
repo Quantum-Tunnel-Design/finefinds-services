@@ -58,6 +58,30 @@ input BulkCreateVendorsInput {
   vendors: [VendorSignUpInput!]!
 }
 
+type BusinessProfile {
+  accountNumber: String
+  bankName: String
+  branch: String
+  businessName: String!
+  categories: [String!]!
+  contactNumber: String!
+  coverImageUrl: String
+  createdAt: DateTime!
+  description: String!
+  facebookUrl: String
+  galleryUrls: [String!]
+  id: ID!
+  instagramUrl: String
+  location: String!
+  logoUrl: String
+  tags: [String!]!
+  twitterUrl: String
+  updatedAt: DateTime!
+  user: User!
+  userId: String!
+  website: String
+}
+
 enum CancellationPolicyType {
   FIXED_COMMITMENT
   FLEXIBLE_RESCHEDULING
@@ -66,6 +90,17 @@ enum CancellationPolicyType {
 type Category {
   id: ID!
   name: String
+}
+
+type Child {
+  createdAt: DateTime!
+  dateOfBirth: DateTime!
+  firstName: String!
+  gender: Gender!
+  id: ID!
+  lastName: String!
+  parentId: ID!
+  updatedAt: DateTime!
 }
 
 type ChildBookingDetailDto {
@@ -113,6 +148,50 @@ input ConfirmSignUpInput {
   email: String!
 }
 
+input CreateBusinessProfileInput {
+  accountNumber: String
+  bankName: String
+  branch: String
+  businessName: String!
+  categories: [String!]!
+  contactNumber: String!
+  coverImageUrl: String
+  description: String!
+  facebookUrl: String
+  galleryUrls: [String!]
+  instagramUrl: String
+  location: String!
+  logoUrl: String
+  tags: [String!]!
+  twitterUrl: String
+  website: String
+}
+
+input CreateChildInput {
+  dateOfBirth: DateTime!
+  firstName: String!
+  gender: Gender!
+  lastName: String!
+}
+
+input CreateClassPackageInput {
+  ageGroupIds: [ID!]!
+  beforeYouComeInstructions: String!
+  cancellationPolicyType: String!
+  categoryId: ID!
+  coverImageUrl: String
+  customDatesInput: CustomDatesRecurrenceInput
+  dailyRecurrenceInput: DailyRecurrenceInput
+  description: String!
+  name: String!
+  pricePerChild: Float!
+  rescheduleDaysBefore: Int
+  schedulingType: SchedulingType!
+  status: String
+  tags: [String!]!
+  weeklyRecurrenceInput: WeeklyRecurrenceInput
+}
+
 input CreateNotificationInput {
   message: String!
   type: String!
@@ -125,6 +204,25 @@ input CreateVendorProfileDto {
   website: String
 }
 
+input CustomDateSlotInput {
+  availableSlots: Int!
+  date: DateTime!
+  endTime: DateTime!
+  startTime: DateTime!
+}
+
+input CustomDatesRecurrenceInput {
+  slots: [CustomDateSlotInput!]!
+}
+
+input DailyRecurrenceInput {
+  availableSlotsPerOccurrence: Int!
+  recurrenceEndDate: DateTime
+  recurrenceStartDate: DateTime!
+  slotEndTime: DateTime!
+  slotStartTime: DateTime!
+}
+
 input DateRangeFilterDto {
   endDate: String
   startDate: String
@@ -135,12 +233,29 @@ A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date
 """
 scalar DateTime
 
+"""Represents a day of the week."""
+enum DayOfWeek {
+  FRIDAY
+  MONDAY
+  SATURDAY
+  SUNDAY
+  THURSDAY
+  TUESDAY
+  WEDNESDAY
+}
+
 input DeleteBusinessProfileInput {
   confirmation: String!
 }
 
 input ForgotPasswordInput {
   email: String!
+}
+
+"""Gender of a child or user"""
+enum Gender {
+  FEMALE
+  MALE
 }
 
 """
@@ -154,6 +269,11 @@ type MonthlyPaymentDataDto {
 }
 
 type Mutation {
+  """
+  Adds a new child to the authenticated parent's profile. Restricted to PARENT role.
+  """
+  addChild(input: CreateChildInput!): Child!
+
   """Authenticates an admin user and returns an access token."""
   adminSignIn(input: AdminSignInInput!): AuthResponse!
 
@@ -174,8 +294,23 @@ type Mutation {
   """Creates a new admin account. Requires ADMIN privileges."""
   createAdminAccount(input: AdminAccountInput!): AuthResponse!
 
+  """
+  Creates a new business profile for the authenticated vendor. Requires VENDOR role.
+  """
+  createMyBusinessProfile(input: CreateBusinessProfileInput!): BusinessProfile!
+
+  """
+  Creates a new class package for the currently authenticated vendor. Cover image URL can be optionally provided if already uploaded elsewhere.
+  """
+  createMyClassPackage(input: CreateClassPackageInput!): ClassPackage!
+
   """Creates a new notification for the currently authenticated user."""
   createNotification(input: CreateNotificationInput!): Notification!
+
+  """
+  Deletes a child's profile for the authenticated parent. Restricted to PARENT role.
+  """
+  deleteChild(childId: ID!): OperationStatusDto!
 
   """
   Deletes the business profile of the currently authenticated vendor. This also archives associated classes. Cannot be undone.
@@ -229,6 +364,25 @@ type Mutation {
   """Registers a new student account in the system."""
   signUp(input: SignUpInput!): AuthResponse!
 
+  """
+  Updates a child's information for the authenticated parent. Restricted to PARENT role.
+  """
+  updateChild(childId: ID!, input: UpdateChildInput!): Child!
+
+  """
+  Updates the business profile for the authenticated vendor. Requires VENDOR role.
+  """
+  updateMyBusinessProfile(input: UpdateBusinessProfileInput!): BusinessProfile!
+
+  """
+  Updates an existing class package for the currently authenticated vendor. Cover image URL can be optionally provided or set to null to remove.
+  """
+  updateMyClassPackage(
+    """The ID of the class package to update."""
+    id: ID!
+    input: UpdateClassPackageInput!
+  ): ClassPackage!
+
   """Updates the password of the currently authenticated parent user."""
   updateMyParentPassword(input: UpdateParentPasswordInput!): OperationStatusDto!
 
@@ -248,6 +402,21 @@ type Mutation {
     """Data for updating the vendor profile."""
     input: UpdateVendorProfileDto!
   ): VendorProfile!
+
+  """
+  Uploads a cover image for the vendor's business profile. Returns the S3 URL. Requires VENDOR role.
+  """
+  uploadBusinessCoverImage(file: Upload!): String!
+
+  """
+  Uploads a gallery image for the vendor's business profile. Returns the S3 URL. Requires VENDOR role.
+  """
+  uploadBusinessGalleryImage(file: Upload!): String!
+
+  """
+  Uploads a logo for the vendor's business profile. Returns the S3 URL. Requires VENDOR role.
+  """
+  uploadBusinessLogo(file: Upload!): String!
 
   """Authenticates a vendor and returns an access token."""
   vendorLogin(input: VendorLoginInput!): AuthResponse!
@@ -325,6 +494,21 @@ type Query {
   ): ClassPackage
 
   """
+  Retrieves a specific child by ID for the authenticated parent. Restricted to PARENT role.
+  """
+  getChild(childId: ID!): Child
+
+  """
+  Retrieves the business profile of the currently authenticated vendor. Requires VENDOR role.
+  """
+  getMyBusinessProfile: BusinessProfile
+
+  """
+  Retrieves all children for the authenticated parent. Restricted to PARENT role.
+  """
+  listChildren: [Child!]!
+
+  """
   Retrieves a list of users. (Placeholder - typically admin-only and with pagination/filtering)
   """
   listUsers: [User!]!
@@ -397,6 +581,14 @@ type ScheduleSlot {
   startTime: DateTime!
 }
 
+"""Defines the type of scheduling for a class package."""
+enum SchedulingType {
+  CUSTOM_DATES
+  DAILY
+  FIXED_SLOTS
+  WEEKLY
+}
+
 input SignInInput {
   email: String!
   password: String!
@@ -424,6 +616,50 @@ type TransactionViewDto {
   vendorName: String!
 }
 
+input UpdateBusinessProfileInput {
+  accountNumber: String
+  bankName: String
+  branch: String
+  businessName: String
+  categories: [String!]
+  contactNumber: String
+  coverImageUrl: String
+  description: String
+  facebookUrl: String
+  galleryUrls: [String!]
+  instagramUrl: String
+  location: String
+  logoUrl: String
+  tags: [String!]
+  twitterUrl: String
+  website: String
+}
+
+input UpdateChildInput {
+  dateOfBirth: DateTime
+  firstName: String
+  gender: Gender
+  lastName: String
+}
+
+input UpdateClassPackageInput {
+  ageGroupIds: [ID!]
+  beforeYouComeInstructions: String
+  cancellationPolicyType: String
+  categoryId: ID
+  coverImageUrl: String
+  customDatesInput: CustomDatesRecurrenceInput
+  dailyRecurrenceInput: DailyRecurrenceInput
+  description: String
+  name: String
+  pricePerChild: Float
+  rescheduleDaysBefore: Int
+  schedulingType: SchedulingType
+  status: String
+  tags: [String!]
+  weeklyRecurrenceInput: WeeklyRecurrenceInput
+}
+
 input UpdateParentPasswordInput {
   confirmNewPassword: String!
   currentPassword: String!
@@ -447,6 +683,9 @@ input UpdateVendorProfileDto {
   phoneNumber: String
   website: String
 }
+
+"""The `Upload` scalar type represents a file upload."""
+scalar Upload
 
 type User {
   avatarUrl: String
@@ -504,4 +743,13 @@ input VendorSignUpInput {
   phoneNumber: String!
   secondaryPhoneNumber: String!
   termsAccepted: Boolean!
+}
+
+input WeeklyRecurrenceInput {
+  availableSlotsPerOccurrence: Int!
+  daysOfWeek: [DayOfWeek!]!
+  recurrenceEndDate: DateTime
+  recurrenceStartDate: DateTime!
+  slotEndTime: DateTime!
+  slotStartTime: DateTime!
 }

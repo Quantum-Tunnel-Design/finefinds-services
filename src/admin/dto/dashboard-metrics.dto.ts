@@ -1,15 +1,16 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ObjectType, Field, Float, Int } from '@nestjs/graphql';
 
+@ObjectType()
 export class DashboardMetricsDto {
-  @ApiProperty({ description: 'Total amount from online payments.', example: 12500.75 })
+  @Field(() => Float, { description: 'Total amount from online payments.' })
   onlinePaymentsTotal: number;
 
-  @ApiProperty({ description: 'Total number of registered users.', example: 1500 })
+  @Field(() => Int, { description: 'Total number of registered users.' })
   totalUsers: number;
 
-  @ApiProperty({ description: 'Number of users registered as parents.', example: 1200 })
+  @Field(() => Int, { description: 'Number of users registered as parents.' })
   parentsRegistered: number;
 
-  @ApiProperty({ description: 'Number of users registered as vendors.', example: 300 })
+  @Field(() => Int, { description: 'Number of users registered as vendors.' })
   vendorsRegistered: number;
 } 
