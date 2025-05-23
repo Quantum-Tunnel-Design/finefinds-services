@@ -42,6 +42,7 @@ permissions:
   contents: read
 
 env:
+  BACKEND_URL: https://${{ github.ref_name == 'main' && 'api.finefindslk.com' || format('{0}-api.finefinds.com', github.ref_name) }}
   FRONTEND_URL: https://${{ github.ref_name == 'main' && 'app.finefindslk.com' || format('{0}-app.finefinds.com', github.ref_name) }}
   ADMIN_FRONTEND_URL: https://${{ github.ref_name == 'main' && 'admin.finefindslk.com' || format('{0}-admin.finefinds.com', github.ref_name) }}
   
@@ -601,6 +602,7 @@ jobs:
           export SERVICES_ENV="${{ env.services_env }}"
           export ECR_REPOSITORY_BACKEND="${{ env.ecr_repository_backend }}"
           export LOG_GROUP_APP="${{ env.log_group_app }}"
+          export BACKEND_URL="${{ github.ref_name == 'main' && 'https://api.finefindslk.com' || format('https://{0}-api.finefinds.com', github.ref_name) }}"
           export FRONTEND_URL="${{ github.ref_name == 'main' && 'https://app.finefindslk.com' || format('https://{0}-app.finefinds.com', github.ref_name) }}"
           export ADMIN_FRONTEND_URL="${{ github.ref_name == 'main' && 'https://admin.finefindslk.com' || format('https://{0}-admin.finefinds.com', github.ref_name) }}"
           export SUBNET_IDS="${{ secrets.SUBNET_IDS }}"
@@ -1113,6 +1115,7 @@ jobs:
           export SERVICES_ENV="${{ env.services_env }}"
           export ECR_REPOSITORY_BACKEND="${{ env.ecr_repository_backend }}"
           export LOG_GROUP_APP="${{ env.log_group_app }}"
+          export BACKEND_URL="${{ github.ref_name == 'main' && 'https://api.finefindslk.com' || format('https://{0}-api.finefinds.com', github.ref_name) }}"
           export FRONTEND_URL="${{ github.ref_name == 'main' && 'https://app.finefindslk.com' || format('https://{0}-app.finefinds.com', github.ref_name) }}"
           export ADMIN_FRONTEND_URL="${{ github.ref_name == 'main' && 'https://admin.finefindslk.com' || format('https://{0}-admin.finefinds.com', github.ref_name) }}"
           # Ensure other necessary secrets are available as env vars if create-task-definition.sh expects them
@@ -1619,6 +1622,7 @@ jobs:
           export SERVICES_ENV="${{ env.services_env }}"
           export ECR_REPOSITORY_BACKEND="${{ env.ecr_repository_backend }}"
           export LOG_GROUP_APP="${{ env.log_group_app }}"
+          export BACKEND_URL="${{ github.ref_name == 'main' && 'https://api.finefindslk.com' || format('https://{0}-api.finefinds.com', github.ref_name) }}"
           export FRONTEND_URL="${{ github.ref_name == 'main' && 'https://app.finefindslk.com' || format('https://{0}-app.finefinds.com', github.ref_name) }}"
           export ADMIN_FRONTEND_URL="${{ github.ref_name == 'main' && 'https://admin.finefindslk.com' || format('https://{0}-admin.finefinds.com', github.ref_name) }}"
           # Ensure other necessary secrets are available as env vars if create-task-definition.sh expects them

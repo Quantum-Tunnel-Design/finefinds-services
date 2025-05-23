@@ -17,6 +17,7 @@ async function bootstrap() {
   app.use(compression());
 
   // Get frontend URLs from environment variables
+  const backendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4000';
   const adminFrontendUrl = process.env.ADMIN_FRONTEND_URL || 'http://localhost:4001';
   const apolloStudioUrl = process.env.APOLLO_STUDIO_URL || 'https://studio.apollographql.com';
@@ -36,6 +37,7 @@ async function bootstrap() {
 
   // Get all URL variants
   const allowedOrigins = [
+    ...getUrlVariants(backendUrl),
     ...getUrlVariants(frontendUrl),
     ...getUrlVariants(adminFrontendUrl)
   ];
