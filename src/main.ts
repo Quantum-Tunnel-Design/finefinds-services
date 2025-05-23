@@ -17,41 +17,30 @@ async function bootstrap() {
   app.use(compression());
 
   // Get frontend URLs from environment variables
-  const frontendUrls = [
-    configService.get('FRONTEND_URL') || 'http://localhost:4000',
-    configService.get('ADMIN_FRONTEND_URL') || 'http://localhost:4001',
-  ].filter(Boolean); // Remove any undefined or empty values
-
-  logger.log('Allowed CORS origins:', frontendUrls);
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4000';
+  const adminFrontendUrl = process.env.ADMIN_FRONTEND_URL || 'http://localhost:4001';
+  const apolloStudioUrl = process.env.APOLLO_STUDIO_URL;
+  
+  const allowedOrigins = [frontendUrl, adminFrontendUrl];
+  if (apolloStudioUrl) {
+    allowedOrigins.push(apolloStudioUrl);
+  }
+  
+  console.log('Allowed CORS origins:', allowedOrigins);
 
   // Enable CORS with specific configuration for credentialed requests
   app.enableCors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) {
-        return callback(null, true);
-      }
-
-      if (frontendUrls.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        logger.warn(`Blocked request from unauthorized origin: ${origin}`);
-        callback(new Error('Not allowed by CORS'), false);
+        console.warn(`Blocked request from disallowed origin: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
       }
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: [
-      'Content-Type',
-      'Accept',
-      'Authorization',
-      'X-Requested-With',
-      'Origin',
-      'Access-Control-Allow-Origin',
-      'Access-Control-Allow-Headers',
-      'Access-Control-Allow-Methods',
-      'Access-Control-Allow-Credentials',
-    ],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   });
 
   // Enable validation pipes

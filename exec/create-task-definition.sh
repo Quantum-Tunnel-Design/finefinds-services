@@ -109,7 +109,8 @@ create_task_definition() {
         {"name": "NODE_ENV", "value": "$SERVICES_ENV"},
         {"name": "AWS_REGION", "value": "$AWS_REGION"},
         {"name": "FRONTEND_URL", "value": "$FRONTEND_URL"},
-        {"name": "ADMIN_FRONTEND_URL", "value": "$ADMIN_FRONTEND_URL"}
+        {"name": "ADMIN_FRONTEND_URL", "value": "$ADMIN_FRONTEND_URL"},
+        {"name": "APOLLO_STUDIO_URL", "value": "$SERVICES_ENV == 'prod' ? '' : 'https://studio.apollographql.com'"}
       ],
       "secrets": [
         {"name": "DATABASE_URL", "valueFrom": "$db_connection_arn:connectionString::"},
