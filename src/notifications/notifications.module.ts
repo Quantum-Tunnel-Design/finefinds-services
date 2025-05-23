@@ -4,6 +4,7 @@ import { NotificationsService } from './notifications.service';
 import { NotificationsResolver } from './notifications.resolver';
 import { BullModule } from '@nestjs/bull';
 import { NotificationProcessor } from './notification.processor';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { NotificationProcessor } from './notification.processor';
     BullModule.registerQueue({
       name: 'notifications',
     }),
+    UsersModule,
   ],
   providers: [NotificationsService, NotificationsResolver, NotificationProcessor],
   exports: [NotificationsService],

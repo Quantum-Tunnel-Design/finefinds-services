@@ -3,10 +3,16 @@ import { UploadsController } from './uploads.controller';
 import { UploadsService } from './uploads.service';
 import { S3Module } from '../s3/s3.module';
 import { AuthModule } from '../auth/auth.module'; // For JwtAuthGuard and CurrentUser decorator
+import { UsersModule } from '../users/users.module'; // Import UsersModule
 import { ConfigModule } from '@nestjs/config'; // If ConfigService is used in UploadsService
 
 @Module({
-  imports: [S3Module, AuthModule, ConfigModule],
+  imports: [
+    S3Module,
+    AuthModule,
+    ConfigModule,
+    UsersModule, // Add UsersModule to imports
+  ],
   controllers: [UploadsController],
   providers: [UploadsService],
   exports: [UploadsService], // Export if other modules will use it directly

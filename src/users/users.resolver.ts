@@ -1,5 +1,5 @@
 import { Resolver, Query, Mutation, Args } from '@nestjs/graphql';
-import { UseGuards } from '@nestjs/common';
+import { UseGuards, UnauthorizedException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { User } from './models/user.model';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -21,8 +21,10 @@ export class UsersResolver {
   @Query(() => User, { description: 'Retrieves the profile of the currently authenticated user. (Alias for AuthResolver.me)' })
   @UseGuards(JwtAuthGuard)
   async me(@CurrentUser() user: PrismaUser): Promise<User> {
-    const prismaUser = await this.usersService.getCurrentUser(user.id);
-    return prismaUser as any as User;
+    if (!user) {
+      throw new UnauthorizedException('Authenticated user not found in session.');
+    }
+    return user as any as User;
   }
 
   @Query(() => [User], { description: 'Retrieves a list of users. (Placeholder - typically admin-only and with pagination/filtering)' })
