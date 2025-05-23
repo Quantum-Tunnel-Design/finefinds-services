@@ -38,7 +38,7 @@ async function bootstrap() {
   );
   app.use(compression());
   app.enableCors({
-    origin: configService.get('CORS_ORIGIN', '*'),
+    origin: configService.get('CORS_ORIGIN', 'http://localhost:3001'),
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
