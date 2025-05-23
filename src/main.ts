@@ -1,66 +1,67 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
-import helmet from 'helmet';
-import compression from 'compression';
-import { WinstonModule } from 'nest-winston';
-import * as winston from 'winston';
 import { ConfigService } from '@nestjs/config';
+import compression from 'compression';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
+  const logger = new Logger('Bootstrap');
 
   // Middleware for GraphQL file uploads - Removed as we use REST for file uploads
   // app.use(graphqlUploadExpress({ maxFileSize: 10000000, maxFiles: 10 }));
 
-  // Global pipes
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-      forbidNonWhitelisted: true,
-    }),
-  );
-
-  // Security middleware
-  app.use(
-    helmet({
-      contentSecurityPolicy: {
-        directives: {
-          ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-          'script-src': ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net'],
-          'img-src': ["'self'", 'data:', 'cdn.jsdelivr.net'],
-        },
-      },
-    }),
-  );
+  // Enable compression
   app.use(compression());
-  app.enableCors({
-    origin: configService.get('CORS_ORIGIN', '*'),
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type, Authorization, X-Requested-With, Accept',
-    credentials: true,
-  });
 
-  // Winston logger configuration
-  const logger = WinstonModule.createLogger({
-    transports: [
-      new winston.transports.Console({
-        format: winston.format.combine(
-          winston.format.timestamp(),
-          winston.format.ms(),
-          winston.format.colorize(),
-          winston.format.printf(({ timestamp, level, message, context, trace }) => {
-            return `${timestamp} [${context}] ${level}: ${message}${trace ? `\n${trace}` : ''}`;
-          }),
-        ),
-      }),
+  // Get frontend URLs from environment variables
+  const frontendUrls = [
+    configService.get('FRONTEND_URL') || 'http://localhost:4000',
+    configService.get('ADMIN_FRONTEND_URL') || 'http://localhost:4001',
+  ].filter(Boolean); // Remove any undefined or empty values
+
+  logger.log('Allowed CORS origins:', frontendUrls);
+
+  // Enable CORS with specific configuration for credentialed requests
+  app.enableCors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (frontendUrls.includes(origin)) {
+        callback(null, true);
+      } else {
+        logger.warn(`Blocked request from unauthorized origin: ${origin}`);
+        callback(new Error('Not allowed by CORS'), false);
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: [
+      'Content-Type',
+      'Accept',
+      'Authorization',
+      'X-Requested-With',
+      'Origin',
+      'Access-Control-Allow-Origin',
+      'Access-Control-Allow-Headers',
+      'Access-Control-Allow-Methods',
+      'Access-Control-Allow-Credentials',
     ],
   });
 
-  app.useLogger(logger);
+  // Enable validation pipes
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
 
   // Global prefix for all routes except health
   app.setGlobalPrefix('api', {
@@ -89,10 +90,10 @@ async function bootstrap() {
     customSiteTitle: 'FineFinds API Documentation',
   });
 
-  const port = configService.get('PORT', 3000);
+  const port = configService.get('PORT') || 3000;
   await app.listen(port);
   logger.log(`Application is running on: http://localhost:${port}`);
   logger.log(`Swagger documentation is available at: http://localhost:${port}/api/docs`);
 }
 
-bootstrap(); 
+bootstrap();
