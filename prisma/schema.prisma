@@ -416,6 +416,7 @@ enum BookingStatus {
 
 enum PaymentType {
   CARD
+  CLASS_PACKAGE_PURCHASE
   // OTHER // Future consideration
 }
 

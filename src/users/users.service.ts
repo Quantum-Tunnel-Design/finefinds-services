@@ -151,13 +151,13 @@ export class UsersService {
   /**
    * Gets the current user's profile
    */
-  async getCurrentUser(userId: string): Promise<User> {
+  async getCurrentUser(cognitoSubValue: string): Promise<User> {
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+      where: { cognitoSub: cognitoSubValue },
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('User not found in local database for the provided token subject.');
     }
 
     return user;

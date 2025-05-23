@@ -681,6 +681,7 @@ enum PaymentStatus {
 
 enum PaymentType {
   CARD
+  CLASS_PACKAGE_PURCHASE
 }
 
 type Query {
