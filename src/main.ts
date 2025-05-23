@@ -19,14 +19,16 @@ async function bootstrap() {
   // Get frontend URLs from environment variables
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4000';
   const adminFrontendUrl = process.env.ADMIN_FRONTEND_URL || 'http://localhost:4001';
-  const apolloStudioUrl = process.env.APOLLO_STUDIO_URL;
+  const apolloStudioUrl = process.env.APOLLO_STUDIO_URL || 'https://studio.apollographql.com';
+  const isLocal = !(['prod', 'staging'].includes(process.env.NODE_ENV)) || !process.env.NODE_ENV;
   
   const allowedOrigins = [frontendUrl, adminFrontendUrl];
-  if (apolloStudioUrl) {
+  if (isLocal || apolloStudioUrl) {
     allowedOrigins.push(apolloStudioUrl);
   }
   
-  console.log('Allowed CORS origins:', allowedOrigins);
+  logger.log('Environment:', process.env.NODE_ENV || 'development');
+  logger.log('Allowed CORS origins:', allowedOrigins);
 
   // Enable CORS with specific configuration for credentialed requests
   app.enableCors({
