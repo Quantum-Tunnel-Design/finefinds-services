@@ -332,7 +332,7 @@ export class AuthService {
       });
       await this.cognitoClient.send(addToGroupCommand);
 
-      await this.usersService.create({
+      const dbUser = await this.usersService.create({
         email: input.email,
         firstName: input.firstName,
         lastName: input.lastName,
@@ -347,8 +347,40 @@ export class AuthService {
         })),
       });
 
+      // Programmatically sign in the user to get tokens
+      const adminUserPoolId = this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID'); // This should be client user pool for the user
+      const clientUserPoolId = this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID');
+      const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
+
+
+      const authResponse = await this.cognitoClient.send(new InitiateAuthCommand({
+        AuthFlow: AuthFlowType.USER_PASSWORD_AUTH,
+        ClientId: clientId, // Use the regular client ID
+        AuthParameters: {
+          USERNAME: input.email,
+          PASSWORD: input.password, // The password user signed up with
+        },
+      }));
+
+      if (!authResponse.AuthenticationResult?.AccessToken) {
+        throw new BadRequestException('Failed to authenticate new parent user to retrieve tokens.');
+      }
+
+      const expiresAt = new Date();
+      expiresAt.setSeconds(expiresAt.getSeconds() + (authResponse.AuthenticationResult.ExpiresIn || 3600));
+
+      await this.sessionService.createSession(
+        dbUser.id,
+        authResponse.AuthenticationResult.AccessToken,
+        expiresAt,
+      );
+
       return {
-        message: 'Parent account created successfully. You can now sign in.',
+        accessToken: authResponse.AuthenticationResult.AccessToken,
+        idToken: authResponse.AuthenticationResult.IdToken,
+        refreshToken: authResponse.AuthenticationResult.RefreshToken,
+        user: dbUser,
+        message: 'Parent account created and verified successfully.',
       };
     } catch (error) {
       console.error('[AuthService parentSignUp Admin Flow] Error:', error);
@@ -639,7 +671,7 @@ export class AuthService {
       });
       await this.cognitoClient.send(addToGroupCommand);
 
-      await this.usersService.create({
+      const dbUser = await this.usersService.create({
         email: input.email,
         firstName: input.firstName,
         lastName: input.lastName,
@@ -653,7 +685,7 @@ export class AuthService {
       await this.mailerService.sendMail({
         to: input.email,
         subject: 'Welcome to FineFinds - Vendor Registration Complete',
-        template: 'vendor-welcome', // Ensure this template doesn't mention verification codes
+        template: 'vendor-welcome',
         context: {
           firstName: input.firstName,
           lastName: input.lastName,
@@ -664,7 +696,7 @@ export class AuthService {
         await this.mailerService.sendMail({
             to: adminEmail,
             subject: 'New Vendor Account Created',
-            template: 'vendor-registration-notification', // Ensure this template is appropriate
+            template: 'vendor-registration-notification',
             context: {
             vendorName: `${input.firstName} ${input.lastName}`,
             vendorEmail: input.email,
@@ -673,8 +705,37 @@ export class AuthService {
         });
       }
 
+      // Programmatically sign in the user to get tokens
+      const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
+
+      const authResponse = await this.cognitoClient.send(new InitiateAuthCommand({
+        AuthFlow: AuthFlowType.USER_PASSWORD_AUTH,
+        ClientId: clientId, // Use the regular client ID
+        AuthParameters: {
+          USERNAME: input.email,
+          PASSWORD: input.password, // The password user signed up with
+        },
+      }));
+
+      if (!authResponse.AuthenticationResult?.AccessToken) {
+        throw new BadRequestException('Failed to authenticate new vendor user to retrieve tokens.');
+      }
+
+      const expiresAt = new Date();
+      expiresAt.setSeconds(expiresAt.getSeconds() + (authResponse.AuthenticationResult.ExpiresIn || 3600));
+
+      await this.sessionService.createSession(
+        dbUser.id,
+        authResponse.AuthenticationResult.AccessToken,
+        expiresAt,
+      );
+      
       return {
-        message: 'Vendor account created successfully. You can now sign in.',
+        accessToken: authResponse.AuthenticationResult.AccessToken,
+        idToken: authResponse.AuthenticationResult.IdToken,
+        refreshToken: authResponse.AuthenticationResult.RefreshToken,
+        user: dbUser,
+        message: 'Vendor account created and verified successfully.',
       };
     } catch (error) {
       console.error('[AuthService vendorSignUp Admin Flow] Error:', error);
