@@ -499,7 +499,7 @@ type Mutation {
   """Creates multiple vendor accounts in bulk. Requires ADMIN privileges."""
   bulkCreateVendors(input: BulkCreateVendorsInput!): AuthResponse!
 
-  """Creates a new admin account. Requires ADMIN privileges."""
+  """Creates a new admin account. Formerly required ADMIN privileges."""
   createAdminAccount(input: AdminAccountInput!): AuthResponse!
 
   """
@@ -681,6 +681,7 @@ enum PaymentStatus {
 
 enum PaymentType {
   CARD
+  CLASS_PACKAGE_PURCHASE
 }
 
 type Query {
