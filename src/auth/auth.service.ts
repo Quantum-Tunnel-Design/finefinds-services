@@ -454,9 +454,15 @@ export class AuthService {
         throw new ConflictException('User already exists');
       }
 
+      const userPoolId = this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID');
+      if (!userPoolId) {
+        console.error('[AuthService createAdminAccount] Missing COGNITO_ADMIN_USER_POOL_ID configuration');
+        throw new Error('Missing Cognito admin user pool configuration');
+      }
+
       // Create user in Cognito
       const createUserCommand = new AdminCreateUserCommand({
-        UserPoolId: this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID'),
+        UserPoolId: userPoolId,
         Username: input.email,
         UserAttributes: [
           { Name: 'email', Value: input.email },
@@ -469,37 +475,65 @@ export class AuthService {
         MessageAction: 'SUPPRESS',
       });
 
-      const cognitoUserResponse = await this.cognitoClient.send(createUserCommand);
-      const cognitoSub = cognitoUserResponse.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value;
+      console.log('[AuthService createAdminAccount] Creating Cognito user...');
+      let cognitoUserResponse;
+      try {
+        cognitoUserResponse = await this.cognitoClient.send(createUserCommand);
+      } catch (error) {
+        console.error('[AuthService createAdminAccount] Cognito create user error:', error);
+        throw new Error(`Failed to create Cognito user: ${error.message}`);
+      }
 
+      const cognitoSub = cognitoUserResponse.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value;
       if (!cognitoSub) {
-        console.error('[AuthService createAdminAccount] Failed to extract Cognito sub from response.');
+        console.error('[AuthService createAdminAccount] Failed to extract Cognito sub from response:', cognitoUserResponse);
         throw new Error('Failed to get Cognito sub for admin user');
       }
 
       // Set password for the user
+      console.log('[AuthService createAdminAccount] Setting user password...');
       const setPasswordCommand = new AdminSetUserPasswordCommand({
-        UserPoolId: this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID'),
+        UserPoolId: userPoolId,
         Username: input.email,
         Password: input.password,
         Permanent: true,
       });
 
-      await this.cognitoClient.send(setPasswordCommand);
+      try {
+        await this.cognitoClient.send(setPasswordCommand);
+      } catch (error) {
+        console.error('[AuthService createAdminAccount] Cognito set password error:', error);
+        throw new Error(`Failed to set user password: ${error.message}`);
+      }
 
       // Create admin in database
-      await this.usersService.create({
-        email: input.email,
-        firstName: input.firstName,
-        lastName: input.lastName,
-        role: UserRole.ADMIN,
-        cognitoSub: cognitoSub,
-      });
+      console.log('[AuthService createAdminAccount] Creating user in database...');
+      try {
+        await this.usersService.create({
+          email: input.email,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          role: UserRole.ADMIN,
+          cognitoSub: cognitoSub,
+          isEmailVerified: true,
+          isActive: true,
+        });
+      } catch (error) {
+        console.error('[AuthService createAdminAccount] Database create user error:', error);
+        throw new Error(`Failed to create user in database: ${error.message}`);
+      }
 
       // Sign in the user to get tokens
+      console.log('[AuthService createAdminAccount] Signing in user...');
+      const clientId = this.configService.get<string>('COGNITO_ADMIN_CLIENT_ID');
+      if (!clientId) {
+        console.error('[AuthService createAdminAccount] Missing COGNITO_ADMIN_CLIENT_ID configuration');
+        throw new Error('Missing Cognito admin client configuration');
+      }
+
       const signInCommand = new AdminInitiateAuthCommand({
-        UserPoolId: this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID'),
-        ClientId: this.configService.get<string>('COGNITO_ADMIN_CLIENT_ID'),
+        UserPoolId: userPoolId,
+        ClientId: clientId,
         AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
         AuthParameters: {
           USERNAME: input.email,
@@ -507,7 +541,13 @@ export class AuthService {
         },
       });
 
-      const authResponse = await this.cognitoClient.send(signInCommand);
+      let authResponse;
+      try {
+        authResponse = await this.cognitoClient.send(signInCommand);
+      } catch (error) {
+        console.error('[AuthService createAdminAccount] Cognito sign in error:', error);
+        throw new Error(`Failed to sign in user: ${error.message}`);
+      }
 
       return {
         idToken: authResponse.AuthenticationResult?.IdToken || '',
@@ -515,11 +555,12 @@ export class AuthService {
         message: 'Admin account created successfully',
       };
     } catch (error) {
+      console.error('[AuthService createAdminAccount] Error:', error);
       if (error instanceof ConflictException) {
         throw error;
       }
       throw new InternalServerErrorException(
-        `Failed to create admin account: ${error.message}`,
+        `Failed to create admin account: ${error.message || 'Unknown error'}`,
       );
     }
   }

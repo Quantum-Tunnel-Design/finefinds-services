@@ -23,6 +23,7 @@ env:
   ECR_REPOSITORY_BACKEND: finefinds-services-${{ inputs.environment }}
   CLUSTER_NAME: finefinds-${{ inputs.environment }}-cluster
   TASK_DEFINITION: finefinds-backend-migration-${{ inputs.environment }}
+  LOG_GROUP: /finefinds/${{ inputs.environment }}/migration
 
 jobs:
   migrate:
@@ -46,98 +47,181 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Get RDS Endpoint and Credentials
+        id: rds_creds
+        run: |
+          echo "::group::Fetching RDS Connection Details"
+          
+          # Get database credentials from Secrets Manager
+          db_creds=$(aws secretsmanager get-secret-value \
+            --secret-id "finefinds-${{ inputs.environment }}-rds-connection" \
+            --query "SecretString" \
+            --output text)
+          if [ $? -ne 0 ]; then
+            echo "::error::Failed to get RDS credentials from Secrets Manager"
+            exit 1
+          fi
+          
+          # Parse credentials from JSON
+          rds_endpoint=$(echo $db_creds | jq -r '.host')
+          db_user=$(echo $db_creds | jq -r '.username')
+          db_password=$(echo $db_creds | jq -r '.password')
+          db_name=$(echo $db_creds | jq -r '.dbName')
+          db_port=$(echo $db_creds | jq -r '.port')
+          
+          # Validate required fields
+          if [ -z "$rds_endpoint" ] || [ -z "$db_user" ] || [ -z "$db_password" ] || [ -z "$db_name" ] || [ -z "$db_port" ]; then
+            echo "::error::Missing required database credentials"
+            exit 1
+          fi
+          
+          # Construct database URL
+          database_url="postgresql://${db_user}:${db_password}@${rds_endpoint}:${db_port}/${db_name}"
+          
+          # Output database URL for task definition
+          echo "database_url=$database_url" >> $GITHUB_OUTPUT
+          
+          echo "✓ Successfully retrieved RDS connection details"
+          echo "::endgroup::"
+
       - name: Get subnet IDs
         id: get-subnets
         run: |
+          echo "::group::Fetching Subnet Information"
           SUBNET_IDS=$(aws cloudformation describe-stacks \
             --stack-name FineFinds-${{ inputs.environment }} \
             --query "Stacks[0].Outputs[?ExportName=='finefinds-${{ inputs.environment }}-migration-task-subnet-ids'].OutputValue" \
             --output text)
+          
+          if [ -z "$SUBNET_IDS" ]; then
+            echo "::error::Failed to get subnet IDs"
+            exit 1
+          fi
+          
           echo "subnet_ids=$SUBNET_IDS" >> $GITHUB_OUTPUT
+          echo "✓ Successfully retrieved subnet IDs"
+          echo "::endgroup::"
 
       - name: Get security group ID
         id: get-sg
         run: |
+          echo "::group::Fetching Security Group Information"
           SG_ID=$(aws cloudformation describe-stacks \
             --stack-name FineFinds-${{ inputs.environment }} \
             --query "Stacks[0].Outputs[?ExportName=='finefinds-${{ inputs.environment }}-migration-task-sg-id'].OutputValue" \
             --output text)
+          
+          if [ -z "$SG_ID" ]; then
+            echo "::error::Failed to get security group ID"
+            exit 1
+          fi
+          
           echo "sg_id=$SG_ID" >> $GITHUB_OUTPUT
+          echo "✓ Successfully retrieved security group ID"
+          echo "::endgroup::"
+          
+      - name: Create CloudWatch Log Group
+        id: create_log_group
+        run: |
+          echo "::group::Creating CloudWatch Log Group"
+          
+          log() {
+            local level=$1
+            shift
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*"
+          }
+          
+          log "INFO" "Checking if log group exists: ${{ env.LOG_GROUP }}"
+          if ! aws logs describe-log-groups \
+            --log-group-name-prefix "${{ env.LOG_GROUP }}" \
+            --query 'logGroups[0].logGroupName' \
+            --output text | grep -q "${{ env.LOG_GROUP }}"; then
+            
+            log "INFO" "Creating log group: ${{ env.LOG_GROUP }}"
+            aws logs create-log-group --log-group-name "${{ env.LOG_GROUP }}"
+            aws logs put-retention-policy \
+              --log-group-name "${{ env.LOG_GROUP }}" \
+              --retention-in-days 30
+            log "INFO" "Created log group with retention period of 30 days"
+          else
+            log "INFO" "Log group already exists"
+          fi
+          echo "::endgroup::"
           
       - name: Run database migration
         id: migration
         run: |
+          echo "::group::Running Database Migration"
+          
+          # Function to log with timestamp and level
+          log() {
+            local level=$1
+            shift
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*"
+          }
+          
+          log "INFO" "Creating task definition..."
+          
           # Generate task definition
-          echo '{
-            "family": "'"${{ env.TASK_DEFINITION }}"'",
+          cat > task-definition.json << EOF
+          {
+            "family": "${{ env.TASK_DEFINITION }}",
             "networkMode": "awsvpc",
             "requiresCompatibilities": ["FARGATE"],
             "cpu": "256",
             "memory": "512",
-            "executionRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-${{ inputs.environment }}-ecs-execution-role",
-            "taskRoleArn": "arn:aws:iam::'"${{ secrets.AWS_ACCOUNT_ID }}"':role/finefinds-${{ inputs.environment }}-ecs-task-role",
+            "executionRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/finefinds-${{ inputs.environment }}-ecs-execution-role",
+            "taskRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/finefinds-${{ inputs.environment }}-ecs-task-role",
             "containerDefinitions": [
               {
                 "name": "MigrationContainer",
-                "image": "'"${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ inputs.version }}"'",
+                "image": "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ inputs.version }}",
                 "essential": true,
                 "workingDirectory": "/app",
                 "command": ["npm", "run", "prisma:migrate"],
-                "secrets": [
-                  {
-                    "name": "DB_NAME",
-                    "valueFrom": "finefinds"
-                  },
-                  {
-                    "name": "DB_USER",
-                    "valueFrom": "postgres"
-                  },
-                  {
-                    "name": "DB_PASSWORD",
-                    "valueFrom": "arn:aws:secretsmanager:us-east-1:'"${{ secrets.AWS_ACCOUNT_ID }}"':secret:FineFindsdevRdsDatabaseSecr-bq75cAjVfSmy-QS5oW0"
-                  },
-                  {
-                    "name": "DB_PORT",
-                    "valueFrom": "5432"
-                  },
-                  {
-                    "name": "DATABASE_HOST",
-                    "valueFrom": "finefinds-dev-rdsdatabase74c89a2a-laqn1velntrj.c2x6mggmobz1.us-east-1.rds.amazonaws.com"
-                  }
-                ],
                 "environment": [
                   {
                     "name": "NODE_ENV",
-                    "value": "'"${{ inputs.environment }}"'"
+                    "value": "${{ inputs.environment }}"
                   },
                   {
                     "name": "AWS_REGION",
-                    "value": "'"${{ env.AWS_REGION }}"'"
+                    "value": "${{ env.AWS_REGION }}"
                   },
                   {
                     "name": "DATABASE_URL",
-                    "value": "postgresql://${DB_USER}:${DB_PASSWORD}@${DATABASE_HOST}:${DB_PORT}/${DB_NAME}?schema=public"
+                    "value": "${{ steps.rds_creds.outputs.database_url }}"
                   }
                 ],
                 "logConfiguration": {
                   "logDriver": "awslogs",
                   "options": {
-                    "awslogs-group": "/finefinds/${{ inputs.environment }}/migration",
-                    "awslogs-region": "'"${{ env.AWS_REGION }}"'",
+                    "awslogs-group": "${{ env.LOG_GROUP }}",
+                    "awslogs-region": "${{ env.AWS_REGION }}",
                     "awslogs-stream-prefix": "migration"
                   }
                 }
               }
             ]
-          }' > task-definition.json
-
+          }
+          EOF
+          
           # Register task definition
+          log "INFO" "Registering task definition..."
           NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
             --cli-input-json file://task-definition.json \
             --query 'taskDefinition.taskDefinitionArn' \
             --output text)
-
+          
+          if [ -z "$NEW_TASK_DEF_ARN" ]; then
+            log "ERROR" "Failed to register task definition"
+            exit 1
+          fi
+          
+          log "INFO" "Task definition registered: $NEW_TASK_DEF_ARN"
+          
           # Run migration task
+          log "INFO" "Starting migration task..."
           TASK_ARN=$(aws ecs run-task \
             --cluster ${{ env.CLUSTER_NAME }} \
             --task-definition $NEW_TASK_DEF_ARN \
@@ -146,22 +230,48 @@ jobs:
             --query 'tasks[0].taskArn' \
             --output text)
           
-          echo "Waiting for migration task to complete..."
-          aws ecs wait tasks-stopped \
-            --cluster ${{ env.CLUSTER_NAME }} \
-            --tasks $TASK_ARN
+          if [ -z "$TASK_ARN" ]; then
+            log "ERROR" "Failed to start migration task"
+            exit 1
+          fi
+          
+          log "INFO" "Migration task started: $TASK_ARN"
+          log "INFO" "Waiting for migration task to complete..."
+          
+          # Wait for task completion with timeout
+          MAX_ATTEMPTS=30
+          ATTEMPT=1
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            TASK_STATUS=$(aws ecs describe-tasks \
+              --cluster ${{ env.CLUSTER_NAME }} \
+              --tasks $TASK_ARN \
+              --query 'tasks[0].lastStatus' \
+              --output text)
             
-          # Check task status
-          TASK_STATUS=$(aws ecs describe-tasks \
+            if [ "$TASK_STATUS" == "STOPPED" ]; then
+              break
+            fi
+            
+            log "INFO" "Task status: $TASK_STATUS (attempt $ATTEMPT of $MAX_ATTEMPTS)"
+            sleep 30
+            ATTEMPT=$((ATTEMPT + 1))
+          done
+          
+          if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
+            log "ERROR" "Migration task timed out after $MAX_ATTEMPTS attempts"
+            exit 1
+          fi
+          
+          # Check task exit code
+          EXIT_CODE=$(aws ecs describe-tasks \
             --cluster ${{ env.CLUSTER_NAME }} \
             --tasks $TASK_ARN \
-            --query 'tasks[0].lastStatus' \
+            --query 'tasks[0].containers[0].exitCode' \
             --output text)
-            
-          if [ "$TASK_STATUS" != "STOPPED" ]; then
-            echo "Migration task failed with status: $TASK_STATUS"
-            # Get detailed task information
-            echo "Task details:"
+          
+          if [ "$EXIT_CODE" != "0" ]; then
+            log "ERROR" "Migration failed with exit code: $EXIT_CODE"
+            log "ERROR" "Task details:"
             aws ecs describe-tasks \
               --cluster ${{ env.CLUSTER_NAME }} \
               --tasks $TASK_ARN \
@@ -170,23 +280,8 @@ jobs:
             exit 1
           fi
           
-          # Check container exit code and get detailed status
-          TASK_DETAILS=$(aws ecs describe-tasks \
-            --cluster ${{ env.CLUSTER_NAME }} \
-            --tasks $TASK_ARN \
-            --query 'tasks[0].containers[0].{exitCode:exitCode,reason:reason,lastStatus:lastStatus}' \
-            --output json)
-            
-          EXIT_CODE=$(echo $TASK_DETAILS | jq -r '.exitCode')
-          REASON=$(echo $TASK_DETAILS | jq -r '.reason')
-          CONTAINER_STATUS=$(echo $TASK_DETAILS | jq -r '.lastStatus')
-            
-          if [ "$EXIT_CODE" != "0" ]; then
-            echo "Migration failed with exit code: $EXIT_CODE"
-            echo "Container status: $CONTAINER_STATUS"
-            echo "Failure reason: $REASON"
-            exit 1
-          fi
+          log "INFO" "Migration completed successfully"
+          echo "::endgroup::"
             
       - name: Notify Slack
         uses: slackapi/slack-github-action@v2.1.0
