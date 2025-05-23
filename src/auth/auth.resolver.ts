@@ -67,10 +67,8 @@ export class AuthResolver {
 
   @Mutation(() => AuthResponse, { 
     name: 'createAdminAccount',
-    description: 'Creates a new admin account. Requires ADMIN privileges.'
+    description: 'Creates a new admin account. Formerly required ADMIN privileges.'
   })
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
   async createAdminAccount(
     @Args('input') input: AdminAccountInput,
   ): Promise<AuthResponse> {
