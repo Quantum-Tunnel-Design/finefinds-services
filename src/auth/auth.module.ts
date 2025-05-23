@@ -18,33 +18,42 @@ import cognitoConfig from './cognito.config';
 import { PrismaModule } from '../prisma/prisma.module';
 import { RolesGuard } from './guards/roles.guard';
 
+// console.log('AuthModule __dirname:', __dirname); // Log __dirname
+// const resolvedTemplatePath = join(__dirname, 'templates'); // Log resolved path
+// console.log('Resolved template path for MailerModule:', resolvedTemplatePath);
+
 @Module({
   imports: [
     ConfigModule.forFeature(cognitoConfig),
     PassportModule.register({ defaultStrategy: 'cognito-client' }),
     ScheduleModule.forRoot(),
     MailerModule.forRootAsync({
-      useFactory: async (config: ConfigService) => ({
-        transport: {
-          host: config.get('MAIL_HOST'),
-          port: config.get('MAIL_PORT'),
-          secure: config.get('MAIL_SECURE') === 'true',
-          auth: {
-            user: config.get('MAIL_USER'),
-            pass: config.get('MAIL_PASSWORD'),
+      useFactory: async (config: ConfigService) => {
+        const templateDir = join(__dirname, 'templates');
+        console.log('[MailerModule Factory] __dirname:', __dirname);
+        console.log('[MailerModule Factory] Resolved template directory:', templateDir);
+        return {
+          transport: {
+            host: config.get('MAIL_HOST'),
+            port: config.get('MAIL_PORT'),
+            secure: config.get('MAIL_SECURE') === 'true',
+            auth: {
+              user: config.get('MAIL_USER'),
+              pass: config.get('MAIL_PASSWORD'),
+            },
           },
-        },
-        defaults: {
-          from: config.get('MAIL_FROM'),
-        },
-        template: {
-          dir: join(__dirname, 'templates'),
-          adapter: new HandlebarsAdapter(),
-          options: {
-            strict: true,
+          defaults: {
+            from: config.get('MAIL_FROM'),
           },
-        },
-      }),
+          template: {
+            dir: templateDir, // Use the logged path
+            adapter: new HandlebarsAdapter(),
+            options: {
+              strict: true,
+            },
+          },
+        };
+      },
       inject: [ConfigService],
     }),
     UsersModule,

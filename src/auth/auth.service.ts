@@ -695,28 +695,28 @@ export class AuthService {
       });
 
       // Send welcome/notification emails (as they were before)
-      await this.mailerService.sendMail({
-        to: input.email,
-        subject: 'Welcome to FineFinds - Vendor Registration Complete',
-        template: 'vendor-welcome',
-        context: {
-          firstName: input.firstName,
-          lastName: input.lastName,
-        },
-      });
-      const adminEmail = this.configService.get('ADMIN_EMAIL');
-      if (adminEmail) {
-        await this.mailerService.sendMail({
-            to: adminEmail,
-            subject: 'New Vendor Account Created',
-            template: 'vendor-registration-notification',
-            context: {
-            vendorName: `${input.firstName} ${input.lastName}`,
-            vendorEmail: input.email,
-            vendorPhone: input.phoneNumber,
-            },
-        });
-      }
+      // await this.mailerService.sendMail({
+      //   to: input.email,
+      //   subject: 'Welcome to FineFinds - Vendor Registration Complete',
+      //   template: 'vendor-welcome',
+      //   context: {
+      //     firstName: input.firstName,
+      //     lastName: input.lastName,
+      //   },
+      // });
+      // const adminEmail = this.configService.get('ADMIN_EMAIL');
+      // if (adminEmail) {
+      //   await this.mailerService.sendMail({
+      //       to: adminEmail,
+      //       subject: 'New Vendor Account Created',
+      //       template: 'vendor-registration-notification',
+      //       context: {
+      //       vendorName: `${input.firstName} ${input.lastName}`,
+      //       vendorEmail: input.email,
+      //       vendorPhone: input.phoneNumber,
+      //       },
+      //   });
+      // }
 
       // Programmatically sign in the user to get tokens
       const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
