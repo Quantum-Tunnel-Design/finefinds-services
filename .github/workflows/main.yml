@@ -42,9 +42,9 @@ permissions:
   contents: read
 
 env:
-  BACKEND_URL: https://${{ github.ref_name == 'main' && 'api.finefindslk.com' || format('{0}-api.finefinds.com', github.ref_name) }}
-  FRONTEND_URL: https://${{ github.ref_name == 'main' && 'app.finefindslk.com' || format('{0}-app.finefinds.com', github.ref_name) }}
-  ADMIN_FRONTEND_URL: https://${{ github.ref_name == 'main' && 'admin.finefindslk.com' || format('{0}-admin.finefinds.com', github.ref_name) }}
+  BACKEND_URL: https://${{ github.ref_name == 'main' && 'api.finefindslk.com' || format('{0}-api.finefindslk.com', github.ref_name) }}
+  FRONTEND_URL: https://${{ github.ref_name == 'main' && 'app.finefindslk.com' || format('{0}-app.finefindslk.com', github.ref_name) }}
+  ADMIN_FRONTEND_URL: https://${{ github.ref_name == 'main' && 'admin.finefindslk.com' || format('{0}-admin.finefindslk.com', github.ref_name) }}
   
   # AWS Configuration
   aws_region: us-east-1
@@ -602,9 +602,9 @@ jobs:
           export SERVICES_ENV="${{ env.services_env }}"
           export ECR_REPOSITORY_BACKEND="${{ env.ecr_repository_backend }}"
           export LOG_GROUP_APP="${{ env.log_group_app }}"
-          export BACKEND_URL="${{ github.ref_name == 'main' && 'https://api.finefindslk.com' || format('https://{0}-api.finefinds.com', github.ref_name) }}"
-          export FRONTEND_URL="${{ github.ref_name == 'main' && 'https://app.finefindslk.com' || format('https://{0}-app.finefinds.com', github.ref_name) }}"
-          export ADMIN_FRONTEND_URL="${{ github.ref_name == 'main' && 'https://admin.finefindslk.com' || format('https://{0}-admin.finefinds.com', github.ref_name) }}"
+          export BACKEND_URL="${{ github.ref_name == 'main' && 'https://api.finefindslk.com' || format('https://{0}-api.finefindslk.com', github.ref_name) }}"
+          export FRONTEND_URL="${{ github.ref_name == 'main' && 'https://app.finefindslk.com' || format('https://{0}-app.finefindslk.com', github.ref_name) }}"
+          export ADMIN_FRONTEND_URL="${{ github.ref_name == 'main' && 'https://admin.finefindslk.com' || format('https://{0}-admin.finefindslk.com', github.ref_name) }}"
           export SUBNET_IDS="${{ secrets.SUBNET_IDS }}"
           export SECURITY_GROUP_IDS="${{ secrets.SECURITY_GROUP_IDS }}"
           export REDIS_CONNECTION_ARN="${{ steps.secrets.outputs.redis_connection_arn }}"
@@ -1115,9 +1115,9 @@ jobs:
           export SERVICES_ENV="${{ env.services_env }}"
           export ECR_REPOSITORY_BACKEND="${{ env.ecr_repository_backend }}"
           export LOG_GROUP_APP="${{ env.log_group_app }}"
-          export BACKEND_URL="${{ github.ref_name == 'main' && 'https://api.finefindslk.com' || format('https://{0}-api.finefinds.com', github.ref_name) }}"
-          export FRONTEND_URL="${{ github.ref_name == 'main' && 'https://app.finefindslk.com' || format('https://{0}-app.finefinds.com', github.ref_name) }}"
-          export ADMIN_FRONTEND_URL="${{ github.ref_name == 'main' && 'https://admin.finefindslk.com' || format('https://{0}-admin.finefinds.com', github.ref_name) }}"
+          export BACKEND_URL="${{ github.ref_name == 'main' && 'https://api.finefindslk.com' || format('https://{0}-api.finefindslk.com', github.ref_name) }}"
+          export FRONTEND_URL="${{ github.ref_name == 'main' && 'https://app.finefindslk.com' || format('https://{0}-app.finefindslk.com', github.ref_name) }}"
+          export ADMIN_FRONTEND_URL="${{ github.ref_name == 'main' && 'https://admin.finefindslk.com' || format('https://{0}-admin.finefindslk.com', github.ref_name) }}"
           # Ensure other necessary secrets are available as env vars if create-task-definition.sh expects them
           # This part needs careful review to ensure create-task-definition.sh gets all its required variables.
 
@@ -1622,9 +1622,9 @@ jobs:
           export SERVICES_ENV="${{ env.services_env }}"
           export ECR_REPOSITORY_BACKEND="${{ env.ecr_repository_backend }}"
           export LOG_GROUP_APP="${{ env.log_group_app }}"
-          export BACKEND_URL="${{ github.ref_name == 'main' && 'https://api.finefindslk.com' || format('https://{0}-api.finefinds.com', github.ref_name) }}"
-          export FRONTEND_URL="${{ github.ref_name == 'main' && 'https://app.finefindslk.com' || format('https://{0}-app.finefinds.com', github.ref_name) }}"
-          export ADMIN_FRONTEND_URL="${{ github.ref_name == 'main' && 'https://admin.finefindslk.com' || format('https://{0}-admin.finefinds.com', github.ref_name) }}"
+          export BACKEND_URL="${{ github.ref_name == 'main' && 'https://api.finefindslk.com' || format('https://{0}-api.finefindslk.com', github.ref_name) }}"
+          export FRONTEND_URL="${{ github.ref_name == 'main' && 'https://app.finefindslk.com' || format('https://{0}-app.finefindslk.com', github.ref_name) }}"
+          export ADMIN_FRONTEND_URL="${{ github.ref_name == 'main' && 'https://admin.finefindslk.com' || format('https://{0}-admin.finefindslk.com', github.ref_name) }}"
           # Ensure other necessary secrets are available as env vars if create-task-definition.sh expects them
           # This part needs careful review to ensure create-task-definition.sh gets all its required variables.
 
