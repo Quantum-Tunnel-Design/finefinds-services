@@ -30,7 +30,7 @@ export class CognitoClientStrategy extends PassportStrategy(Strategy, 'cognito-c
 
     this.verifier = CognitoJwtVerifier.create({
       userPoolId: cognitoConfig.userPoolId,
-      tokenUse: 'access',
+      tokenUse: 'id',
       clientId: cognitoConfig.clientId,
     });
   }

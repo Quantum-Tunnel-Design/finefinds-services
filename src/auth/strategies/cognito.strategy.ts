@@ -31,7 +31,7 @@ export class CognitoStrategy extends PassportStrategy(Strategy) {
 
     this.verifier = CognitoJwtVerifier.create({
       userPoolId,
-      tokenUse: 'access',
+      tokenUse: 'id',
       clientId,
       clientSecret,
     });
@@ -56,9 +56,8 @@ export class CognitoStrategy extends PassportStrategy(Strategy) {
   }
 
   private mapCognitoGroupsToRole(groups: string[]): UserRole {
-    if (groups.includes('admin')) return UserRole.ADMIN;
-    if (groups.includes('vendor')) return UserRole.VENDOR;
     if (groups.includes('parent')) return UserRole.PARENT;
+    if (groups.includes('vendor')) return UserRole.VENDOR;
     return UserRole.STUDENT;
   }
 } 

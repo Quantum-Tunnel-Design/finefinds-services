@@ -4,9 +4,6 @@ import { User } from '../../users/models/user.model';
 @ObjectType()
 export class AuthResponse {
   @Field(() => String, { nullable: true })
-  accessToken?: string;
-
-  @Field(() => String, { nullable: true })
   idToken?: string;
 
   @Field(() => String, { nullable: true })

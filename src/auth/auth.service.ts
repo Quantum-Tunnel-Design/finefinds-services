@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, ForbiddenException, ConflictException, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 // import * as crypto from 'crypto'; // No longer needed
 import {
@@ -82,7 +82,8 @@ export class AuthService {
       { Name: 'email_verified', Value: 'true' },
       { Name: 'given_name', Value: input.firstName },
       { Name: 'family_name', Value: input.lastName },
-      // Role is managed in DB, not as Cognito custom attribute
+      { Name: 'custom:roleName', Value: input.role },
+      { Name: 'custom:metadata', Value: JSON.stringify({ createdAt: new Date().toISOString() }) },
     ];
 
     try {
@@ -137,13 +138,11 @@ export class AuthService {
 
   async signIn(input: SignInInput): Promise<AuthResponse> {
     const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
-    // No SecretHash computation or usage as client secret is not enabled
 
     const authParameters: { [key: string]: string } = {
         USERNAME: input.email,
         PASSWORD: input.password,
     };
-    // No SecretHash to add to authParameters
 
     try {
       const authCommand = new InitiateAuthCommand({
@@ -155,7 +154,7 @@ export class AuthService {
       const response = await this.cognitoClient.send(authCommand);
       const user = await this.usersService.findByEmail(input.email);
 
-      if (!response.AuthenticationResult?.AccessToken) {
+      if (!response.AuthenticationResult?.IdToken) {
         throw new UnauthorizedException('Invalid credentials');
       }
 
@@ -163,10 +162,10 @@ export class AuthService {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + (input.rememberMe ? 30 : 1)); // 30 days for remember me, 1 day otherwise
 
-      // Create session
+      // Create session with ID token
       await this.sessionService.createSession(
         user.id,
-        response.AuthenticationResult.AccessToken,
+        response.AuthenticationResult.IdToken,
         expiresAt
       );
 
@@ -185,7 +184,6 @@ export class AuthService {
       }
 
       return {
-        accessToken: response.AuthenticationResult.AccessToken,
         idToken: response.AuthenticationResult.IdToken,
         refreshToken: response.AuthenticationResult.RefreshToken,
         user,
@@ -291,9 +289,8 @@ export class AuthService {
 
   async parentSignUp(input: ParentSignUpInput): Promise<AuthResponse> {
     const userPoolId = this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID');
-    // No SecretHash computation needed for Admin commands
 
-    // Validate input (e.g., password confirmation, children data) - Keep existing validations or add as needed
+    // Validate input
     if (input.password !== input.confirmPassword) {
       throw new BadRequestException('Passwords do not match');
     }
@@ -321,6 +318,12 @@ export class AuthService {
       { Name: 'given_name', Value: input.firstName },
       { Name: 'family_name', Value: input.lastName },
       { Name: 'phone_number', Value: input.phoneNumber },
+      { Name: 'custom:roleName', Value: UserRole.PARENT },
+      { Name: 'custom:metadata', Value: JSON.stringify({ 
+        createdAt: new Date().toISOString(),
+        phoneNumber: input.phoneNumber,
+        childrenCount: input.children.length
+      }) },
     ];
 
     try {
@@ -365,19 +368,17 @@ export class AuthService {
 
       // Programmatically sign in the user to get tokens
       const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
-      const region = this.configService.get<string>('AWS_REGION'); // Get region for logging
-      console.log(`[AuthService parentSignUp] Attempting InitiateAuth with ClientId: ${clientId}, Region: ${region}`); // Log the values
 
       const authResponse = await this.cognitoClient.send(new InitiateAuthCommand({
         AuthFlow: AuthFlowType.USER_PASSWORD_AUTH,
-        ClientId: clientId, // Use the regular client ID
+        ClientId: clientId,
         AuthParameters: {
           USERNAME: input.email,
-          PASSWORD: input.password, // The password user signed up with
+          PASSWORD: input.password,
         },
       }));
 
-      if (!authResponse.AuthenticationResult?.AccessToken) {
+      if (!authResponse.AuthenticationResult?.IdToken) {
         throw new BadRequestException('Failed to authenticate new parent user to retrieve tokens.');
       }
 
@@ -386,12 +387,11 @@ export class AuthService {
 
       await this.sessionService.createSession(
         dbUser.id,
-        authResponse.AuthenticationResult.AccessToken,
+        authResponse.AuthenticationResult.IdToken,
         expiresAt,
       );
 
       return {
-        accessToken: authResponse.AuthenticationResult.AccessToken,
         idToken: authResponse.AuthenticationResult.IdToken,
         refreshToken: authResponse.AuthenticationResult.RefreshToken,
         user: dbUser,
@@ -405,13 +405,11 @@ export class AuthService {
 
   async adminSignIn(input: AdminSignInInput): Promise<AuthResponse> {
     const adminClientId = this.configService.get<string>('COGNITO_ADMIN_CLIENT_ID');
-    // No SecretHash computation or usage
 
     const authParameters: { [key: string]: string } = {
       USERNAME: input.username,
       PASSWORD: input.password,
     };
-    // No SecretHash to add to authParameters
 
     try {
       const authCommand = new AdminInitiateAuthCommand({
@@ -424,22 +422,21 @@ export class AuthService {
       const response = await this.cognitoClient.send(authCommand);
       const user = await this.usersService.findByEmail(input.username);
 
-      if (!response.AuthenticationResult?.AccessToken) {
+      if (!response.AuthenticationResult?.IdToken) {
         throw new UnauthorizedException('Invalid credentials');
       }
 
-      // Create session
+      // Create session with ID token
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 1); // Admin sessions expire in 1 day
 
       await this.sessionService.createSession(
         user.id,
-        response.AuthenticationResult.AccessToken,
+        response.AuthenticationResult.IdToken,
         expiresAt
       );
 
       return {
-        accessToken: response.AuthenticationResult.AccessToken,
         idToken: response.AuthenticationResult.IdToken,
         refreshToken: response.AuthenticationResult.RefreshToken,
         user,
@@ -451,13 +448,13 @@ export class AuthService {
 
   async createAdminAccount(input: AdminAccountInput): Promise<AuthResponse> {
     try {
-      // Check if admin already exists
-      const existingAdmin = await this.usersService.findByEmail(input.email);
-      if (existingAdmin) {
-        throw new BadRequestException('Admin account already exists');
+      // Check if user already exists in Cognito
+      const existingUser = await this.usersService.findByEmail(input.email);
+      if (existingUser) {
+        throw new ConflictException('User already exists');
       }
 
-      // Create admin user in Cognito
+      // Create user in Cognito
       const createUserCommand = new AdminCreateUserCommand({
         UserPoolId: this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID'),
         Username: input.email,
@@ -466,13 +463,21 @@ export class AuthService {
           { Name: 'email_verified', Value: 'true' },
           { Name: 'given_name', Value: input.firstName },
           { Name: 'family_name', Value: input.lastName },
+          { Name: 'custom:roleName', Value: UserRole.ADMIN },
+          { Name: 'custom:metadata', Value: JSON.stringify({ createdAt: new Date().toISOString() }) },
         ],
-        MessageAction: 'SUPPRESS', // Don't send welcome email
+        MessageAction: 'SUPPRESS',
       });
 
-      await this.cognitoClient.send(createUserCommand);
+      const cognitoUserResponse = await this.cognitoClient.send(createUserCommand);
+      const cognitoSub = cognitoUserResponse.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value;
 
-      // Set admin password
+      if (!cognitoSub) {
+        console.error('[AuthService createAdminAccount] Failed to extract Cognito sub from response.');
+        throw new Error('Failed to get Cognito sub for admin user');
+      }
+
+      // Set password for the user
       const setPasswordCommand = new AdminSetUserPasswordCommand({
         UserPoolId: this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID'),
         Username: input.email,
@@ -482,32 +487,40 @@ export class AuthService {
 
       await this.cognitoClient.send(setPasswordCommand);
 
-      // Add to admin group
-      const addToGroupCommand = new AdminAddUserToGroupCommand({
-        UserPoolId: this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID'),
-        Username: input.email,
-        GroupName: 'admin',
-      });
-
-      await this.cognitoClient.send(addToGroupCommand);
-
       // Create admin in database
       await this.usersService.create({
         email: input.email,
         firstName: input.firstName,
         lastName: input.lastName,
         role: UserRole.ADMIN,
-        cognitoSub: input.email, // Using email as cognitoSub for admin
+        cognitoSub: cognitoSub,
       });
 
+      // Sign in the user to get tokens
+      const signInCommand = new AdminInitiateAuthCommand({
+        UserPoolId: this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID'),
+        ClientId: this.configService.get<string>('COGNITO_ADMIN_CLIENT_ID'),
+        AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
+        AuthParameters: {
+          USERNAME: input.email,
+          PASSWORD: input.password,
+        },
+      });
+
+      const authResponse = await this.cognitoClient.send(signInCommand);
+
       return {
+        idToken: authResponse.AuthenticationResult?.IdToken || '',
+        refreshToken: authResponse.AuthenticationResult?.RefreshToken || '',
         message: 'Admin account created successfully',
       };
     } catch (error) {
-      if (error instanceof BadRequestException) {
+      if (error instanceof ConflictException) {
         throw error;
       }
-      throw new UnauthorizedException(error.message);
+      throw new InternalServerErrorException(
+        `Failed to create admin account: ${error.message}`,
+      );
     }
   }
 
@@ -637,7 +650,6 @@ export class AuthService {
 
   async vendorSignUp(input: VendorSignUpInput): Promise<AuthResponse> {
     const userPoolId = this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID');
-    // No SecretHash computation needed for Admin commands
 
     // --- Input Validations ---
     if (input.password !== input.confirmPassword) {
@@ -650,7 +662,6 @@ export class AuthService {
     if (existingUser) {
       throw new BadRequestException('Email already registered');
     }
-    // --- End Validations ---
 
     const userAttributes = [
       { Name: 'email', Value: input.email },
@@ -658,6 +669,13 @@ export class AuthService {
       { Name: 'given_name', Value: input.firstName },
       { Name: 'family_name', Value: input.lastName },
       { Name: 'phone_number', Value: input.phoneNumber },
+      { Name: 'custom:roleName', Value: UserRole.VENDOR },
+      { Name: 'custom:metadata', Value: JSON.stringify({ 
+        createdAt: new Date().toISOString(),
+        termsAccepted: input.termsAccepted,
+        phoneNumber: input.phoneNumber,
+        secondaryPhoneNumber: input.secondaryPhoneNumber
+      }) },
     ];
 
     try {
@@ -692,45 +710,23 @@ export class AuthService {
         role: UserRole.VENDOR,
         cognitoSub: cognitoSub,
         phoneNumber: input.phoneNumber,
+        secondaryPhoneNumber: input.secondaryPhoneNumber,
+        termsAccepted: input.termsAccepted,
       });
-
-      // Send welcome/notification emails (as they were before)
-      // await this.mailerService.sendMail({
-      //   to: input.email,
-      //   subject: 'Welcome to FineFinds - Vendor Registration Complete',
-      //   template: 'vendor-welcome',
-      //   context: {
-      //     firstName: input.firstName,
-      //     lastName: input.lastName,
-      //   },
-      // });
-      // const adminEmail = this.configService.get('ADMIN_EMAIL');
-      // if (adminEmail) {
-      //   await this.mailerService.sendMail({
-      //       to: adminEmail,
-      //       subject: 'New Vendor Account Created',
-      //       template: 'vendor-registration-notification',
-      //       context: {
-      //       vendorName: `${input.firstName} ${input.lastName}`,
-      //       vendorEmail: input.email,
-      //       vendorPhone: input.phoneNumber,
-      //       },
-      //   });
-      // }
 
       // Programmatically sign in the user to get tokens
       const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
 
       const authResponse = await this.cognitoClient.send(new InitiateAuthCommand({
         AuthFlow: AuthFlowType.USER_PASSWORD_AUTH,
-        ClientId: clientId, // Use the regular client ID
+        ClientId: clientId,
         AuthParameters: {
           USERNAME: input.email,
-          PASSWORD: input.password, // The password user signed up with
+          PASSWORD: input.password,
         },
       }));
 
-      if (!authResponse.AuthenticationResult?.AccessToken) {
+      if (!authResponse.AuthenticationResult?.IdToken) {
         throw new BadRequestException('Failed to authenticate new vendor user to retrieve tokens.');
       }
 
@@ -739,12 +735,11 @@ export class AuthService {
 
       await this.sessionService.createSession(
         dbUser.id,
-        authResponse.AuthenticationResult.AccessToken,
+        authResponse.AuthenticationResult.IdToken,
         expiresAt,
       );
       
       return {
-        accessToken: authResponse.AuthenticationResult.AccessToken,
         idToken: authResponse.AuthenticationResult.IdToken,
         refreshToken: authResponse.AuthenticationResult.RefreshToken,
         user: dbUser,
@@ -787,13 +782,11 @@ export class AuthService {
 
   async vendorLogin(input: VendorLoginInput) {
     const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
-    // No SecretHash computation or usage
 
     const authParameters: { [key: string]: string } = {
       USERNAME: input.email,
       PASSWORD: input.password,
     };
-    // No SecretHash to add to authParameters
 
     // Check if account is locked
     const { locked, lockedUntil } = await this.loginAttemptService.isAccountLocked(input.email);
@@ -823,18 +816,17 @@ export class AuthService {
       // Clear failed attempts on successful login
       await this.loginAttemptService.clearFailedAttempts(user.id);
 
-      // Create session
+      // Create session with ID token
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 1); // Sessions expire in 1 day
 
       await this.sessionService.createSession(
         user.id,
-        response.AuthenticationResult.AccessToken,
+        response.AuthenticationResult.IdToken,
         expiresAt
       );
 
       return {
-        accessToken: response.AuthenticationResult.AccessToken,
         idToken: response.AuthenticationResult.IdToken,
         refreshToken: response.AuthenticationResult.RefreshToken,
         expiresIn: response.AuthenticationResult.ExpiresIn,
@@ -860,47 +852,5 @@ export class AuthService {
         `Invalid credentials. ${attemptsLeft} attempts remaining before account is locked.`,
       );
     }
-  }
-
-  // Temporary method for dummy user data
-  async getDummyUsers(): Promise<any[]> { // Using any[] for now, will match DummyUserDto structure
-    console.log('[AuthService] getDummyUsers called - returning dummy data.');
-    return [
-      {
-        id: 'dummy-parent-001',
-        firstName: 'Parent',
-        lastName: 'One',
-        email: 'parent1@example.com',
-        role: 'PARENT',
-      },
-      {
-        id: 'dummy-vendor-001',
-        firstName: 'Vendor',
-        lastName: 'Uno',
-        email: 'vendor1@example.com',
-        role: 'VENDOR',
-      },
-      {
-        id: 'dummy-admin-001',
-        firstName: 'Admin',
-        lastName: 'Prime',
-        email: 'admin1@example.com',
-        role: 'ADMIN',
-      },
-      {
-        id: 'dummy-parent-002',
-        firstName: 'Parent',
-        lastName: 'Two',
-        email: 'parent2@example.com',
-        role: 'PARENT',
-      },
-      {
-        id: 'dummy-vendor-002',
-        firstName: 'Vendor',
-        lastName: 'Dos',
-        email: 'vendor2@example.com',
-        role: 'VENDOR',
-      },
-    ];
   }
 } 

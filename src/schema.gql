@@ -207,7 +207,6 @@ type AgeGroup {
 }
 
 type AuthResponse {
-  accessToken: String
   idToken: String
   message: String
   refreshToken: String
@@ -442,14 +441,6 @@ enum DayOfWeek {
 
 input DeleteBusinessProfileInput {
   confirmation: String!
-}
-
-type DummyUserDto {
-  email: String!
-  firstName: String!
-  id: ID!
-  lastName: String!
-  role: String!
 }
 
 input ForgotPasswordInput {
@@ -743,9 +734,6 @@ type Query {
     """The ID of the class package to retrieve."""
     id: ID!
   ): ClassPackage
-
-  """TEMPORARY: Retrieves a list of dummy users for testing."""
-  dummyUsers: [DummyUserDto!]!
 
   """
   Retrieves a specific child by ID for the authenticated parent. Restricted to PARENT role.

@@ -1,11 +1,11 @@
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from '../src/app.module';
-import { AuthService } from '../src/auth/auth.service';
-import { UsersService } from '../src/users/users.service';
-import { PrismaService } from '../src/prisma/prisma.service';
-import { ParentSignUpInput } from '../src/auth/dto/parent-sign-up.input';
-import { VendorSignUpInput } from '../src/auth/dto/vendor-sign-up.input';
-import { AdminAccountInput } from '../src/auth/dto/admin-account.input';
+import { AppModule } from '../app.module';
+import { AuthService } from '../auth/auth.service';
+import { UsersService } from '../users/users.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { ParentSignUpInput } from '../auth/dto/parent-sign-up.input';
+import { VendorSignUpInput } from '../auth/dto/vendor-sign-up.input';
+import { AdminAccountInput } from '../auth/dto/admin-account.input';
 import { INestApplicationContext } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
@@ -46,8 +46,8 @@ async function bootstrap() {
         password: DEFAULT_PASSWORD,
       };
       try {
-        await authService.createAdminAccount(adminInput);
-        console.log(`Admin user ${adminEmail} created.`);
+        const adminResult = await authService.createAdminAccount(adminInput);
+        console.log(`Admin user ${adminEmail} created. IDToken: ${adminResult.idToken ? 'Generated' : 'Not Generated'}`);
       } catch (error) {
         if (error.message?.includes('Admin account already exists')) {
           console.log(`Admin user ${adminEmail} already exists.`);
@@ -90,8 +90,8 @@ async function bootstrap() {
       const existingParent = await usersService.findByEmail(parentInput.email);
       if (!existingParent) {
         try {
-          const result = await authService.parentSignUp(parentInput);
-          console.log(`Parent user ${parentInput.email} created. IDToken: ${result.idToken ? 'Generated' : 'Not Generated'}`);
+          const parentResult = await authService.parentSignUp(parentInput);
+          console.log(`Parent user ${parentInput.email} created. IDToken: ${parentResult.idToken ? 'Generated' : 'Not Generated'}`);
         } catch (error) {
           if (error.message?.includes('Email already registered')) {
              console.log(`Parent user ${parentInput.email} already exists (caught by service).`);
@@ -115,8 +115,6 @@ async function bootstrap() {
         phoneNumber: '+94711234567',
         secondaryPhoneNumber: '+94711234568',
         termsAccepted: true,
-        // Potentially add businessName, category, etc. if your VendorSignUpInput supports it
-        // and you want to create basic BusinessProfile info here.
       },
       {
         email: 'vendor2@example.com',
@@ -134,11 +132,8 @@ async function bootstrap() {
       const existingVendor = await usersService.findByEmail(vendorInput.email);
       if (!existingVendor) {
         try {
-          const result = await authService.vendorSignUp(vendorInput);
-          console.log(`Vendor user ${vendorInput.email} created. IDToken: ${result.idToken ? 'Generated' : 'Not Generated'}`);
-          // TODO: Optionally create a basic BusinessProfile and a ClassPackage for this vendor
-          // This would require getting the newly created user's ID from the result
-          // and then using VendorsService and ClassPackagesService.
+          const vendorResult = await authService.vendorSignUp(vendorInput);
+          console.log(`Vendor user ${vendorInput.email} created. IDToken: ${vendorResult.idToken ? 'Generated' : 'Not Generated'}`);
         } catch (error) {
            if (error.message?.includes('Email already registered')) {
              console.log(`Vendor user ${vendorInput.email} already exists (caught by service).`);
