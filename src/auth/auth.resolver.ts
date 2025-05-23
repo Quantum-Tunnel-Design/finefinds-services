@@ -38,11 +38,6 @@ export class AuthResolver {
     return this.authService.parentSignUp(input);
   }
 
-  @Mutation(() => AuthResponse, { description: 'Confirms a user\'s registration using the verification code sent to their email.' })
-  async confirmSignUp(@Args('input') input: ConfirmSignUpInput): Promise<AuthResponse> {
-    return this.authService.confirmSignUp(input);
-  }
-
   @Mutation(() => AuthResponse, { description: 'Authenticates a user and returns an access token.' })
   async signIn(@Args('input') input: SignInInput): Promise<AuthResponse> {
     return this.authService.signIn(input);
