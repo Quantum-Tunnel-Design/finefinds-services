@@ -111,6 +111,7 @@ create_task_definition() {
         {"name": "BACKEND_URL", "value": "$BACKEND_URL"},
         {"name": "FRONTEND_URL", "value": "$FRONTEND_URL"},
         {"name": "ADMIN_FRONTEND_URL", "value": "$ADMIN_FRONTEND_URL"},
+        {"name": "APOLLO_STUDIO_URL", "value": "https://studio.apollographql.com"}
       ],
       "secrets": [
         {"name": "DATABASE_URL", "valueFrom": "$db_connection_arn:connectionString::"},
