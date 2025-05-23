@@ -26,6 +26,9 @@ FROM --platform=${TARGETPLATFORM:-linux/amd64} node:20-alpine
 # Install OpenSSL and other required dependencies
 RUN apk add --no-cache openssl
 
+# Install wget for healthchecks
+RUN apk add --no-cache wget
+
 # Define build arguments for environment variables
 ARG AWS_REGION
 ARG DATABASE_URL
