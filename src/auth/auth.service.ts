@@ -658,7 +658,6 @@ export class AuthService {
       { Name: 'given_name', Value: input.firstName },
       { Name: 'family_name', Value: input.lastName },
       { Name: 'phone_number', Value: input.phoneNumber },
-      { Name: 'custom:secondary_phone', Value: input.secondaryPhoneNumber || '' },
     ];
 
     try {
@@ -693,7 +692,6 @@ export class AuthService {
         role: UserRole.VENDOR,
         cognitoSub: cognitoSub,
         phoneNumber: input.phoneNumber,
-        secondaryPhoneNumber: input.secondaryPhoneNumber,
       });
 
       // Send welcome/notification emails (as they were before)
