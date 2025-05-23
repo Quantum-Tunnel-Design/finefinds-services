@@ -50,23 +50,23 @@ export class AuthService {
     private loginAttemptService: LoginAttemptService,
   ) {
     const awsRegion = this.configService.get<string>('AWS_REGION');
-    const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-    const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
-    const sessionToken = this.configService.get<string>('AWS_SESSION_TOKEN'); // Optional
+    // const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID'); // Removed
+    // const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY'); // Removed
+    // const sessionToken = this.configService.get<string>('AWS_SESSION_TOKEN'); // Optional // Removed
 
-    if (!awsRegion || !accessKeyId || !secretAccessKey) {
-      throw new Error('Missing AWS configuration for Cognito client (region, access key, secret key). Check environment variables.');
+    if (!awsRegion) { // Modified check: only region is mandatory here
+      throw new Error('Missing AWS_REGION configuration for Cognito client. Check environment variables.');
     }
 
-    const credentials = {
-      accessKeyId,
-      secretAccessKey,
-      ...(sessionToken && { sessionToken }), // Add sessionToken only if it exists
-    };
+    // const credentials = { // Removed
+    //   accessKeyId, // Removed
+    //   secretAccessKey, // Removed
+    //   ...(sessionToken && { sessionToken }), // Add sessionToken only if it exists // Removed
+    // }; // Removed
 
     this.cognitoClient = new CognitoIdentityProviderClient({
       region: awsRegion,
-      credentials,
+      // credentials, // Removed: SDK will use default credential provider chain (incl. IAM Task Role)
     });
   }
 
