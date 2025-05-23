@@ -49,8 +49,24 @@ export class AuthService {
     private prisma: PrismaService,
     private loginAttemptService: LoginAttemptService,
   ) {
+    const awsRegion = this.configService.get<string>('AWS_REGION');
+    const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
+    const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
+    const sessionToken = this.configService.get<string>('AWS_SESSION_TOKEN'); // Optional
+
+    if (!awsRegion || !accessKeyId || !secretAccessKey) {
+      throw new Error('Missing AWS configuration for Cognito client (region, access key, secret key). Check environment variables.');
+    }
+
+    const credentials = {
+      accessKeyId,
+      secretAccessKey,
+      ...(sessionToken && { sessionToken }), // Add sessionToken only if it exists
+    };
+
     this.cognitoClient = new CognitoIdentityProviderClient({
-      region: this.configService.get<string>('AWS_REGION'),
+      region: awsRegion,
+      credentials,
     });
   }
 
@@ -348,10 +364,9 @@ export class AuthService {
       });
 
       // Programmatically sign in the user to get tokens
-      const adminUserPoolId = this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID'); // This should be client user pool for the user
-      const clientUserPoolId = this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID');
       const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
-
+      const region = this.configService.get<string>('AWS_REGION'); // Get region for logging
+      console.log(`[AuthService parentSignUp] Attempting InitiateAuth with ClientId: ${clientId}, Region: ${region}`); // Log the values
 
       const authResponse = await this.cognitoClient.send(new InitiateAuthCommand({
         AuthFlow: AuthFlowType.USER_PASSWORD_AUTH,

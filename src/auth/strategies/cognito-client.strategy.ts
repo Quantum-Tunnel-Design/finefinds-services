@@ -24,7 +24,7 @@ export class CognitoClientStrategy extends PassportStrategy(Strategy, 'cognito-c
       }),
     });
 
-    if (!cognitoConfig.userPoolId || !cognitoConfig.clientId || !cognitoConfig.clientSecret) {
+    if (!cognitoConfig.userPoolId || !cognitoConfig.clientId) {
       throw new Error('Client Cognito configuration is missing. Please check your environment variables.');
     }
 
@@ -32,7 +32,6 @@ export class CognitoClientStrategy extends PassportStrategy(Strategy, 'cognito-c
       userPoolId: cognitoConfig.userPoolId,
       tokenUse: 'access',
       clientId: cognitoConfig.clientId,
-      clientSecret: cognitoConfig.clientSecret,
     });
   }
 

@@ -330,11 +330,6 @@ enum ClassPackageStatus {
   PUBLISHED
 }
 
-input ConfirmSignUpInput {
-  code: String!
-  email: String!
-}
-
 input CreateBusinessProfileInput {
   accountNumber: String
   bankName: String
@@ -503,11 +498,6 @@ type Mutation {
 
   """Creates multiple vendor accounts in bulk. Requires ADMIN privileges."""
   bulkCreateVendors(input: BulkCreateVendorsInput!): AuthResponse!
-
-  """
-  Confirms a user's registration using the verification code sent to their email.
-  """
-  confirmSignUp(input: ConfirmSignUpInput!): AuthResponse!
 
   """Creates a new admin account. Requires ADMIN privileges."""
   createAdminAccount(input: AdminAccountInput!): AuthResponse!
