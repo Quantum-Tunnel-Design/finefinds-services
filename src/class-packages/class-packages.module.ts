@@ -6,9 +6,10 @@ import { S3Module } from '../s3/s3.module';
 import { AuthModule } from '../auth/auth.module';
 import { AuditModule } from '../audit/audit.module';
 import { ClassPackagesResolver } from './class-packages.resolver';
+import { UsersModule } from '../users/users.module';
 
 @Module({
-  imports: [PrismaModule, S3Module, AuthModule, AuditModule],
+  imports: [PrismaModule, S3Module, AuthModule, AuditModule, UsersModule],
   // controllers: [ClassPackagesController],
   providers: [ClassPackagesService, ClassPackagesResolver],
   exports: [ClassPackagesService],
