@@ -22,7 +22,24 @@ async function bootstrap() {
   const apolloStudioUrl = process.env.APOLLO_STUDIO_URL || 'https://studio.apollographql.com';
   const isLocal = !(['prod', 'staging'].includes(process.env.NODE_ENV)) || !process.env.NODE_ENV;
   
-  const allowedOrigins = [frontendUrl, adminFrontendUrl];
+  // Function to get both HTTP and HTTPS versions of a URL
+  const getUrlVariants = (url: string) => {
+    if (!url) return [];
+    const variants = [url];
+    if (url.startsWith('https://')) {
+      variants.push(url.replace('https://', 'http://'));
+    } else if (url.startsWith('http://')) {
+      variants.push(url.replace('http://', 'https://'));
+    }
+    return variants;
+  };
+
+  // Get all URL variants
+  const allowedOrigins = [
+    ...getUrlVariants(frontendUrl),
+    ...getUrlVariants(adminFrontendUrl)
+  ];
+  
   if (isLocal || apolloStudioUrl) {
     allowedOrigins.push(apolloStudioUrl);
   }
@@ -36,7 +53,8 @@ async function bootstrap() {
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        console.warn(`Blocked request from disallowed origin: ${origin}`);
+        logger.warn(`Blocked request from disallowed origin: ${origin}`);
+        logger.debug('Allowed origins:', allowedOrigins);
         callback(new Error('Not allowed by CORS'));
       }
     },
