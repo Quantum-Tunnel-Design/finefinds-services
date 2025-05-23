@@ -853,4 +853,46 @@ export class AuthService {
       );
     }
   }
+
+  // Temporary method for dummy user data
+  async getDummyUsers(): Promise<any[]> { // Using any[] for now, will match DummyUserDto structure
+    console.log('[AuthService] getDummyUsers called - returning dummy data.');
+    return [
+      {
+        id: 'dummy-parent-001',
+        firstName: 'Parent',
+        lastName: 'One',
+        email: 'parent1@example.com',
+        role: 'PARENT',
+      },
+      {
+        id: 'dummy-vendor-001',
+        firstName: 'Vendor',
+        lastName: 'Uno',
+        email: 'vendor1@example.com',
+        role: 'VENDOR',
+      },
+      {
+        id: 'dummy-admin-001',
+        firstName: 'Admin',
+        lastName: 'Prime',
+        email: 'admin1@example.com',
+        role: 'ADMIN',
+      },
+      {
+        id: 'dummy-parent-002',
+        firstName: 'Parent',
+        lastName: 'Two',
+        email: 'parent2@example.com',
+        role: 'PARENT',
+      },
+      {
+        id: 'dummy-vendor-002',
+        firstName: 'Vendor',
+        lastName: 'Dos',
+        email: 'vendor2@example.com',
+        role: 'VENDOR',
+      },
+    ];
+  }
 } 

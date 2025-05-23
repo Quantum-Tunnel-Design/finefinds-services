@@ -23,6 +23,7 @@ import { ResetAdminPasswordInput } from './dto/reset-admin-password.input';
 import { VendorSignUpInput } from './dto/vendor-sign-up.input';
 import { VendorLoginInput } from './dto/vendor-login.input';
 import { BulkCreateVendorsInput } from './dto/bulk-create-vendors.input';
+import { DummyUserDto } from './dto/dummy-user.dto';
 
 @Resolver(() => User)
 export class AuthResolver {
@@ -160,5 +161,14 @@ export class AuthResolver {
   @UseGuards(JwtAuthGuard)
   async me(@CurrentUser() user: PrismaUser): Promise<User> {
     return user as any as User;
+  }
+
+  @Query(() => [DummyUserDto], { 
+    name: 'dummyUsers',
+    description: 'TEMPORARY: Retrieves a list of dummy users for testing.'
+  })
+  async getDummyUsers(): Promise<DummyUserDto[]> {
+    // @ts-ignore // Temporary: AuthService.getDummyUsers returns any[], but structure matches
+    return this.authService.getDummyUsers(); 
   }
 } 
