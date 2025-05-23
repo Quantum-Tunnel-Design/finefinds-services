@@ -20,8 +20,8 @@ async function bootstrap() {
   const backendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4000';
   const adminFrontendUrl = process.env.ADMIN_FRONTEND_URL || 'http://localhost:4001';
-  const apolloStudioUrl = process.env.APOLLO_STUDIO_URL || 'https://studio.apollographql.com';
-  const isLocal = !(['prod', 'staging'].includes(process.env.NODE_ENV)) || !process.env.NODE_ENV;
+  const apolloStudioUrl = 'https://studio.apollographql.com';
+  const isLocal = !(['prod', 'production', 'staging'].includes(process.env.NODE_ENV));
   
   // Function to get both HTTP and HTTPS versions of a URL
   const getUrlVariants = (url: string) => {
@@ -42,7 +42,7 @@ async function bootstrap() {
     ...getUrlVariants(adminFrontendUrl)
   ];
   
-  if (isLocal || apolloStudioUrl) {
+  if (isLocal) {
     allowedOrigins.push(apolloStudioUrl);
   }
   
