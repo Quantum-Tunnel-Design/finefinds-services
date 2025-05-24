@@ -32,8 +32,9 @@ model User {
   savedClassPackages   SavedClassPackage[]
   parent               Parent?
   vendor               Vendor?
-  children             Child[]
+  children             Child[]                  @relation("UserChildren")
   courseEnrollments    Enrollment[]             @relation("UserCourseEnrollments")
+  vendorProfile        VendorProfile?           @relation("UserVendorProfile")
 
   @@index([email])
   @@index([cognitoSub])
@@ -71,6 +72,8 @@ model VendorProfile {
   id            String   @id @default(cuid())
   vendorId      String
   vendor        Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  user          User     @relation("UserVendorProfile", fields: [userId], references: [id], onDelete: Cascade)
+  userId        String   @unique
   profileLogoUrl String?  @db.VarChar(255)
   coverImageUrl  String?  @db.VarChar(255)
   businessName   String   @db.VarChar(100)
@@ -99,6 +102,7 @@ model VendorProfile {
   galleryImages     GalleryImage[]
 
   @@index([vendorId])
+  @@index([userId])
   @@map("vendor_profiles")
 }
 
@@ -200,32 +204,32 @@ model Payment {
 model Notification {
   id        String   @id @default(uuid())
   userId    String
-  type      String
   message   String
-  read      Boolean  @default(false)
+  isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@map("notifications")
 }
 
 model Child {
-  id          String                   @id @default(cuid())
-  firstName   String
-  lastName    String
-  dateOfBirth DateTime
-  gender      Gender
-  userId      String
-  parentId    String
-  parent      Parent                   @relation(fields: [parentId], references: [id], onDelete: Cascade)
-  user        User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime                 @default(now())
-  updatedAt   DateTime                 @updatedAt
-  enrollments ClassPackageEnrollment[] @relation("EnrolledChildren")
+  id            String   @id @default(cuid())
+  firstName     String
+  lastName      String
+  gender        Gender
+  dateOfBirth   DateTime
+  parentId      String
+  parent        Parent   @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation("UserChildren", fields: [userId], references: [id], onDelete: Cascade)
+  enrollments   ClassPackageEnrollment[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  @@index([userId])
   @@index([parentId])
+  @@index([userId])
   @@map("children")
 }
 
@@ -239,119 +243,101 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([token])
   @@map("sessions")
 }
 
 model AgeGroup {
-  id            String         @id @default(cuid())
-  name          String         @unique @db.VarChar(50)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  classPackages ClassPackage[] @relation("ClassPackageAgeGroups")
+  id          String   @id @default(cuid())
+  name        String   @unique
+  minAge      Int
+  maxAge      Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@map("age_groups")
 }
 
 model Category {
-  id             String                  @id @default(cuid())
-  name           String                  @unique @db.VarChar(100)
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-  description    String?
-  classPackages  ClassPackage[]
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   vendorProfiles VendorProfileCategory[]
 
   @@map("categories")
 }
 
 model ClassPackage {
-  id                        String                   @id @default(cuid())
-  vendorId                  String
-  vendor                    Vendor                   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  name                      String                   @db.VarChar(100)
-  description               String
-  beforeYouComeInstructions String
-  pricePerChild             Float
-  coverImageUrl             String?                  @db.VarChar(255)
-  status                    ClassPackageStatus       @default(DRAFT)
-  cancellationPolicyType    CancellationPolicyType
-  rescheduleDaysBefore      Int?
-  categoryId                String
-  tags                      String[]                 @db.VarChar(50)
-  createdAt                 DateTime                 @default(now())
-  updatedAt                 DateTime                 @updatedAt
-  scheduleSlots             ScheduleSlot[]
-  enrollments               ClassPackageEnrollment[]
-  category                  Category                 @relation(fields: [categoryId], references: [id])
-  savedByUsers              SavedClassPackage[]
-  ageGroups                 AgeGroup[]               @relation("ClassPackageAgeGroups")
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  price       Float
+  status      ClassPackageStatus @default(DRAFT)
+  vendorId    String
+  vendor      Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  enrollments ClassPackageEnrollment[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([vendorId])
-  @@index([categoryId])
   @@map("class_packages")
 }
 
 model ScheduleSlot {
-  id             String                   @id @default(cuid())
-  classPackageId String
-  startTime      DateTime
-  endTime        DateTime
-  availableSlots Int
-  createdAt      DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
-  enrollments    ClassPackageEnrollment[]
-  classPackage   ClassPackage             @relation(fields: [classPackageId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  startTime DateTime
+  endTime   DateTime
+  enrollments ClassPackageEnrollment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@index([classPackageId])
   @@map("schedule_slots")
 }
 
 model LoginAttempt {
   id        String   @id @default(uuid())
   userId    String
-  success   Boolean  @default(false)
+  ipAddress String
+  userAgent String
+  success   Boolean
   createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([createdAt])
   @@map("login_attempts")
 }
 
 model AuditLog {
-  id             String             @id @default(uuid())
-  userId         String
-  entityId       String
-  changes        Json
-  previousValues Json
-  createdAt      DateTime           @default(now())
-  action         AuditLogAction
-  entityType     AuditLogEntityType
-  user           User               @relation(fields: [userId], references: [id])
+  id        String   @id @default(uuid())
+  userId    String
+  action    AuditLogAction
+  entityType AuditLogEntityType
+  entityId  String
+  details   String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([entityType, entityId])
-  @@index([createdAt])
   @@map("audit_logs")
 }
 
 model ClassPackageEnrollment {
-  id               String        @id @default(cuid())
-  parentId         String
-  parent           Parent        @relation(fields: [parentId], references: [id], onDelete: Cascade)
-  classPackageId   String
-  scheduleSlotId   String
-  bookingStatus    BookingStatus @default(PAID)
-  paymentType      PaymentType   @default(CARD)
-  bookedAt         DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  classPackage     ClassPackage  @relation(fields: [classPackageId], references: [id], onDelete: Cascade)
-  scheduleSlot     ScheduleSlot  @relation(fields: [scheduleSlotId], references: [id], onDelete: Cascade)
-  payment          Payment?
-  enrolledChildren Child[]       @relation("EnrolledChildren")
+  id            String   @id @default(cuid())
+  parentId      String
+  parent        Parent   @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  classPackageId String
+  classPackage  ClassPackage @relation(fields: [classPackageId], references: [id], onDelete: Cascade)
+  scheduleSlotId String
+  scheduleSlot  ScheduleSlot @relation(fields: [scheduleSlotId], references: [id], onDelete: Cascade)
+  enrolledChildren Child[]
+  bookingStatus BookingStatus @default(PENDING)
+  paymentType   PaymentType
+  bookedAt      DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  payment       Payment?
 
-  @@unique([parentId, scheduleSlotId])
   @@index([parentId])
   @@index([classPackageId])
   @@index([scheduleSlotId])
@@ -359,12 +345,12 @@ model ClassPackageEnrollment {
 }
 
 model SavedClassPackage {
-  id             String       @id @default(cuid())
-  userId         String
-  classPackageId String
-  createdAt      DateTime     @default(now())
-  classPackage   ClassPackage @relation(fields: [classPackageId], references: [id], onDelete: Cascade)
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String   @id @default(cuid())
+  userId          String
+  classPackageId  String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, classPackageId])
   @@index([userId])
@@ -373,12 +359,13 @@ model SavedClassPackage {
 }
 
 model VendorProfileCategory {
+  id              String   @id @default(cuid())
   vendorProfileId String
   categoryId      String
-  createdAt       DateTime      @default(now())
-  id              String        @id @default(cuid())
-  category        Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   vendorProfile   VendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
+  category        Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@unique([vendorProfileId, categoryId])
   @@index([vendorProfileId])
@@ -387,12 +374,13 @@ model VendorProfileCategory {
 }
 
 model VendorProfileTag {
+  id              String   @id @default(cuid())
   vendorProfileId String
   tagId           String
-  createdAt       DateTime      @default(now())
-  id              String        @id @default(cuid())
-  tag             Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
   vendorProfile   VendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
+  tag             Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@unique([vendorProfileId, tagId])
   @@index([vendorProfileId])
@@ -401,11 +389,11 @@ model VendorProfileTag {
 }
 
 model Tag {
-  id             String             @id @default(cuid())
-  name           String             @unique @db.VarChar(50)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  description    String?
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   vendorProfiles VendorProfileTag[]
 
   @@map("tags")
@@ -415,25 +403,20 @@ enum AuditLogAction {
   CREATE
   UPDATE
   DELETE
-  LOGIN
-  LOGOUT
-  VIEW
 }
 
 enum AuditLogEntityType {
   USER
-  VENDOR_PROFILE
-  BUSINESS_PROFILE
-  CLASS_PACKAGE
-  ORDER
+  VENDOR
+  COURSE
+  ENROLLMENT
   PAYMENT
 }
 
 enum UserRole {
-  STUDENT
-  PARENT
-  VENDOR
   ADMIN
+  VENDOR
+  PARENT
 }
 
 enum CourseStatus {
@@ -469,32 +452,36 @@ enum ClassPackageStatus {
 }
 
 enum CancellationPolicyType {
-  FIXED_COMMITMENT
-  FLEXIBLE_RESCHEDULING
+  FLEXIBLE
+  MODERATE
+  STRICT
 }
 
 enum DayOfWeek {
-  SUNDAY
   MONDAY
   TUESDAY
   WEDNESDAY
   THURSDAY
   FRIDAY
   SATURDAY
+  SUNDAY
 }
 
 enum BookingStatus {
-  PAID
+  PENDING
+  CONFIRMED
   CANCELLED
-  RESCHEDULED
+  COMPLETED
 }
 
 enum PaymentType {
+  CASH
   CARD
-  CLASS_PACKAGE_PURCHASE
+  BANK_TRANSFER
 }
 
 enum Gender {
   MALE
   FEMALE
+  OTHER
 }
