@@ -78,7 +78,7 @@ export class TransactionsService {
       return {
         id: payment.id,
         paymentDate: payment.createdAt,
-        className: classPackage?.name || 'N/A',
+        className: classPackage?.title || 'N/A',
         scheduleDetails: scheduleDetails,
         paymentAmount: payment.amount,
         paymentMethod: payment.paymentMethod,
@@ -129,6 +129,9 @@ export class TransactionsService {
 
     const enrollment = await this.prisma.classPackageEnrollment.findUnique({
       where: { id: payment.classPackageEnrollmentId },
+      include: {
+        enrolledChildren: true,
+      },
     });
     const classPackage = await this.prisma.classPackage.findUnique({
       where: { id: enrollment?.classPackageId },
@@ -160,7 +163,10 @@ export class TransactionsService {
       scheduleInfo = `${startDate} from ${startTime} to ${endTime}`;
     }
     
-    const childrenDetails = enrollment?.enrolledChildren ? enrollment.enrolledChildren.map(child => `${child.firstName} ${child.lastName}`).join(', ') : 'N/A';
+    let childrenDetails = 'N/A';
+    if (enrollment?.enrolledChildren) {
+      childrenDetails = enrollment.enrolledChildren.map(child => `${child.firstName} ${child.lastName}`).join(', ');
+    }
 
     const pricePerChild = classPackage?.price;
 
@@ -188,9 +194,9 @@ export class TransactionsService {
               width: '*',
               text: [
                 { text: 'Vendor Details:\n', style: 'subheader' },
-                `${vendorProfile?.businessName || (vendor?.user ? `${vendor.user.firstName} ${vendor.user.lastName}` : 'N/A')}\n`,
+                `${vendorProfile?.businessName || 'N/A'}\n`,
                 `${vendorProfile?.location || 'N/A'}\n`,
-                `${vendorProfile?.contactNumber || vendor?.user?.phoneNumber || 'N/A'}`,
+                `${vendorProfile?.contactNumber || 'N/A'}`,
               ],
               alignment: 'right'
             }
@@ -208,12 +214,12 @@ export class TransactionsService {
               [
                 {
                   stack: [
-                    { text: classPackage?.name || 'Class Package', bold: true },
+                    { text: classPackage?.title || 'Class Package', bold: true },
                     { text: `Schedule: ${scheduleInfo}`, fontSize: 9 },
                     { text: `Children: ${childrenDetails}`, fontSize: 9 },
                   ]
                 },
-                enrollment?.enrolledChildren.length || 1, 
+                enrollment?.enrolledChildren ? enrollment.enrolledChildren.length : 1, 
                 `${currencySymbol} ${(pricePerChild || 0).toFixed(2)}`,
                 `${currencySymbol} ${payment.amount.toFixed(2)}`,
               ]
