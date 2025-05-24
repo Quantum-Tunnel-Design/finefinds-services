@@ -1,5 +1,5 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
-import { ClassPackageType } from '../../class-packages/graphql-types/class-package.type';
+import { ClassPackage } from '../../class-packages/graphql-types/class-package.type';
 
 @ObjectType()
 export class SavedClassPackage {
@@ -12,8 +12,8 @@ export class SavedClassPackage {
   @Field(() => ID)
   classPackageId: string;
 
-  @Field(() => ClassPackageType)
-  classPackage: ClassPackageType;
+  @Field(() => ClassPackage)
+  classPackage: ClassPackage;
 
   @Field()
   createdAt: Date;

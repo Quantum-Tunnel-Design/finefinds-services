@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { VendorRevenueMetricsDto } from './vendor-revenue-metrics.dto';
+import { VendorRevenueMetricsDto } from '../../admin/dto/vendor-revenue-metrics.dto';
 import { MonthlyPaymentDataDto } from '../../admin/dto/monthly-payment-data.dto'; // Reusing from admin
 import { Type } from 'class-transformer';
 import { ValidateNested } from 'class-validator';
