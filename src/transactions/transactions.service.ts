@@ -44,7 +44,7 @@ export class TransactionsService {
               include: {
                 vendor: {
                   include: {
-                    businessProfile: true,
+                    vendorProfile: true,
                   },
                 },
                 category: true,
@@ -65,7 +65,7 @@ export class TransactionsService {
       const classPackage = enrollment?.classPackage;
       const scheduleSlot = enrollment?.scheduleSlot;
       const vendor = classPackage?.vendor;
-      const businessProfile = vendor?.businessProfile;
+      const vendorProfile = vendor?.vendorProfile;
 
       let scheduleDetails = 'N/A';
       if (scheduleSlot) {
@@ -85,7 +85,7 @@ export class TransactionsService {
         paymentStatus: payment.status,
         transactionId: payment.transactionId,
         classPackageId: classPackage?.id || 'N/A',
-        vendorName: businessProfile?.businessName || `${vendor?.firstName} ${vendor?.lastName}` || 'N/A',
+        vendorName: vendorProfile?.businessName || `${vendor?.firstName} ${vendor?.lastName}` || 'N/A',
       };
     });
   }
@@ -105,7 +105,7 @@ export class TransactionsService {
             classPackage: {
               include: {
                 vendor: {
-                  include: { businessProfile: true }
+                  include: { vendorProfile: true }
                 },
                 category: true,
               }
@@ -129,7 +129,7 @@ export class TransactionsService {
     const classPackage = enrollment?.classPackage;
     const scheduleSlot = enrollment?.scheduleSlot;
     const vendor = classPackage?.vendor;
-    const businessProfile = vendor?.businessProfile;
+    const vendorProfile = vendor?.vendorProfile;
     const parent = payment.User;
 
     const companyName = 'FineFinds Inc.'; // Replace with actual company name
@@ -174,9 +174,9 @@ export class TransactionsService {
               width: '*',
               text: [
                 { text: 'Vendor Details:\n', style: 'subheader' },
-                `${businessProfile?.businessName || (vendor ? `${vendor.firstName} ${vendor.lastName}` : 'N/A')}\n`,
-                `${businessProfile?.location || 'N/A'}\n`,
-                `${businessProfile?.contactNumber || vendor?.phoneNumber || 'N/A'}`,
+                `${vendorProfile?.businessName || (vendor ? `${vendor.firstName} ${vendor.lastName}` : 'N/A')}\n`,
+                `${vendorProfile?.location || 'N/A'}\n`,
+                `${vendorProfile?.contactNumber || vendor?.phoneNumber || 'N/A'}`,
               ],
               alignment: 'right'
             }

@@ -40,7 +40,6 @@ export class AdminUsersService {
       where: { id: userId, deletedAt: null }, // Typically don't fetch details for deleted users unless specified
       include: {
         children: { orderBy: { createdAt: 'asc' } },
-        businessProfile: true,
         vendorProfile: true,
         createdClassPackages: {
           orderBy: { createdAt: 'desc' },
@@ -51,7 +50,7 @@ export class AdminUsersService {
           include: {
             classPackage: {
               include: {
-                vendor: { include: { businessProfile: true } }, // To get vendor name
+                vendor: { include: { vendorProfile: true } }, // To get vendor name
               },
             },
           },
@@ -70,7 +69,7 @@ export class AdminUsersService {
         classPackageId: e.classPackageId,
         classPackageName: e.classPackage.name,
         vendorId: e.classPackage.vendorId,
-        vendorName: e.classPackage.vendor.businessProfile?.businessName || `${e.classPackage.vendor.firstName} ${e.classPackage.vendor.lastName}`,
+        vendorName: e.classPackage.vendor.vendorProfile?.businessName || `${e.classPackage.vendor.firstName} ${e.classPackage.vendor.lastName}`,
         bookingStatus: e.bookingStatus,
         bookedAt: e.bookedAt,
       }));
@@ -108,7 +107,6 @@ export class AdminUsersService {
       updatedAt: user.updatedAt,
       children: mappedChildren, // Use mapped children
       enrolledPackages,
-      businessProfile: user.role === UserRole.VENDOR ? user.businessProfile : undefined,
       vendorProfile: user.role === UserRole.VENDOR ? user.vendorProfile : undefined,
       createdPackages: createdPackagesByVendor,
     } as AdminUserDetailsDto; // Cast to ensure type compatibility if Prisma types don't perfectly match GraphQL models

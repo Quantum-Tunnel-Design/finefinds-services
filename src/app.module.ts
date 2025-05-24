@@ -17,6 +17,7 @@ import { UploadsModule } from './uploads/uploads.module';
 import { AdminModule } from './admin/admin.module';
 import { SavedClassPackagesModule } from './saved-class-packages/saved-class-packages.module';
 import { CoursesModule } from './courses/courses.module';
+import { VendorProfileModule } from './vendor-profile/vendor-profile.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { CoursesModule } from './courses/courses.module';
     AdminModule,
     SavedClassPackagesModule,
     CoursesModule,
+    VendorProfileModule,
   ],
   providers: [PrismaService],
 })

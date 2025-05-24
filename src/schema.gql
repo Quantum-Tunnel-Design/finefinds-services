@@ -244,35 +244,6 @@ input BulkCreateVendorsInput {
   vendors: [VendorSignUpInput!]!
 }
 
-type BusinessProfile {
-  accountNumber: String
-  bankName: String
-  branch: String
-  businessName: String!
-  categories: [String!]!
-  contactNumber: String!
-  coverImageUrl: String
-  createdAt: DateTime!
-  description: String!
-  facebookUrl: String
-  galleryUrls: [String!]
-  id: ID!
-  instagramUrl: String
-  location: String!
-  logoUrl: String
-  tags: [String!]!
-  twitterUrl: String
-  updatedAt: DateTime!
-  user: User
-  userId: String!
-  website: String
-}
-
-enum CancellationPolicyType {
-  FIXED_COMMITMENT
-  FLEXIBLE_RESCHEDULING
-}
-
 type Category {
   id: ID!
   name: String

@@ -148,7 +148,7 @@ export class BookingsService {
           include: {
             vendor: {
               include: {
-                businessProfile: true, // To get vendor name and location
+                vendorProfile: true, // To get vendor name and location
               },
             },
           },
@@ -176,8 +176,8 @@ export class BookingsService {
         }));
       
       let vendorName = `${vendor.firstName} ${vendor.lastName}`;
-      if (vendor.businessProfile && vendor.businessProfile.businessName) {
-        vendorName = vendor.businessProfile.businessName;
+      if (vendor.vendorProfile && vendor.vendorProfile.businessName) {
+        vendorName = vendor.vendorProfile.businessName;
       }
 
       return {
@@ -189,7 +189,7 @@ export class BookingsService {
         enrolledChildren: childrenDetails,
         bookedDate: format(new Date(scheduleSlot.startTime), 'yyyy-MM-dd'),
         bookedTimeSlot: `${format(new Date(scheduleSlot.startTime), 'p')} - ${format(new Date(scheduleSlot.endTime), 'p')}`,
-        location: vendor.businessProfile?.location || 'Location not available',
+        location: vendor.vendorProfile?.location || 'Location not available',
         bookingStatus: enrollment.bookingStatus,
         paymentType: enrollment.paymentType,
         scheduleSlotId: scheduleSlot.id,

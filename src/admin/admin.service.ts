@@ -110,7 +110,7 @@ export class AdminService {
               include: {
                 vendor: { // User who is the vendor
                   include: {
-                    businessProfile: true, // To get businessName
+                    vendorProfile: true, // To get businessName
                   },
                 },
               },
@@ -128,10 +128,10 @@ export class AdminService {
       const enrollment = payment.classPackageEnrollment;
       const classPackage = enrollment?.classPackage;
       const vendorUser = classPackage?.vendor;
-      const businessProfile = vendorUser?.businessProfile;
+      const vendorProfile = vendorUser?.vendorProfile;
 
       const parentName = parent ? `${parent.firstName} ${parent.lastName}` : 'N/A';
-      const vendorName = businessProfile?.businessName || (vendorUser ? `${vendorUser.firstName} ${vendorUser.lastName}` : 'N/A');
+      const vendorName = vendorProfile?.businessName || (vendorUser ? `${vendorUser.firstName} ${vendorUser.lastName}` : 'N/A');
       
       return {
         id: payment.id,

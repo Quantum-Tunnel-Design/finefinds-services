@@ -1,8 +1,7 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
 import { UserRole } from '@prisma/client';
 import { Child } from '../../users/models/child.model';
-import { BusinessProfile } from '../../vendors/models/business-profile.model';
-import { VendorProfile } from '../../vendors/models/vendor-profile.model';
+import { VendorProfile } from '../../vendor-profile/models/vendor-profile.model';
 import { AdminClassPackageBasicInfoDto } from './admin-class-package-basic-info.dto';
 import { AdminPackageEnrollmentBasicInfoDto } from './admin-package-enrollment-basic-info.dto';
 
@@ -43,10 +42,7 @@ export class AdminUserDetailsDto {
   enrolledPackages?: AdminPackageEnrollmentBasicInfoDto[];
 
   // Vendor specific fields
-  @Field(() => BusinessProfile, { nullable: true, description: 'Business profile of the user, if the user is a VENDOR and has a profile.' })
-  businessProfile?: BusinessProfile;
-
-  @Field(() => VendorProfile, { nullable: true, description: 'Vendor-specific profile details, if the user is a VENDOR and has a profile.' })
+  @Field(() => VendorProfile, { nullable: true, description: 'Vendor profile of the user, if the user is a VENDOR and has a profile.' })
   vendorProfile?: VendorProfile;
 
   @Field(() => [AdminClassPackageBasicInfoDto], { nullable: true, description: 'Class packages created by the user, if the user is a VENDOR.' })

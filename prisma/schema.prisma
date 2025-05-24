@@ -24,7 +24,6 @@ model User {
   updatedAt            DateTime                 @updatedAt
   deletedAt            DateTime?
   auditLogs            AuditLog[]
-  businessProfile      BusinessProfile?
   children             Child[]
   loginAttempts        LoginAttempt[]
   sessions             Session[]
@@ -43,18 +42,52 @@ model User {
 }
 
 model VendorProfile {
-  id            String   @id @default(uuid())
-  userId        String   @unique
-  instituteName String
-  description   String
-  website       String?
-  phoneNumber   String?
-  approved      Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id            String   @id @default(cuid())
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String   @unique
+
+  profileLogoUrl String?  @db.VarChar(255)
+  coverImageUrl  String?  @db.VarChar(255)
+  businessName   String   @db.VarChar(100)
+  location       String   @db.VarChar(500)
+  description    String   @db.Text
+  contactNumber  String   @db.VarChar(20)
+  
+  websiteUrl        String?  @db.VarChar(255)
+  facebookUrl       String?  @db.VarChar(255)
+  instagramUrl      String?  @db.VarChar(255)
+  linkedInUrl       String?  @db.VarChar(255)
+  twitterUrl        String?  @db.VarChar(255)
+  tiktokUrl         String?  @db.VarChar(255)
+  youtubeUrl        String?  @db.VarChar(255)
+
+  bankName          String?  @db.VarChar(100)
+  accountNumber     String?  @db.VarChar(20)
+  bankBranch        String?  @db.VarChar(100)
+
+  approved          Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  categories        VendorProfileCategory[]
+  tags              VendorProfileTag[]
+  galleryImages     GalleryImage[]
 
   @@map("vendor_profiles")
+  @@index([userId])
+}
+
+model GalleryImage {
+  id              String        @id @default(cuid())
+  vendorProfile   VendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
+  vendorProfileId String
+  url             String        @db.VarChar(255)
+  caption         String?       @db.VarChar(255)
+  order           Int?
+  createdAt       DateTime      @default(now())
+
+  @@index([vendorProfileId])
+  @@map("gallery_images")
 }
 
 model Course {
@@ -177,32 +210,6 @@ model Session {
   @@index([token])
 }
 
-model BusinessProfile {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  businessName  String   @db.VarChar(100)
-  location      String   @db.VarChar(500)
-  description   String
-  contactNumber String
-  website       String?  @db.VarChar(255)
-  facebookUrl   String?  @db.VarChar(255)
-  instagramUrl  String?  @db.VarChar(255)
-  twitterUrl    String?  @db.VarChar(255)
-  bankName      String?  @db.VarChar(100)
-  accountNumber String?  @db.VarChar(20)
-  branch        String?  @db.VarChar(100)
-  logoUrl       String?  @db.VarChar(255)
-  coverImageUrl String?  @db.VarChar(255)
-  galleryUrls   String[] @db.VarChar(255)
-  categories    String[]
-  tags          String[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  user          User     @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-}
-
 model AgeGroup {
   id            String         @id @default(cuid())
   name          String         @unique @db.VarChar(50)
@@ -216,9 +223,11 @@ model AgeGroup {
 model Category {
   id            String         @id @default(cuid())
   name          String         @unique @db.VarChar(100)
+  description   String?        @db.Text
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   classPackages ClassPackage[]
+  vendorProfiles VendorProfileCategory[]
 
   @@map("categories")
 }
@@ -413,4 +422,43 @@ enum PaymentType {
 enum Gender {
   MALE
   FEMALE
+}
+
+model VendorProfileCategory {
+  id              String        @id @default(cuid())
+  vendorProfile   VendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
+  vendorProfileId String
+  category        Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId      String
+  createdAt       DateTime      @default(now())
+
+  @@unique([vendorProfileId, categoryId])
+  @@index([vendorProfileId])
+  @@index([categoryId])
+  @@map("vendor_profile_categories")
+}
+
+model VendorProfileTag {
+  id              String        @id @default(cuid())
+  vendorProfile   VendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
+  vendorProfileId String
+  tag             Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tagId           String
+  createdAt       DateTime      @default(now())
+
+  @@unique([vendorProfileId, tagId])
+  @@index([vendorProfileId])
+  @@index([tagId])
+  @@map("vendor_profile_tags")
+}
+
+model Tag {
+  id            String    @id @default(cuid())
+  name          String    @unique @db.VarChar(50)
+  description   String?   @db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  vendorProfiles VendorProfileTag[]
+
+  @@map("tags")
 }

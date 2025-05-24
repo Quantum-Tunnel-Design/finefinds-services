@@ -21,7 +21,7 @@ export class SavedClassPackageDto {
   vendorId: string;
 
   @Field()
-  vendorName: string; // BusinessProfile.businessName or User's name
+  vendorName: string; // VendorProfile.businessName or User's name
 
   @Field()
   savedAt: Date;

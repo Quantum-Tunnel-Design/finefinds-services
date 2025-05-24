@@ -16,7 +16,7 @@ export class ParentBookingDetailsDto {
   classPackageId: string;
 
   @Field()
-  vendorName: string; // BusinessProfile.businessName or User's name
+  vendorName: string; // VendorProfile.businessName or User's name
 
   @Field(() => ID)
   vendorId: string;
@@ -31,7 +31,7 @@ export class ParentBookingDetailsDto {
   bookedTimeSlot: string; // Formatted: HH:MM AM/PM - HH:MM AM/PM
 
   @Field({ nullable: true })
-  location?: string; // From BusinessProfile
+  location?: string; // From VendorProfile
 
   @Field(() => BookingStatus)
   bookingStatus: BookingStatus;

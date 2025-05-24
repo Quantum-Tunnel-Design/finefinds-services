@@ -16,7 +16,7 @@ export class AuditService {
       data: {
         userId,
         action: AuditLogAction.UPDATE,
-        entityType: AuditLogEntityType.BUSINESS_PROFILE,
+        entityType: AuditLogEntityType.VENDOR_PROFILE,
         entityId,
         previousValues,
         changes: updatedValues,
@@ -33,7 +33,7 @@ export class AuditService {
       data: {
         userId,
         action: AuditLogAction.DELETE,
-        entityType: AuditLogEntityType.BUSINESS_PROFILE,
+        entityType: AuditLogEntityType.VENDOR_PROFILE,
         entityId,
         changes: {},
         previousValues: deletedData,
