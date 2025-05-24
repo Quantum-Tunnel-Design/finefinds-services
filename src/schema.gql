@@ -164,6 +164,34 @@ type AdminUserDetails {
   vendorProfile: VendorProfile
 }
 
+input AdminUserListFilterDto {
+  ageGroup: AgeGroup
+  isActive: Boolean
+  isEmailVerified: Boolean
+  pagination: PaginationInput
+  role: UserRole
+  searchTerm: String
+}
+
+type AdminUserListViewDto {
+  businessDescription: String
+  businessName: String
+  childrenCount: Float
+  createdAt: DateTime!
+  email: String!
+  firstName: String!
+  id: String!
+  isActive: Boolean!
+  isEmailVerified: Boolean!
+  lastName: String!
+  phoneNumber: String!
+  role: UserRole!
+  secondaryPhoneNumber: String
+  termsAccepted: Boolean!
+  updatedAt: DateTime!
+  userId: String!
+}
+
 """Basic view of a user for admin lists."""
 type AdminUserView {
   """Timestamp when the user was created."""
@@ -192,6 +220,15 @@ type AdminUserView {
 
   """Timestamp when the user was last updated."""
   updatedAt: DateTime!
+}
+
+"""Age groups for filtering users"""
+enum AgeGroup {
+  ELEMENTARY
+  INFANT
+  PRESCHOOL
+  TEEN
+  TODDLER
 }
 
 type AuthResponse {
@@ -576,6 +613,25 @@ type OperationStatusDto {
   success: Boolean!
 }
 
+type PaginatedUserListResponse {
+  items: [AdminUserListViewDto!]!
+  pagination: PaginationInfo!
+}
+
+type PaginationInfo {
+  currentPage: Int!
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  limit: Int!
+  total: Int!
+  totalPages: Int!
+}
+
+input PaginationInput {
+  limit: Int! = 10
+  page: Int! = 1
+}
+
 type ParentBookingDetailsDto {
   bookedDate: String!
   bookedTimeSlot: String!
@@ -657,6 +713,21 @@ type Query {
   ): [AdminUserView!]!
 
   """
+  Retrieves a paginated list of all parents with optional filtering. Requires ADMIN privileges.
+  """
+  adminListParents(filters: AdminUserListFilterDto): PaginatedUserListResponse!
+
+  """
+  Retrieves a paginated list of all users with optional filtering. Requires ADMIN privileges.
+  """
+  adminListUsers(filters: AdminUserListFilterDto): PaginatedUserListResponse!
+
+  """
+  Retrieves a paginated list of all vendors with optional filtering. Requires ADMIN privileges.
+  """
+  adminListVendors(filters: AdminUserListFilterDto): PaginatedUserListResponse!
+
+  """
   Get key metrics for the admin dashboard including total payments, users, parents, and vendors. Requires ADMIN privileges.
   """
   adminMetrics(
@@ -682,6 +753,24 @@ type Query {
 
   """TEMPORARY: Retrieves a list of dummy users for testing."""
   dummyUsers: [DummyUserDto!]!
+
+  """Exports admin dashboard metrics to Excel. Requires ADMIN privileges."""
+  exportMetricsToExcel(filters: DateRangeFilterDto): Boolean!
+
+  """Exports the filtered parent list to Excel. Requires ADMIN privileges."""
+  exportParentsToExcel(filters: AdminUserListFilterDto): Boolean!
+
+  """Exports payment chart data to Excel. Requires ADMIN privileges."""
+  exportPaymentChartToExcel(filters: DateRangeFilterDto): Boolean!
+
+  """Exports transaction list to Excel. Requires ADMIN privileges."""
+  exportTransactionsToExcel(filters: DateRangeFilterDto): Boolean!
+
+  """Exports the filtered user list to Excel. Requires ADMIN privileges."""
+  exportUsersToExcel(filters: AdminUserListFilterDto): Boolean!
+
+  """Exports the filtered vendor list to Excel. Requires ADMIN privileges."""
+  exportVendorsToExcel(filters: AdminUserListFilterDto): Boolean!
 
   """
   Retrieves a specific child by ID for the authenticated parent. Restricted to PARENT role.
