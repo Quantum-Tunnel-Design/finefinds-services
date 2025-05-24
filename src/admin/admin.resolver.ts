@@ -9,6 +9,8 @@ import { AdminDashboardDataDto } from './dto/admin-dashboard-data.dto';
 import { DateRangeFilterDto } from './dto/date-range-filter.dto';
 import { AdminTransactionListViewDto } from './dto/admin-transaction-list-view.dto';
 import { DashboardMetricsDto } from './dto/dashboard-metrics.dto';
+import { AdminUserListViewDto } from './dto/admin-user-list-view.dto';
+import { AdminUserListFilterDto } from './dto/admin-user-list-filter.dto';
 
 @Resolver()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -47,5 +49,38 @@ export class AdminResolver {
     filters?: DateRangeFilterDto,
   ): Promise<AdminTransactionListViewDto[]> {
     return this.adminService.listAllTransactions(filters);
+  }
+
+  @Query(() => [AdminUserListViewDto], {
+    name: 'adminListUsers',
+    description: 'Retrieves a list of all users with optional filtering. Requires ADMIN privileges.',
+  })
+  async listUsers(
+    @Args('filters', { type: () => AdminUserListFilterDto, nullable: true })
+    filters?: AdminUserListFilterDto,
+  ): Promise<AdminUserListViewDto[]> {
+    return this.adminService.listUsers(filters);
+  }
+
+  @Query(() => [AdminUserListViewDto], {
+    name: 'adminListVendors',
+    description: 'Retrieves a list of all vendors with optional filtering. Requires ADMIN privileges.',
+  })
+  async listVendors(
+    @Args('filters', { type: () => AdminUserListFilterDto, nullable: true })
+    filters?: Omit<AdminUserListFilterDto, 'role'>,
+  ): Promise<AdminUserListViewDto[]> {
+    return this.adminService.listVendors(filters);
+  }
+
+  @Query(() => [AdminUserListViewDto], {
+    name: 'adminListParents',
+    description: 'Retrieves a list of all parents with optional filtering. Requires ADMIN privileges.',
+  })
+  async listParents(
+    @Args('filters', { type: () => AdminUserListFilterDto, nullable: true })
+    filters?: Omit<AdminUserListFilterDto, 'role'>,
+  ): Promise<AdminUserListViewDto[]> {
+    return this.adminService.listParents(filters);
   }
 } 

@@ -6,6 +6,8 @@ import { DashboardMetricsDto } from './dto/dashboard-metrics.dto';
 import { MonthlyPaymentDataDto } from './dto/monthly-payment-data.dto';
 import { DateRangeFilterDto } from './dto/date-range-filter.dto';
 import { AdminTransactionListViewDto } from './dto/admin-transaction-list-view.dto';
+import { AdminUserListViewDto } from './dto/admin-user-list-view.dto';
+import { AdminUserListFilterDto } from './dto/admin-user-list-filter.dto';
 
 @Injectable()
 export class AdminService {
@@ -168,5 +170,80 @@ export class AdminService {
         status: payment.status,
       };
     });
+  }
+
+  async listUsers(filters?: AdminUserListFilterDto): Promise<AdminUserListViewDto[]> {
+    const where: Prisma.UserWhereInput = {};
+
+    if (filters?.role) {
+      where.role = filters.role;
+    }
+
+    if (filters?.isActive !== undefined) {
+      where.isActive = filters.isActive;
+    }
+
+    if (filters?.isEmailVerified !== undefined) {
+      where.isEmailVerified = filters.isEmailVerified;
+    }
+
+    if (filters?.searchTerm) {
+      where.OR = [
+        { email: { contains: filters.searchTerm, mode: 'insensitive' } },
+        { firstName: { contains: filters.searchTerm, mode: 'insensitive' } },
+        { lastName: { contains: filters.searchTerm, mode: 'insensitive' } },
+      ];
+    }
+
+    const users = await this.prisma.user.findMany({
+      where,
+      include: {
+        parent: {
+          include: {
+            children: true,
+          },
+        },
+        vendor: {
+          include: {
+            profiles: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return users.map(user => {
+      const vendorProfile = user.vendor?.profiles?.[0];
+      return {
+        id: user.vendor?.id || user.parent?.id || user.id,
+        userId: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phoneNumber: user.phoneNumber,
+        secondaryPhoneNumber: user.secondaryPhoneNumber,
+        isEmailVerified: user.isEmailVerified,
+        isActive: user.isActive,
+        termsAccepted: user.termsAccepted,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        role: user.role,
+        // Vendor specific fields
+        businessName: vendorProfile?.businessName,
+        businessDescription: vendorProfile?.businessDescription,
+        // Parent specific fields
+        childrenCount: user.parent?.children?.length,
+      };
+    });
+  }
+
+  async listVendors(filters?: Omit<AdminUserListFilterDto, 'role'>): Promise<AdminUserListViewDto[]> {
+    return this.listUsers({ ...filters, role: UserRole.VENDOR });
+  }
+
+  async listParents(filters?: Omit<AdminUserListFilterDto, 'role'>): Promise<AdminUserListViewDto[]> {
+    return this.listUsers({ ...filters, role: UserRole.PARENT });
   }
 } 
