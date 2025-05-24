@@ -1,5 +1,6 @@
 import { Field, InputType } from '@nestjs/graphql';
 import { UserRole } from '@prisma/client';
+import { AgeGroup } from './age-group.enum';
 
 @InputType()
 export class AdminUserListFilterDto {
@@ -14,4 +15,7 @@ export class AdminUserListFilterDto {
 
   @Field(() => Boolean, { nullable: true })
   isEmailVerified?: boolean;
+
+  @Field(() => AgeGroup, { nullable: true })
+  ageGroup?: AgeGroup;
 } 

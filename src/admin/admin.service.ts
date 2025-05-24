@@ -8,6 +8,7 @@ import { DateRangeFilterDto } from './dto/date-range-filter.dto';
 import { AdminTransactionListViewDto } from './dto/admin-transaction-list-view.dto';
 import { AdminUserListViewDto } from './dto/admin-user-list-view.dto';
 import { AdminUserListFilterDto } from './dto/admin-user-list-filter.dto';
+import { AgeGroup } from './dto/age-group.enum';
 
 @Injectable()
 export class AdminService {
@@ -172,6 +173,35 @@ export class AdminService {
     });
   }
 
+  private getAgeRange(ageGroup: AgeGroup): { minAge: number; maxAge: number } {
+    switch (ageGroup) {
+      case AgeGroup.INFANT:
+        return { minAge: 0, maxAge: 2 };
+      case AgeGroup.TODDLER:
+        return { minAge: 2, maxAge: 4 };
+      case AgeGroup.PRESCHOOL:
+        return { minAge: 4, maxAge: 6 };
+      case AgeGroup.ELEMENTARY:
+        return { minAge: 6, maxAge: 12 };
+      case AgeGroup.TEEN:
+        return { minAge: 12, maxAge: 18 };
+      default:
+        return { minAge: 0, maxAge: 18 };
+    }
+  }
+
+  private calculateAge(dateOfBirth: Date): number {
+    const today = new Date();
+    let age = today.getFullYear() - dateOfBirth.getFullYear();
+    const monthDiff = today.getMonth() - dateOfBirth.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dateOfBirth.getDate())) {
+      age--;
+    }
+    
+    return age;
+  }
+
   async listUsers(filters?: AdminUserListFilterDto): Promise<AdminUserListViewDto[]> {
     const where: Prisma.UserWhereInput = {};
 
@@ -206,6 +236,11 @@ export class AdminService {
         vendor: {
           include: {
             profiles: true,
+            classPackages: {
+              include: {
+                ageGroups: true,
+              },
+            },
           },
         },
       },
@@ -214,7 +249,31 @@ export class AdminService {
       },
     });
 
-    return users.map(user => {
+    // Filter by age group if specified
+    let filteredUsers = users;
+    if (filters?.ageGroup) {
+      const { minAge, maxAge } = this.getAgeRange(filters.ageGroup);
+      
+      filteredUsers = users.filter(user => {
+        if (user.role === UserRole.PARENT && user.parent?.children) {
+          // For parents, check if any child falls in the age range
+          return user.parent.children.some(child => {
+            const age = this.calculateAge(child.dateOfBirth);
+            return age >= minAge && age <= maxAge;
+          });
+        } else if (user.role === UserRole.VENDOR && user.vendor?.classPackages) {
+          // For vendors, check if any class package targets the age group
+          return user.vendor.classPackages.some(pkg => 
+            pkg.ageGroups?.some(ageGroup => 
+              ageGroup.minAge <= maxAge && ageGroup.maxAge >= minAge
+            )
+          );
+        }
+        return false;
+      });
+    }
+
+    return filteredUsers.map(user => {
       const vendorProfile = user.vendor?.profiles?.[0];
       return {
         id: user.vendor?.id || user.parent?.id || user.id,
@@ -232,7 +291,7 @@ export class AdminService {
         role: user.role,
         // Vendor specific fields
         businessName: vendorProfile?.businessName,
-        businessDescription: vendorProfile?.businessDescription,
+        businessDescription: vendorProfile?.description,
         // Parent specific fields
         childrenCount: user.parent?.children?.length,
       };
