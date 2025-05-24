@@ -53,6 +53,7 @@ export class UsersService {
     termsAccepted?: boolean;
     password?: string;
   }): Promise<User> {
+    // First create the user
     const user = await this.prisma.user.create({
       data: {
         email: data.email,
@@ -66,26 +67,59 @@ export class UsersService {
         isActive: data.isActive,
         termsAccepted: data.termsAccepted,
         password: data.password,
-        children: data.children ? {
-          create: data.children.map(child => ({
-            firstName: child.firstName,
-            lastName: child.lastName,
-            gender: child.gender,
-            dateOfBirth: child.dateOfBirth,
-            parent: {
-              connect: {
-                id: user.id,
-              },
-            },
-          })),
-        } : undefined,
-      },
-      include: {
-        children: true,
       },
     });
 
-    return user;
+    // Then create the parent/vendor record if needed
+    if (data.role === UserRole.PARENT) {
+      await this.prisma.parent.create({
+        data: {
+          userId: user.id,
+        },
+      });
+    } else if (data.role === UserRole.VENDOR) {
+      await this.prisma.vendor.create({
+        data: {
+          userId: user.id,
+        },
+      });
+    }
+
+    // Finally create children if provided
+    if (data.children && data.children.length > 0) {
+      const parent = await this.prisma.parent.findUnique({
+        where: { userId: user.id },
+      });
+
+      if (!parent) {
+        throw new Error('Parent record not found for user');
+      }
+
+      await Promise.all(
+        data.children.map(child =>
+          this.prisma.child.create({
+            data: {
+              firstName: child.firstName,
+              lastName: child.lastName,
+              gender: child.gender,
+              dateOfBirth: child.dateOfBirth,
+              userId: user.id,
+              parentId: parent.id,
+            },
+          }),
+        ),
+      );
+    }
+
+    // Return the complete user with all relations
+    return this.prisma.user.findUnique({
+      where: { id: user.id },
+      include: {
+        children: true,
+        parent: true,
+        vendor: true,
+      },
+    });
   }
 
   async update(id: string, data: Partial<User>): Promise<User> {
