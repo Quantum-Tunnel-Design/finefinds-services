@@ -4,14 +4,23 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { UserRole } from '@prisma/client';
 import { COGNITO_GROUPS } from '../constants/cognito-groups';
+import { passportJwtSecret } from 'jwks-rsa';
 
 @Injectable()
 export class CognitoAdminStrategy extends PassportStrategy(Strategy, 'cognito-admin') {
   constructor(private configService: ConfigService) {
+    const userPoolId = configService.get<string>('COGNITO_ADMIN_USER_POOL_ID');
+    const region = configService.get<string>('AWS_REGION');
+
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get('COGNITO_ADMIN_PUBLIC_KEY'),
+      secretOrKeyProvider: passportJwtSecret({
+        cache: true,
+        rateLimit: true,
+        jwksRequestsPerMinute: 5,
+        jwksUri: `https://cognito-idp.${region}.amazonaws.com/${userPoolId}/.well-known/jwks.json`,
+      }),
       algorithms: ['RS256'],
     });
   }
