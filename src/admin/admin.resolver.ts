@@ -88,7 +88,7 @@ export class AdminResolver {
 
   @Query(() => Boolean, {
     name: 'exportUsersToExcel',
-    description: 'Exports the filtered user list to Excel. Requires ADMIN privileges.',
+    description: 'Exports a filtered list of all users to an Excel file. The export includes user details such as name, email, phone, verification status, and role-specific information. Requires ADMIN privileges.',
   })
   async exportUsersToExcel(
     @Res() res: Response,
@@ -109,7 +109,7 @@ export class AdminResolver {
 
   @Query(() => Boolean, {
     name: 'exportVendorsToExcel',
-    description: 'Exports the filtered vendor list to Excel. Requires ADMIN privileges.',
+    description: 'Exports a filtered list of all vendors to an Excel file. The export includes vendor details such as business name, description, contact information, and verification status. Requires ADMIN privileges.',
   })
   async exportVendorsToExcel(
     @Res() res: Response,
@@ -130,7 +130,7 @@ export class AdminResolver {
 
   @Query(() => Boolean, {
     name: 'exportParentsToExcel',
-    description: 'Exports the filtered parent list to Excel. Requires ADMIN privileges.',
+    description: 'Exports a filtered list of all parents to an Excel file. The export includes parent details such as name, email, phone, children count, and verification status. Requires ADMIN privileges.',
   })
   async exportParentsToExcel(
     @Res() res: Response,
@@ -151,7 +151,7 @@ export class AdminResolver {
 
   @Query(() => Boolean, {
     name: 'exportMetricsToExcel',
-    description: 'Exports admin dashboard metrics to Excel. Requires ADMIN privileges.',
+    description: 'Exports admin dashboard metrics to an Excel file. The export includes total online payments, total number of payments, total users, parents registered, and vendors registered. Optional date range filtering is supported. Requires ADMIN privileges.',
   })
   async exportMetricsToExcel(
     @Res() res: Response,
@@ -172,7 +172,7 @@ export class AdminResolver {
 
   @Query(() => Boolean, {
     name: 'exportTransactionsToExcel',
-    description: 'Exports transaction list to Excel. Requires ADMIN privileges.',
+    description: 'Exports a list of all transactions to an Excel file. The export includes transaction details such as ID, payment date, amount, status, and associated parent/vendor information. Optional date range filtering is supported. Requires ADMIN privileges.',
   })
   async exportTransactionsToExcel(
     @Res() res: Response,
@@ -193,7 +193,7 @@ export class AdminResolver {
 
   @Query(() => Boolean, {
     name: 'exportPaymentChartToExcel',
-    description: 'Exports payment chart data to Excel. Requires ADMIN privileges.',
+    description: 'Exports payment chart data to an Excel file. The export includes monthly payment trends with total amounts for each month. Optional date range filtering is supported. Requires ADMIN privileges.',
   })
   async exportPaymentChartToExcel(
     @Res() res: Response,
