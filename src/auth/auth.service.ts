@@ -38,6 +38,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { VendorLoginInput } from './dto/vendor-login.input';
 import { LoginAttemptService } from './services/login-attempt.service';
 import { AwsConfigService } from '../config/aws.config';
+import { COGNITO_GROUPS } from './constants/cognito-groups';
 
 @Injectable()
 export class AuthService {
@@ -101,8 +102,8 @@ export class AuthService {
       await this.cognitoClient.send(adminSetPasswordCmd);
       
       let groupName: string;
-      if (input.role === UserRole.PARENT) groupName = 'parent';
-      else if (input.role === UserRole.VENDOR) groupName = 'vendor';
+      if (input.role === UserRole.PARENT) groupName = COGNITO_GROUPS.PARENT;
+      else if (input.role === UserRole.VENDOR) groupName = COGNITO_GROUPS.VENDOR;
       else {
         console.warn(`[AuthService signUp] Unknown role ${input.role} for group assignment for user ${input.email}.`);
       }
@@ -174,7 +175,7 @@ export class AuthService {
       const groups = cognitoUser.UserAttributes?.find(attr => attr.Name === 'custom:groups')?.Value?.split(',') || [];
 
       // Update user role if needed
-      if (groups.includes('parent') && user.role !== UserRole.PARENT) {
+      if (groups.includes(COGNITO_GROUPS.PARENT) && user.role !== UserRole.PARENT) {
         await this.usersService.update(user.id, { role: UserRole.PARENT });
         user.role = UserRole.PARENT;
       }
@@ -343,7 +344,7 @@ export class AuthService {
       const addToGroupCommand = new AdminAddUserToGroupCommand({
         UserPoolId: userPoolId,
         Username: input.email,
-        GroupName: 'parent',
+        GroupName: COGNITO_GROUPS.PARENT,
       });
       await this.cognitoClient.send(addToGroupCommand);
 
@@ -731,7 +732,7 @@ export class AuthService {
       const addToGroupCommand = new AdminAddUserToGroupCommand({
         UserPoolId: userPoolId,
         Username: input.email,
-        GroupName: 'vendor',
+        GroupName: COGNITO_GROUPS.VENDOR,
       });
       await this.cognitoClient.send(addToGroupCommand);
 
