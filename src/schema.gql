@@ -368,6 +368,9 @@ type DashboardMetricsDto {
   """Number of users registered as parents."""
   parentsRegistered: Int!
 
+  """Total amount from all payments."""
+  totalPayments: Float!
+
   """Total number of registered users."""
   totalUsers: Int!
 
@@ -619,14 +622,6 @@ enum PaymentType {
 
 type Query {
   """
-  Retrieves dashboard data for administrators, including metrics and monthly payment trends. Requires ADMIN privileges.
-  """
-  adminDashboardData(
-    """Optional date range (startDate, endDate) to filter data."""
-    filters: DateRangeFilterDto
-  ): AdminDashboardDataDto!
-
-  """
   Retrieves detailed information for a specific user by ID. Admin role required.
   """
   adminGetUserDetails(
@@ -660,6 +655,22 @@ type Query {
     """Set to true to include soft-deleted users in the list."""
     showDeleted: Boolean = false
   ): [AdminUserView!]!
+
+  """
+  Get key metrics for the admin dashboard including total payments, users, parents, and vendors. Requires ADMIN privileges.
+  """
+  adminMetrics(
+    """Optional date range (startDate, endDate) to filter metrics."""
+    filters: DateRangeFilterDto
+  ): DashboardMetricsDto!
+
+  """
+  Retrieves payment chart data including monthly payment trends and metrics. Requires ADMIN privileges.
+  """
+  adminPaymentChartData(
+    """Optional date range (startDate, endDate) to filter chart data."""
+    filters: DateRangeFilterDto
+  ): AdminDashboardDataDto!
 
   """
   Retrieves a single class package by its ID. If the authenticated user is a vendor, it ensures the package belongs to them.
