@@ -481,7 +481,12 @@ export class AuthService {
         cognitoUserResponse = await this.cognitoClient.send(createUserCommand);
       } catch (error) {
         console.error('[AuthService createAdminAccount] Cognito create user error:', error);
-        throw new Error(`Failed to create Cognito user: ${error.message}`);
+        let detailMessage = error.message;
+        // Check for AggregateError-like structure
+        if (error && typeof error === 'object' && Array.isArray(error.errors) && error.errors.length > 0) {
+          detailMessage = error.errors.map(e => e.message || String(e)).join('; ');
+        }
+        throw new Error(`Failed to create Cognito user: ${detailMessage || 'Network issue or timeout connecting to Cognito'}`);
       }
 
       const cognitoSub = cognitoUserResponse.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value;
