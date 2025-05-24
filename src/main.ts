@@ -21,7 +21,9 @@ async function bootstrap() {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4000';
   const adminFrontendUrl = process.env.ADMIN_FRONTEND_URL || 'http://localhost:4001';
   const apolloStudioUrl = 'https://studio.apollographql.com';
-  const isLocal = !(['prod', 'production', 'staging'].includes(process.env.NODE_ENV));
+  const nodeEnv = process.env.NODE_ENV || 'development'; // Default to 'development' if not set
+  const isProduction = ['prod', 'production', 'staging'].includes(nodeEnv);
+  const isDevelopment = nodeEnv === 'development' || nodeEnv === 'dev';
   
   // Function to get both HTTP and HTTPS versions of a URL
   const getUrlVariants = (url: string) => {
@@ -42,12 +44,28 @@ async function bootstrap() {
     ...getUrlVariants(adminFrontendUrl)
   ];
   
-  if (isLocal) {
+  if (isDevelopment) {
+    // Ensure localhost URLs are always allowed in development
+    const localhostUrls = [
+      'http://localhost:4000',
+      'https://localhost:4000', 
+      'http://localhost:4001',
+      'https://localhost:4001'
+    ];
+    localhostUrls.forEach(url => {
+      if (!allowedOrigins.includes(url)) {
+        allowedOrigins.push(url);
+      }
+    });
+  }
+  
+  // Allow Apollo Studio in non-production environments
+  if (!isProduction) {
     allowedOrigins.push(apolloStudioUrl);
   }
   
-  logger.log('Environment:', process.env.NODE_ENV || 'development');
-  logger.log('Allowed CORS origins:', allowedOrigins);
+  logger.log('Environment:', nodeEnv);
+  logger.log('Allowed CORS origins:', [...new Set(allowedOrigins)]); // Use Set to remove duplicates for logging
 
   // Enable CORS with specific configuration for credentialed requests
   app.enableCors({
