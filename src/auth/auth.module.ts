@@ -17,6 +17,9 @@ import { LoginAttemptService } from './services/login-attempt.service';
 import cognitoConfig from './cognito.config';
 import { PrismaModule } from '../prisma/prisma.module';
 import { RolesGuard } from './guards/roles.guard';
+import { SessionModule } from './session.module';
+import { LoginAttemptModule } from './services/login-attempt.module';
+import { AwsConfigService } from '../config/aws.config';
 
 // console.log('AuthModule __dirname:', __dirname); // Log __dirname
 // const resolvedTemplatePath = join(__dirname, 'templates'); // Log resolved path
@@ -28,36 +31,34 @@ import { RolesGuard } from './guards/roles.guard';
     PassportModule.register({ defaultStrategy: 'cognito-client' }),
     ScheduleModule.forRoot(),
     MailerModule.forRootAsync({
-      useFactory: async (config: ConfigService) => {
-        const templateDir = join(__dirname, 'templates');
-        console.log('[MailerModule Factory] __dirname:', __dirname);
-        console.log('[MailerModule Factory] Resolved template directory:', templateDir);
-        return {
-          transport: {
-            host: config.get('MAIL_HOST'),
-            port: config.get('MAIL_PORT'),
-            secure: config.get('MAIL_SECURE') === 'true',
-            auth: {
-              user: config.get('MAIL_USER'),
-              pass: config.get('MAIL_PASSWORD'),
-            },
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        transport: {
+          host: configService.get('SMTP_HOST'),
+          port: configService.get('SMTP_PORT'),
+          secure: configService.get('SMTP_SECURE') === 'true',
+          auth: {
+            user: configService.get('SMTP_USER'),
+            pass: configService.get('SMTP_PASS'),
           },
-          defaults: {
-            from: config.get('MAIL_FROM'),
+        },
+        defaults: {
+          from: configService.get('SMTP_FROM'),
+        },
+        template: {
+          dir: join(__dirname, '..', 'templates'),
+          adapter: require('handlebars'),
+          options: {
+            strict: true,
           },
-          template: {
-            dir: templateDir, // Use the logged path
-            adapter: new HandlebarsAdapter(),
-            options: {
-              strict: true,
-            },
-          },
-        };
-      },
+        },
+      }),
       inject: [ConfigService],
     }),
     UsersModule,
     PrismaModule,
+    SessionModule,
+    LoginAttemptModule,
   ],
   providers: [
     AuthService,
@@ -67,6 +68,7 @@ import { RolesGuard } from './guards/roles.guard';
     SessionService,
     LoginAttemptService,
     RolesGuard,
+    AwsConfigService,
   ],
   // controllers: [AuthController], // AuthController removed as it's now empty
   exports: [AuthService, SessionService],

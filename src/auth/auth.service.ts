@@ -37,10 +37,22 @@ import { MailerService } from '@nestjs-modules/mailer';
 import { PrismaService } from '../prisma/prisma.service';
 import { VendorLoginInput } from './dto/vendor-login.input';
 import { LoginAttemptService } from './services/login-attempt.service';
+import { AwsConfigService } from '../config/aws.config';
 
 @Injectable()
 export class AuthService {
   private cognitoClient: CognitoIdentityProviderClient;
+  private cognitoConfig: {
+    client: {
+      userPoolId: string;
+      clientId: string;
+    };
+    admin: {
+      userPoolId: string;
+      clientId: string;
+    };
+  };
+
   constructor(
     private configService: ConfigService,
     private usersService: UsersService,
@@ -48,30 +60,14 @@ export class AuthService {
     private mailerService: MailerService,
     private prisma: PrismaService,
     private loginAttemptService: LoginAttemptService,
+    private awsConfigService: AwsConfigService,
   ) {
-    const awsRegion = this.configService.get<string>('AWS_REGION');
-    // const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID'); // Removed
-    // const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY'); // Removed
-    // const sessionToken = this.configService.get<string>('AWS_SESSION_TOKEN'); // Optional // Removed
-
-    if (!awsRegion) { // Modified check: only region is mandatory here
-      throw new Error('Missing AWS_REGION configuration for Cognito client. Check environment variables.');
-    }
-
-    // const credentials = { // Removed
-    //   accessKeyId, // Removed
-    //   secretAccessKey, // Removed
-    //   ...(sessionToken && { sessionToken }), // Add sessionToken only if it exists // Removed
-    // }; // Removed
-
-    this.cognitoClient = new CognitoIdentityProviderClient({
-      region: awsRegion,
-      // credentials, // Removed: SDK will use default credential provider chain (incl. IAM Task Role)
-    });
+    this.cognitoClient = this.awsConfigService.getCognitoClient();
+    this.cognitoConfig = this.awsConfigService.getCognitoConfig();
   }
 
   async signUp(input: SignUpInput): Promise<AuthResponse> {
-    const userPoolId = this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID');
+    const userPoolId = this.cognitoConfig.client.userPoolId;
     const existingUser = await this.usersService.findByEmail(input.email);
     if (existingUser) {
       throw new BadRequestException('Email already registered');
@@ -137,7 +133,7 @@ export class AuthService {
   }
 
   async signIn(input: SignInInput): Promise<AuthResponse> {
-    const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
+    const clientId = this.cognitoConfig.client.clientId;
 
     const authParameters: { [key: string]: string } = {
         USERNAME: input.email,
@@ -221,7 +217,7 @@ export class AuthService {
   }
 
   async forgotPassword(input: ForgotPasswordInput): Promise<AuthResponse> {
-    const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
+    const clientId = this.cognitoConfig.client.clientId;
     // No SecretHash computation or usage
 
     const params: any = {
@@ -258,7 +254,7 @@ export class AuthService {
   }
 
   async resetPassword(input: ResetPasswordInput): Promise<AuthResponse> {
-    const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
+    const clientId = this.cognitoConfig.client.clientId;
     // No SecretHash computation or usage
 
     const params: any = {
@@ -288,7 +284,7 @@ export class AuthService {
   }
 
   async parentSignUp(input: ParentSignUpInput): Promise<AuthResponse> {
-    const userPoolId = this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID');
+    const userPoolId = this.cognitoConfig.client.userPoolId;
 
     // Validate input
     if (input.password !== input.confirmPassword) {
@@ -367,7 +363,7 @@ export class AuthService {
       });
 
       // Programmatically sign in the user to get tokens
-      const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
+      const clientId = this.cognitoConfig.client.clientId;
 
       const authResponse = await this.cognitoClient.send(new InitiateAuthCommand({
         AuthFlow: AuthFlowType.USER_PASSWORD_AUTH,
@@ -404,7 +400,7 @@ export class AuthService {
   }
 
   async adminSignIn(input: AdminSignInInput): Promise<AuthResponse> {
-    const adminClientId = this.configService.get<string>('COGNITO_ADMIN_CLIENT_ID');
+    const adminConfig = this.cognitoConfig.admin;
 
     const authParameters: { [key: string]: string } = {
       USERNAME: input.username,
@@ -413,8 +409,8 @@ export class AuthService {
 
     try {
       const authCommand = new AdminInitiateAuthCommand({
-        UserPoolId: this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID'),
-        ClientId: adminClientId,
+        UserPoolId: adminConfig.userPoolId,
+        ClientId: adminConfig.clientId,
         AuthFlow: 'ADMIN_USER_PASSWORD_AUTH' as AuthFlowType,
         AuthParameters: authParameters,
       });
@@ -448,21 +444,16 @@ export class AuthService {
 
   async createAdminAccount(input: AdminAccountInput): Promise<AuthResponse> {
     try {
+      const adminConfig = this.cognitoConfig.admin;
       // Check if user already exists in Cognito
       const existingUser = await this.usersService.findByEmail(input.email);
       if (existingUser) {
         throw new ConflictException('User already exists');
       }
 
-      const userPoolId = this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID');
-      if (!userPoolId) {
-        console.error('[AuthService createAdminAccount] Missing COGNITO_ADMIN_USER_POOL_ID configuration');
-        throw new Error('Missing Cognito admin user pool configuration');
-      }
-
       // Create user in Cognito
       const createUserCommand = new AdminCreateUserCommand({
-        UserPoolId: userPoolId,
+        UserPoolId: adminConfig.userPoolId,
         Username: input.email,
         UserAttributes: [
           { Name: 'email', Value: input.email },
@@ -498,7 +489,7 @@ export class AuthService {
       // Set password for the user
       console.log('[AuthService createAdminAccount] Setting user password...');
       const setPasswordCommand = new AdminSetUserPasswordCommand({
-        UserPoolId: userPoolId,
+        UserPoolId: adminConfig.userPoolId,
         Username: input.email,
         Password: input.password,
         Permanent: true,
@@ -530,15 +521,9 @@ export class AuthService {
 
       // Sign in the user to get tokens
       console.log('[AuthService createAdminAccount] Signing in user...');
-      const clientId = this.configService.get<string>('COGNITO_ADMIN_CLIENT_ID');
-      if (!clientId) {
-        console.error('[AuthService createAdminAccount] Missing COGNITO_ADMIN_CLIENT_ID configuration');
-        throw new Error('Missing Cognito admin client configuration');
-      }
-
       const signInCommand = new AdminInitiateAuthCommand({
-        UserPoolId: userPoolId,
-        ClientId: clientId,
+        UserPoolId: adminConfig.userPoolId,
+        ClientId: adminConfig.clientId,
         AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
         AuthParameters: {
           USERNAME: input.email,
@@ -572,6 +557,7 @@ export class AuthService {
 
   async resetAdminPassword(adminEmail: string, newPassword: string): Promise<AuthResponse> {
     try {
+      const adminConfig = this.cognitoConfig.admin;
       // Verify admin exists
       const admin = await this.usersService.findByEmail(adminEmail);
       if (!admin || admin.role !== UserRole.ADMIN) {
@@ -580,7 +566,7 @@ export class AuthService {
 
       // Set new password
       const setPasswordCommand = new AdminSetUserPasswordCommand({
-        UserPoolId: this.configService.get<string>('COGNITO_ADMIN_USER_POOL_ID'),
+        UserPoolId: adminConfig.userPoolId,
         Username: adminEmail,
         Password: newPassword,
         Permanent: true,
@@ -611,7 +597,7 @@ export class AuthService {
 
       // Update user in Cognito
       const updateUserCommand = new AdminUpdateUserAttributesCommand({
-        UserPoolId: this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID'),
+        UserPoolId: this.cognitoConfig.client.userPoolId,
         Username: user.email,
         UserAttributes: [
           { Name: 'given_name', Value: input.firstName },
@@ -647,7 +633,7 @@ export class AuthService {
     }
 
     // 1. Verify current password by trying to authenticate
-    const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
+    const clientId = this.cognitoConfig.client.clientId;
     // No SecretHash computation or usage for verification
 
     const verifyAuthParams: { [key: string]: string } = {
@@ -672,7 +658,7 @@ export class AuthService {
     // AdminSetUserPasswordCommand does not require SecretHash
     try {
       const setPasswordCommand = new AdminSetUserPasswordCommand({
-        UserPoolId: this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID'),
+        UserPoolId: this.cognitoConfig.client.userPoolId,
         Username: user.email,
         Password: input.newPassword,
         Permanent: true,
@@ -695,7 +681,7 @@ export class AuthService {
   }
 
   async vendorSignUp(input: VendorSignUpInput): Promise<AuthResponse> {
-    const userPoolId = this.configService.get<string>('COGNITO_CLIENT_USER_POOL_ID');
+    const userPoolId = this.cognitoConfig.client.userPoolId;
 
     // --- Input Validations ---
     if (input.password !== input.confirmPassword) {
@@ -761,7 +747,7 @@ export class AuthService {
       });
 
       // Programmatically sign in the user to get tokens
-      const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
+      const clientId = this.cognitoConfig.client.clientId;
 
       const authResponse = await this.cognitoClient.send(new InitiateAuthCommand({
         AuthFlow: AuthFlowType.USER_PASSWORD_AUTH,
@@ -827,7 +813,7 @@ export class AuthService {
   }
 
   async vendorLogin(input: VendorLoginInput) {
-    const clientId = this.configService.get<string>('COGNITO_CLIENT_CLIENT_ID');
+    const clientId = this.cognitoConfig.client.clientId;
 
     const authParameters: { [key: string]: string } = {
       USERNAME: input.email,
