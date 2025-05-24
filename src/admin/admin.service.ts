@@ -84,7 +84,7 @@ export class AdminService {
       SELECT
         to_char("createdAt", 'YYYY-MM') as year_month,
         SUM(amount) as total_amount
-      FROM "Payment"
+      FROM payments
       WHERE status = 'COMPLETED'
         AND "createdAt" >= ${new Date(startDateString)}::timestamp
         AND "createdAt" <= ${new Date(endDateString)}::timestamp
