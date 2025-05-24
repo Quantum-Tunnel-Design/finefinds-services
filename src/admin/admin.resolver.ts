@@ -8,6 +8,7 @@ import { UserRole } from '@prisma/client';
 import { AdminDashboardDataDto } from './dto/admin-dashboard-data.dto';
 import { DateRangeFilterDto } from './dto/date-range-filter.dto';
 import { AdminTransactionListViewDto } from './dto/admin-transaction-list-view.dto';
+import { DashboardMetricsDto } from './dto/dashboard-metrics.dto';
 
 @Resolver()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -15,15 +16,26 @@ import { AdminTransactionListViewDto } from './dto/admin-transaction-list-view.d
 export class AdminResolver {
   constructor(private readonly adminService: AdminService) {}
 
-  @Query(() => AdminDashboardDataDto, {
-    name: 'adminDashboardData',
-    description: 'Retrieves dashboard data for administrators, including metrics and monthly payment trends. Requires ADMIN privileges.'
+  @Query(() => DashboardMetricsDto, {
+    name: 'adminMetrics',
+    description: 'Get key metrics for the admin dashboard including total payments, users, parents, and vendors. Requires ADMIN privileges.'
   })
-  async getAdminDashboardData(
-    @Args('filters', { type: () => DateRangeFilterDto, nullable: true, description: 'Optional date range (startDate, endDate) to filter data.' })
+  async getAdminMetrics(
+    @Args('filters', { type: () => DateRangeFilterDto, nullable: true, description: 'Optional date range (startDate, endDate) to filter metrics.' })
+    filters?: DateRangeFilterDto,
+  ): Promise<DashboardMetricsDto> {
+    return this.adminService.getMetrics(filters);
+  }
+
+  @Query(() => AdminDashboardDataDto, {
+    name: 'adminPaymentChartData',
+    description: 'Retrieves payment chart data including monthly payment trends and metrics. Requires ADMIN privileges.'
+  })
+  async getPaymentChartData(
+    @Args('filters', { type: () => DateRangeFilterDto, nullable: true, description: 'Optional date range (startDate, endDate) to filter chart data.' })
     filters?: DateRangeFilterDto,
   ): Promise<AdminDashboardDataDto> {
-    return this.adminService.getDashboardData(filters);
+    return this.adminService.getPaymentChartData(filters);
   }
 
   @Query(() => [AdminTransactionListViewDto], {

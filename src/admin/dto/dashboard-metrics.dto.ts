@@ -5,6 +5,9 @@ export class DashboardMetricsDto {
   @Field(() => Float, { description: 'Total amount from online payments.' })
   onlinePaymentsTotal: number;
 
+  @Field(() => Float, { description: 'Total amount from all payments.' })
+  totalPayments: number;
+
   @Field(() => Int, { description: 'Total number of registered users.' })
   totalUsers: number;
 

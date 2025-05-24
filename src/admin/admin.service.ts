@@ -11,7 +11,7 @@ import { AdminTransactionListViewDto } from './dto/admin-transaction-list-view.d
 export class AdminService {
   constructor(private prisma: PrismaService) {}
 
-  async getDashboardData(filters?: DateRangeFilterDto): Promise<AdminDashboardDataDto> {
+  async getMetrics(filters?: DateRangeFilterDto): Promise<DashboardMetricsDto> {
     const dateFilter: Prisma.DateTimeFilter = {};
     if (filters?.startDate) {
       dateFilter.gte = new Date(filters.startDate);
@@ -22,63 +22,80 @@ export class AdminService {
       dateFilter.lte = endDate;
     }
 
-    // Metrics
+    // Get total online payments
     const onlinePaymentsAggregation = await this.prisma.payment.aggregate({
       _sum: { amount: true },
+      _count: { id: true },
       where: {
-        status: PaymentStatus.COMPLETED, // Assuming COMPLETED status for successful payments
-        createdAt: Object.keys(dateFilter).length > 0 ? dateFilter : undefined,
-      },
-    });
-    const onlinePaymentsTotal = onlinePaymentsAggregation._sum.amount || 0;
-
-    const totalUsers = await this.prisma.user.count({
-      where: { createdAt: Object.keys(dateFilter).length > 0 ? dateFilter : undefined },
-    });
-    const parentsRegistered = await this.prisma.user.count({
-      where: {
-        role: UserRole.PARENT,
-        createdAt: Object.keys(dateFilter).length > 0 ? dateFilter : undefined,
-      },
-    });
-    const vendorsRegistered = await this.prisma.user.count({
-      where: {
-        role: UserRole.VENDOR,
+        status: PaymentStatus.COMPLETED,
         createdAt: Object.keys(dateFilter).length > 0 ? dateFilter : undefined,
       },
     });
 
-    const metrics: DashboardMetricsDto = {
-      onlinePaymentsTotal,
+    // Get user counts from Parent and Vendor tables
+    const [parentsCount, vendorsCount] = await Promise.all([
+      // Count from Parent table
+      this.prisma.parent.count({
+        where: {
+          createdAt: Object.keys(dateFilter).length > 0 ? dateFilter : undefined,
+        },
+      }),
+      // Count from Vendor table
+      this.prisma.vendor.count({
+        where: {
+          createdAt: Object.keys(dateFilter).length > 0 ? dateFilter : undefined,
+        },
+      }),
+    ]);
+
+    // Calculate total users (sum of parents and vendors)
+    const totalUsers = parentsCount + vendorsCount;
+
+    return {
+      onlinePaymentsTotal: onlinePaymentsAggregation._sum.amount || 0,
+      totalPayments: onlinePaymentsAggregation._count.id || 0,
       totalUsers,
-      parentsRegistered,
-      vendorsRegistered,
+      parentsRegistered: parentsCount,
+      vendorsRegistered: vendorsCount,
     };
+  }
 
-    // Monthly Payment Data for Graph (using raw query for grouping by month)
-    // Adjust date filtering for raw query based on your DB (PostgreSQL example)
-    const startDateString = filters?.startDate ? new Date(filters.startDate).toISOString() : new Date(0).toISOString(); // Default to epoch if no start date
+  async getPaymentChartData(filters?: DateRangeFilterDto): Promise<AdminDashboardDataDto> {
+    const dateFilter: Prisma.DateTimeFilter = {};
+    if (filters?.startDate) {
+      dateFilter.gte = new Date(filters.startDate);
+    }
+    if (filters?.endDate) {
+      const endDate = new Date(filters.endDate);
+      endDate.setHours(23, 59, 59, 999); // Include the whole end day
+      dateFilter.lte = endDate;
+    }
+
+    // Get metrics
+    const metrics = await this.getMetrics(filters);
+
+    // Get monthly payment data for the chart
+    const startDateString = filters?.startDate ? new Date(filters.startDate).toISOString() : new Date(0).toISOString();
     const endDateString = filters?.endDate
-        ? new Date(new Date(filters.endDate).setHours(23, 59, 59, 999)).toISOString()
-        : new Date().toISOString(); // Default to now if no end date
+      ? new Date(new Date(filters.endDate).setHours(23, 59, 59, 999)).toISOString()
+      : new Date().toISOString();
 
     const monthlyPaymentsRaw: { year_month: string; total_amount: number }[] = await this.prisma.$queryRaw`
-        SELECT
-            to_char("createdAt", 'YYYY-MM') as year_month,
-            SUM(amount) as total_amount
-        FROM "Payment"
-        WHERE status = 'COMPLETED'
+      SELECT
+        to_char("createdAt", 'YYYY-MM') as year_month,
+        SUM(amount) as total_amount
+      FROM "Payment"
+      WHERE status = 'COMPLETED'
         AND "createdAt" >= ${new Date(startDateString)}::timestamp
         AND "createdAt" <= ${new Date(endDateString)}::timestamp
-        GROUP BY year_month
-        ORDER BY year_month ASC;
+      GROUP BY year_month
+      ORDER BY year_month ASC;
     `;
-    
-    const monthlyPayments: MonthlyPaymentDataDto[] = monthlyPaymentsRaw.map(item => ({
-        month: item.year_month,
-        totalAmount: Number(item.total_amount) || 0,
-    }));
 
+    const monthlyPayments: MonthlyPaymentDataDto[] = monthlyPaymentsRaw.map(item => ({
+      month: item.year_month,
+      totalAmount: Number(item.total_amount) || 0,
+    }));
 
     return {
       metrics,
