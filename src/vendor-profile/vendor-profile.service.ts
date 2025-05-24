@@ -12,7 +12,6 @@ export class VendorProfileService {
     const categories = await this.prisma.category.findMany({
       where: { id: { in: categoryIds } },
     });
-
     if (categories.length !== categoryIds.length) {
       const foundIds = categories.map(c => c.id);
       const missingIds = categoryIds.filter(id => !foundIds.includes(id));
@@ -24,12 +23,19 @@ export class VendorProfileService {
     const tags = await this.prisma.tag.findMany({
       where: { id: { in: tagIds } },
     });
-
     if (tags.length !== tagIds.length) {
       const foundIds = tags.map(t => t.id);
       const missingIds = tagIds.filter(id => !foundIds.includes(id));
       throw new BadRequestException(`Invalid tag IDs: ${missingIds.join(', ')}`);
     }
+  }
+
+  private async getOrCreateVendorForUser(user: User) {
+    let vendor = await this.prisma.vendor.findUnique({ where: { userId: user.id } });
+    if (!vendor) {
+      vendor = await this.prisma.vendor.create({ data: { userId: user.id } });
+    }
+    return vendor;
   }
 
   async createVendorProfile(
@@ -40,12 +46,13 @@ export class VendorProfileService {
       throw new ForbiddenException('Only vendors can create a business profile.');
     }
 
-    const existingProfile = await this.prisma.vendorProfile.findUnique({ 
-      where: { userId: user.id } 
+    const vendor = await this.getOrCreateVendorForUser(user);
+
+    const existingProfile = await this.prisma.vendorProfile.findFirst({
+      where: { vendorId: vendor.id },
     });
-    
     if (existingProfile) {
-      throw new BadRequestException('Vendor profile already exists for this user.');
+      throw new BadRequestException('Vendor profile already exists for this vendor.');
     }
 
     await this.validateCategoryIds(createVendorProfileInput.categoryIds);
@@ -55,7 +62,7 @@ export class VendorProfileService {
 
     const createData: Prisma.VendorProfileCreateInput = {
       ...profileData,
-      user: { connect: { id: user.id } },
+      vendor: { connect: { id: vendor.id } },
       categories: {
         create: categoryIds.map(catId => ({
           category: { connect: { id: catId } },
@@ -66,26 +73,17 @@ export class VendorProfileService {
           tag: { connect: { id: tagId } },
         })),
       },
-    };
-
-    if (galleryImagesInput && galleryImagesInput.length > 0) {
-      createData.galleryImages = {
+      galleryImages: galleryImagesInput && galleryImagesInput.length > 0 ? {
         create: galleryImagesInput.map(img => ({
           url: img.url,
           caption: img.caption,
           order: img.order,
         })),
-      };
-    }
+      } : undefined,
+    };
 
     return this.prisma.vendorProfile.create({
       data: createData,
-      include: {
-        user: true,
-        categories: { include: { category: true } },
-        tags: { include: { tag: true } },
-        galleryImages: true,
-      },
     });
   }
 
@@ -94,58 +92,36 @@ export class VendorProfileService {
     updateVendorProfileInput: UpdateVendorProfileInput,
     currentUser: User,
   ): Promise<PrismaVendorProfile> {
+    const vendor = await this.getOrCreateVendorForUser(currentUser);
     const currentProfile = await this.prisma.vendorProfile.findUnique({ where: { id } });
     if (!currentProfile) {
       throw new NotFoundException(`Vendor profile with ID ${id} not found.`);
     }
-    
-    if (currentProfile.userId !== currentUser.id && currentUser.role !== 'ADMIN') {
+    if (currentProfile.vendorId !== vendor.id && currentUser.role !== 'ADMIN') {
       throw new ForbiddenException('You can only update your own profile.');
     }
 
     const { categoryIds, tagIds, galleryImages: galleryImagesInput, ...profileData } = updateVendorProfileInput;
-
     if (categoryIds) await this.validateCategoryIds(categoryIds);
     if (tagIds) await this.validateTagIds(tagIds);
 
     return this.prisma.$transaction(async (tx) => {
-      // 1. Update scalar fields
       await tx.vendorProfile.update({
         where: { id },
-        data: profileData,
-      });
-
-      // 2. Update Categories (if provided)
-      if (categoryIds !== undefined) {
-        await tx.vendorProfile.update({
-          where: { id },
-          data: {
+        data: {
+          ...profileData,
+          ...(categoryIds !== undefined && {
             categories: {
-              deleteMany: {},
-              create: categoryIds.map(catId => ({
-                category: { connect: { id: catId } },
-              })),
+              set: categoryIds.map(catId => ({ categoryId: catId })),
             },
-          },
-        });
-      }
-
-      // 3. Update Tags (if provided)
-      if (tagIds !== undefined) {
-        await tx.vendorProfile.update({
-          where: { id },
-          data: {
+          }),
+          ...(tagIds !== undefined && {
             tags: {
-              deleteMany: {},
-              create: tagIds.map(tagId => ({
-                tag: { connect: { id: tagId } },
-              })),
+              set: tagIds.map(tagId => ({ tagId: tagId })),
             },
-          },
-        });
-      }
-
-      // 4. Update Gallery Images (if provided)
+          }),
+        },
+      });
       if (galleryImagesInput !== undefined) {
         await tx.galleryImage.deleteMany({ where: { vendorProfileId: id } });
         if (galleryImagesInput.length > 0) {
@@ -159,51 +135,26 @@ export class VendorProfileService {
           });
         }
       }
-
       return tx.vendorProfile.findUniqueOrThrow({
         where: { id },
-        include: {
-          user: true,
-          categories: { include: { category: true } },
-          tags: { include: { tag: true } },
-          galleryImages: true,
-        },
       });
     });
   }
 
-  async findOneByUserId(userId: string): Promise<PrismaVendorProfile | null> {
-    return this.prisma.vendorProfile.findUnique({
-      where: { userId },
-      include: {
-        user: true,
-        categories: { include: { category: true } },
-        tags: { include: { tag: true } },
-        galleryImages: true,
-      },
+  async findOneByVendorId(vendorId: string): Promise<PrismaVendorProfile | null> {
+    const profiles = await this.prisma.vendorProfile.findMany({
+      where: { vendorId },
     });
+    return profiles[0] || null;
   }
-  
+
   async findOneById(id: string): Promise<PrismaVendorProfile | null> {
     return this.prisma.vendorProfile.findUnique({
       where: { id },
-      include: {
-        user: true,
-        categories: { include: { category: true } },
-        tags: { include: { tag: true } },
-        galleryImages: true,
-      },
     });
   }
 
   async findAll(): Promise<PrismaVendorProfile[]> {
-    return this.prisma.vendorProfile.findMany({
-      include: {
-        user: true,
-        categories: { include: { category: true } },
-        tags: { include: { tag: true } },
-        galleryImages: true,
-      },
-    });
+    return this.prisma.vendorProfile.findMany();
   }
 } 

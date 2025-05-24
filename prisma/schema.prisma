@@ -24,29 +24,53 @@ model User {
   updatedAt            DateTime                 @updatedAt
   deletedAt            DateTime?
   auditLogs            AuditLog[]
-  children             Child[]
   loginAttempts        LoginAttempt[]
   sessions             Session[]
-  enrollments          ClassPackageEnrollment[]
-  createdClassPackages ClassPackage[]           @relation("VendorClassPackages")
-  courses              Course[]                 @relation("VendorCourses")
-  courseEnrollments    Enrollment[]             @relation("UserCourseEnrollments")
   notifications        Notification[]
   payments             Payment[]
   reviews              Review[]
   savedClassPackages   SavedClassPackage[]
-  vendorProfile        VendorProfile?
+  parent               Parent?
+  vendor               Vendor?
+  children             Child[]
+  courseEnrollments    Enrollment[]             @relation("UserCourseEnrollments")
 
-  @@map("users")
   @@index([email])
   @@index([cognitoSub])
+  @@map("users")
+}
+
+model Parent {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  children  Child[]
+  enrollments ClassPackageEnrollment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("parents")
+}
+
+model Vendor {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profiles  VendorProfile[]
+  classPackages ClassPackage[]
+  courses   Course[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("vendors")
 }
 
 model VendorProfile {
   id            String   @id @default(cuid())
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId        String   @unique
-
+  vendorId      String
+  vendor        Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   profileLogoUrl String?  @db.VarChar(255)
   coverImageUrl  String?  @db.VarChar(255)
   businessName   String   @db.VarChar(100)
@@ -74,18 +98,18 @@ model VendorProfile {
   tags              VendorProfileTag[]
   galleryImages     GalleryImage[]
 
+  @@index([vendorId])
   @@map("vendor_profiles")
-  @@index([userId])
 }
 
 model GalleryImage {
   id              String        @id @default(cuid())
-  vendorProfile   VendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
   vendorProfileId String
   url             String        @db.VarChar(255)
   caption         String?       @db.VarChar(255)
   order           Int?
   createdAt       DateTime      @default(now())
+  vendorProfile   VendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
 
   @@index([vendorProfileId])
   @@map("gallery_images")
@@ -101,13 +125,14 @@ model Course {
   status      CourseStatus @default(DRAFT)
   isPublished Boolean      @default(false)
   vendorId    String
+  vendor      Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
-  vendor      User         @relation("VendorCourses", fields: [vendorId], references: [id], onDelete: Cascade)
   enrollments Enrollment[]
   reviews     Review[]
   schedules   Schedule[]
 
+  @@index([vendorId])
   @@map("courses")
 }
 
@@ -122,6 +147,8 @@ model Enrollment {
   user      User     @relation("UserCourseEnrollments", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
   @@map("enrollments")
 }
 
@@ -190,13 +217,16 @@ model Child {
   dateOfBirth DateTime
   gender      Gender
   userId      String
+  parentId    String
+  parent      Parent                   @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  user        User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime                 @default(now())
   updatedAt   DateTime                 @updatedAt
-  user        User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   enrollments ClassPackageEnrollment[] @relation("EnrolledChildren")
 
-  @@map("children")
   @@index([userId])
+  @@index([parentId])
+  @@map("children")
 }
 
 model Session {
@@ -208,9 +238,9 @@ model Session {
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("sessions")
   @@index([userId])
   @@index([token])
+  @@map("sessions")
 }
 
 model AgeGroup {
@@ -224,12 +254,12 @@ model AgeGroup {
 }
 
 model Category {
-  id            String         @id @default(cuid())
-  name          String         @unique @db.VarChar(100)
-  description   String?        @db.Text
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  classPackages ClassPackage[]
+  id             String                  @id @default(cuid())
+  name           String                  @unique @db.VarChar(100)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  description    String?
+  classPackages  ClassPackage[]
   vendorProfiles VendorProfileCategory[]
 
   @@map("categories")
@@ -238,6 +268,7 @@ model Category {
 model ClassPackage {
   id                        String                   @id @default(cuid())
   vendorId                  String
+  vendor                    Vendor                   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   name                      String                   @db.VarChar(100)
   description               String
   beforeYouComeInstructions String
@@ -253,7 +284,6 @@ model ClassPackage {
   scheduleSlots             ScheduleSlot[]
   enrollments               ClassPackageEnrollment[]
   category                  Category                 @relation(fields: [categoryId], references: [id])
-  vendor                    User                     @relation("VendorClassPackages", fields: [vendorId], references: [id], onDelete: Cascade)
   savedByUsers              SavedClassPackage[]
   ageGroups                 AgeGroup[]               @relation("ClassPackageAgeGroups")
 
@@ -270,11 +300,11 @@ model ScheduleSlot {
   availableSlots Int
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt
-  classPackage   ClassPackage             @relation(fields: [classPackageId], references: [id], onDelete: Cascade)
   enrollments    ClassPackageEnrollment[]
+  classPackage   ClassPackage             @relation(fields: [classPackageId], references: [id], onDelete: Cascade)
 
-  @@map("schedule_slots")
   @@index([classPackageId])
+  @@map("schedule_slots")
 }
 
 model LoginAttempt {
@@ -284,9 +314,9 @@ model LoginAttempt {
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
 
-  @@map("login_attempts")
   @@index([userId])
   @@index([createdAt])
+  @@map("login_attempts")
 }
 
 model AuditLog {
@@ -300,15 +330,16 @@ model AuditLog {
   entityType     AuditLogEntityType
   user           User               @relation(fields: [userId], references: [id])
 
-  @@map("audit_logs")
   @@index([userId])
   @@index([entityType, entityId])
   @@index([createdAt])
+  @@map("audit_logs")
 }
 
 model ClassPackageEnrollment {
   id               String        @id @default(cuid())
-  userId           String
+  parentId         String
+  parent           Parent        @relation(fields: [parentId], references: [id], onDelete: Cascade)
   classPackageId   String
   scheduleSlotId   String
   bookingStatus    BookingStatus @default(PAID)
@@ -317,12 +348,11 @@ model ClassPackageEnrollment {
   updatedAt        DateTime      @updatedAt
   classPackage     ClassPackage  @relation(fields: [classPackageId], references: [id], onDelete: Cascade)
   scheduleSlot     ScheduleSlot  @relation(fields: [scheduleSlotId], references: [id], onDelete: Cascade)
-  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   payment          Payment?
   enrolledChildren Child[]       @relation("EnrolledChildren")
 
-  @@unique([userId, scheduleSlotId])
-  @@index([userId])
+  @@unique([parentId, scheduleSlotId])
+  @@index([parentId])
   @@index([classPackageId])
   @@index([scheduleSlotId])
   @@map("class_package_enrollments")
@@ -340,6 +370,45 @@ model SavedClassPackage {
   @@index([userId])
   @@index([classPackageId])
   @@map("saved_class_packages")
+}
+
+model VendorProfileCategory {
+  vendorProfileId String
+  categoryId      String
+  createdAt       DateTime      @default(now())
+  id              String        @id @default(cuid())
+  category        Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  vendorProfile   VendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorProfileId, categoryId])
+  @@index([vendorProfileId])
+  @@index([categoryId])
+  @@map("vendor_profile_categories")
+}
+
+model VendorProfileTag {
+  vendorProfileId String
+  tagId           String
+  createdAt       DateTime      @default(now())
+  id              String        @id @default(cuid())
+  tag             Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  vendorProfile   VendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorProfileId, tagId])
+  @@index([vendorProfileId])
+  @@index([tagId])
+  @@map("vendor_profile_tags")
+}
+
+model Tag {
+  id             String             @id @default(cuid())
+  name           String             @unique @db.VarChar(50)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  description    String?
+  vendorProfiles VendorProfileTag[]
+
+  @@map("tags")
 }
 
 enum AuditLogAction {
@@ -428,43 +497,4 @@ enum PaymentType {
 enum Gender {
   MALE
   FEMALE
-}
-
-model VendorProfileCategory {
-  id              String        @id @default(cuid())
-  vendorProfile   VendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
-  vendorProfileId String
-  category        Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  categoryId      String
-  createdAt       DateTime      @default(now())
-
-  @@unique([vendorProfileId, categoryId])
-  @@index([vendorProfileId])
-  @@index([categoryId])
-  @@map("vendor_profile_categories")
-}
-
-model VendorProfileTag {
-  id              String        @id @default(cuid())
-  vendorProfile   VendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
-  vendorProfileId String
-  tag             Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
-  tagId           String
-  createdAt       DateTime      @default(now())
-
-  @@unique([vendorProfileId, tagId])
-  @@index([vendorProfileId])
-  @@index([tagId])
-  @@map("vendor_profile_tags")
-}
-
-model Tag {
-  id            String    @id @default(cuid())
-  name          String    @unique @db.VarChar(50)
-  description   String?   @db.Text
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  vendorProfiles VendorProfileTag[]
-
-  @@map("tags")
 }
