@@ -11,6 +11,8 @@ import { AdminTransactionListViewDto } from './dto/admin-transaction-list-view.d
 import { DashboardMetricsDto } from './dto/dashboard-metrics.dto';
 import { AdminUserListViewDto, PaginatedUserListResponse } from './dto/admin-user-list-view.dto';
 import { AdminUserListFilterDto } from './dto/admin-user-list-filter.dto';
+import { Res } from '@nestjs/common';
+import { Response } from 'express';
 
 @Resolver()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -82,5 +84,131 @@ export class AdminResolver {
     filters?: Omit<AdminUserListFilterDto, 'role'>,
   ): Promise<PaginatedUserListResponse> {
     return this.adminService.listParents(filters);
+  }
+
+  @Query(() => Boolean, {
+    name: 'exportUsersToExcel',
+    description: 'Exports the filtered user list to Excel. Requires ADMIN privileges.',
+  })
+  async exportUsersToExcel(
+    @Res() res: Response,
+    @Args('filters', { type: () => AdminUserListFilterDto, nullable: true })
+    filters?: AdminUserListFilterDto,
+  ): Promise<boolean> {
+    const buffer = await this.adminService.exportUsersToExcel(filters);
+    
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename=users.xlsx',
+      'Content-Length': buffer.length,
+    });
+    
+    res.send(buffer);
+    return true;
+  }
+
+  @Query(() => Boolean, {
+    name: 'exportVendorsToExcel',
+    description: 'Exports the filtered vendor list to Excel. Requires ADMIN privileges.',
+  })
+  async exportVendorsToExcel(
+    @Res() res: Response,
+    @Args('filters', { type: () => AdminUserListFilterDto, nullable: true })
+    filters?: Omit<AdminUserListFilterDto, 'role'>,
+  ): Promise<boolean> {
+    const buffer = await this.adminService.exportVendorsToExcel(filters);
+    
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename=vendors.xlsx',
+      'Content-Length': buffer.length,
+    });
+    
+    res.send(buffer);
+    return true;
+  }
+
+  @Query(() => Boolean, {
+    name: 'exportParentsToExcel',
+    description: 'Exports the filtered parent list to Excel. Requires ADMIN privileges.',
+  })
+  async exportParentsToExcel(
+    @Res() res: Response,
+    @Args('filters', { type: () => AdminUserListFilterDto, nullable: true })
+    filters?: Omit<AdminUserListFilterDto, 'role'>,
+  ): Promise<boolean> {
+    const buffer = await this.adminService.exportParentsToExcel(filters);
+    
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename=parents.xlsx',
+      'Content-Length': buffer.length,
+    });
+    
+    res.send(buffer);
+    return true;
+  }
+
+  @Query(() => Boolean, {
+    name: 'exportMetricsToExcel',
+    description: 'Exports admin dashboard metrics to Excel. Requires ADMIN privileges.',
+  })
+  async exportMetricsToExcel(
+    @Res() res: Response,
+    @Args('filters', { type: () => DateRangeFilterDto, nullable: true })
+    filters?: DateRangeFilterDto,
+  ): Promise<boolean> {
+    const buffer = await this.adminService.exportMetricsToExcel(filters);
+    
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename=admin_metrics.xlsx',
+      'Content-Length': buffer.length,
+    });
+    
+    res.send(buffer);
+    return true;
+  }
+
+  @Query(() => Boolean, {
+    name: 'exportTransactionsToExcel',
+    description: 'Exports transaction list to Excel. Requires ADMIN privileges.',
+  })
+  async exportTransactionsToExcel(
+    @Res() res: Response,
+    @Args('filters', { type: () => DateRangeFilterDto, nullable: true })
+    filters?: DateRangeFilterDto,
+  ): Promise<boolean> {
+    const buffer = await this.adminService.exportTransactionsToExcel(filters);
+    
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename=transactions.xlsx',
+      'Content-Length': buffer.length,
+    });
+    
+    res.send(buffer);
+    return true;
+  }
+
+  @Query(() => Boolean, {
+    name: 'exportPaymentChartToExcel',
+    description: 'Exports payment chart data to Excel. Requires ADMIN privileges.',
+  })
+  async exportPaymentChartToExcel(
+    @Res() res: Response,
+    @Args('filters', { type: () => DateRangeFilterDto, nullable: true })
+    filters?: DateRangeFilterDto,
+  ): Promise<boolean> {
+    const buffer = await this.adminService.exportPaymentChartToExcel(filters);
+    
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename=payment_chart.xlsx',
+      'Content-Length': buffer.length,
+    });
+    
+    res.send(buffer);
+    return true;
   }
 } 

@@ -10,10 +10,14 @@ import { AdminUserListViewDto, PaginatedUserListResponse } from './dto/admin-use
 import { AdminUserListFilterDto } from './dto/admin-user-list-filter.dto';
 import { AgeGroup } from './dto/age-group.enum';
 import { PaginationInfo } from './dto/pagination.dto';
+import { ExcelExportService } from './services/excel-export.service';
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private excelExportService: ExcelExportService,
+  ) {}
 
   async getMetrics(filters?: DateRangeFilterDto): Promise<DashboardMetricsDto> {
     const dateFilter: Prisma.DateTimeFilter = {};
@@ -332,5 +336,38 @@ export class AdminService {
 
   async listParents(filters?: Omit<AdminUserListFilterDto, 'role'>): Promise<PaginatedUserListResponse> {
     return this.listUsers({ ...filters, role: UserRole.PARENT });
+  }
+
+  async exportUsersToExcel(filters?: AdminUserListFilterDto): Promise<Buffer> {
+    // Get all users without pagination for export
+    const users = await this.listUsers({ ...filters, pagination: undefined });
+    return this.excelExportService.generateUserListExcel(users.items, filters?.role);
+  }
+
+  async exportVendorsToExcel(filters?: Omit<AdminUserListFilterDto, 'role'>): Promise<Buffer> {
+    // Get all vendors without pagination for export
+    const vendors = await this.listVendors({ ...filters, pagination: undefined });
+    return this.excelExportService.generateUserListExcel(vendors.items, UserRole.VENDOR);
+  }
+
+  async exportParentsToExcel(filters?: Omit<AdminUserListFilterDto, 'role'>): Promise<Buffer> {
+    // Get all parents without pagination for export
+    const parents = await this.listParents({ ...filters, pagination: undefined });
+    return this.excelExportService.generateUserListExcel(parents.items, UserRole.PARENT);
+  }
+
+  async exportMetricsToExcel(filters?: DateRangeFilterDto): Promise<Buffer> {
+    const metrics = await this.getMetrics(filters);
+    return this.excelExportService.generateMetricsExcel(metrics);
+  }
+
+  async exportTransactionsToExcel(filters?: DateRangeFilterDto): Promise<Buffer> {
+    const transactions = await this.listAllTransactions(filters);
+    return this.excelExportService.generateTransactionsExcel(transactions);
+  }
+
+  async exportPaymentChartToExcel(filters?: DateRangeFilterDto): Promise<Buffer> {
+    const chartData = await this.getPaymentChartData(filters);
+    return this.excelExportService.generatePaymentChartExcel(chartData.monthlyPayments);
   }
 } 
