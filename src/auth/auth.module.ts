@@ -3,27 +3,21 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
 import { ScheduleModule } from '@nestjs/schedule';
 import { MailerModule } from '@nestjs-modules/mailer';
-import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 import { join } from 'path';
 import { AuthService } from './auth.service';
 import { AuthResolver } from './auth.resolver';
 import { CognitoClientStrategy } from './strategies/cognito-client.strategy';
 import { CognitoAdminStrategy } from './strategies/cognito-admin.strategy';
 import { UsersModule } from '../users/users.module';
-// AuthController is no longer used and can be removed or its import commented out
-// import { AuthController } from './auth.controller'; 
 import { SessionService } from './session.service';
 import { LoginAttemptService } from './services/login-attempt.service';
 import cognitoConfig from './cognito.config';
 import { PrismaModule } from '../prisma/prisma.module';
 import { RolesGuard } from './guards/roles.guard';
 import { SessionModule } from './session.module';
-import { LoginAttemptModule } from './services/login-attempt.module';
+import { LoginAttemptModule } from './services/login-attempt.module'
 import { AwsConfigService } from '../config/aws.config';
 
-// console.log('AuthModule __dirname:', __dirname); // Log __dirname
-// const resolvedTemplatePath = join(__dirname, 'templates'); // Log resolved path
-// console.log('Resolved template path for MailerModule:', resolvedTemplatePath);
 
 @Module({
   imports: [
@@ -70,7 +64,6 @@ import { AwsConfigService } from '../config/aws.config';
     RolesGuard,
     AwsConfigService,
   ],
-  // controllers: [AuthController], // AuthController removed as it's now empty
   exports: [AuthService, SessionService],
 })
 export class AuthModule {} 

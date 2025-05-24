@@ -17,16 +17,6 @@ services:
       
       # AWS Configuration
       AWS_REGION: ${AWS_REGION:-us-east-1}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      
-      # Authentication - Client Cognito
-      COGNITO_CLIENT_USER_POOL_ID: ${COGNITO_CLIENT_USER_POOL_ID:-}
-      COGNITO_CLIENT_CLIENT_ID: ${COGNITO_CLIENT_CLIENT_ID:-}
-      
-      # Authentication - Admin Cognito
-      COGNITO_ADMIN_USER_POOL_ID: ${COGNITO_ADMIN_USER_POOL_ID:-}
-      COGNITO_ADMIN_CLIENT_ID: ${COGNITO_ADMIN_CLIENT_ID:-}
       
       # Authentication - JWT
       JWT_SECRET: ${JWT_SECRET:-}
