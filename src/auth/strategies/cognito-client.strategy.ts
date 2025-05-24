@@ -56,6 +56,6 @@ export class CognitoClientStrategy extends PassportStrategy(Strategy, 'cognito-c
   private mapCognitoGroupsToRole(groups: string[]): UserRole {
     if (groups.includes('parent')) return UserRole.PARENT;
     if (groups.includes('vendor')) return UserRole.VENDOR;
-    return UserRole.STUDENT;
+    return UserRole.PARENT;
   }
 } 

@@ -53,7 +53,7 @@ export class UsersService {
     termsAccepted?: boolean;
     password?: string;
   }): Promise<User> {
-    return this.prisma.user.create({
+    const user = await this.prisma.user.create({
       data: {
         email: data.email,
         firstName: data.firstName,
@@ -72,13 +72,20 @@ export class UsersService {
             lastName: child.lastName,
             gender: child.gender,
             dateOfBirth: child.dateOfBirth,
-          }))
+            parent: {
+              connect: {
+                id: user.id,
+              },
+            },
+          })),
         } : undefined,
       },
       include: {
         children: true,
       },
     });
+
+    return user;
   }
 
   async update(id: string, data: Partial<User>): Promise<User> {
@@ -109,7 +116,7 @@ export class UsersService {
     cognitoSub: string,
     email: string,
     firstName: string, // Changed from name
-    lastName: string,  // Added lastName parameter
+    lastName: string,  // Added lastName
     role: UserRole,
   ): Promise<User> {
     return this.prisma.user.upsert({
@@ -192,8 +199,20 @@ export class UsersService {
 
     return this.prisma.child.create({
       data: {
-        ...input,
-        userId: parentId,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        gender: input.gender,
+        dateOfBirth: input.dateOfBirth,
+        user: {
+          connect: {
+            id: parentId,
+          },
+        },
+        parent: {
+          connect: {
+            id: parentId,
+          },
+        },
       },
     });
   }

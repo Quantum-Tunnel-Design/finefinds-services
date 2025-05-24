@@ -19,7 +19,6 @@ export class NotificationsService {
 
   async sendNotification(
     userId: string,
-    type: string,
     message: string,
     data?: Record<string, any>,
   ): Promise<void> {
@@ -28,7 +27,6 @@ export class NotificationsService {
         'send-notification',
         {
           userId,
-          type,
           message,
           data,
         },
@@ -106,10 +104,8 @@ export class NotificationsService {
       where: { userId },
       orderBy: { createdAt: 'desc' },
     });
-    
     return notifications.map(notification => ({
       ...notification,
-      title: notification.type,
       data: {},
     }));
   }
@@ -128,9 +124,8 @@ export class NotificationsService {
   async markNotificationAsRead(id: string, userId: string): Promise<PrismaNotification> {
     const notification = await this.prisma.notification.update({
       where: { id, userId },
-      data: { read: true },
+      data: { isRead: true },
     });
-
     return notification;
   }
 }

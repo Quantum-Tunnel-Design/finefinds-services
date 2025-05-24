@@ -16,10 +16,8 @@ export class AuditService {
       data: {
         userId,
         action: AuditLogAction.UPDATE,
-        entityType: AuditLogEntityType.VENDOR_PROFILE,
+        entityType: AuditLogEntityType.VENDOR,
         entityId,
-        previousValues,
-        changes: updatedValues,
       },
     });
   }
@@ -33,10 +31,8 @@ export class AuditService {
       data: {
         userId,
         action: AuditLogAction.DELETE,
-        entityType: AuditLogEntityType.VENDOR_PROFILE,
+        entityType: AuditLogEntityType.VENDOR,
         entityId,
-        changes: {},
-        previousValues: deletedData,
       },
     });
   }

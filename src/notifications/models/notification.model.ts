@@ -1,5 +1,5 @@
 // src/users/models/user.model.ts
-import { Field, ObjectType, registerEnumType } from '@nestjs/graphql';
+import { Field, ObjectType } from '@nestjs/graphql';
 // import { UserRole } from '@prisma/client'; // UserRole is imported but not used after removing registerEnumType
 import GraphQLJSON from 'graphql-type-json';
 
@@ -11,19 +11,13 @@ export class Notification {
   id: string;
 
   @Field()
-  title: string;
-
-  @Field()
   message: string;
 
   @Field()
-  read: boolean;
+  isRead: boolean;
 
-  @Field()
-  type: string;
-
-  @Field(() => GraphQLJSON)
-  data: Record<string, any>;
+  @Field(() => GraphQLJSON, { nullable: true })
+  data?: Record<string, any>;
 
   @Field()
   userId: string;

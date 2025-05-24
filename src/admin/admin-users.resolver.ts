@@ -8,7 +8,7 @@ import { AdminUsersService } from './admin-users.service';
 import { AdminUserViewDto } from './dto/admin-user-view.dto';
 import { AdminUserDetailsDto } from './dto/admin-user-details.dto';
 import { AdminUpdateUserStatusInput } from './dto/admin-update-user-status.input';
-import { VendorRevenueMetricsDto } from '../vendors/dto/vendor-revenue-metrics.dto';
+import { VendorRevenueMetricsDto } from './dto/vendor-revenue-metrics.dto';
 import { DateRangeFilterDto } from './dto/date-range-filter.dto';
 
 @Resolver(() => AdminUserViewDto)

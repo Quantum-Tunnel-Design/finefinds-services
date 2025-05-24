@@ -224,7 +224,7 @@ model Child {
   parent        Parent   @relation(fields: [parentId], references: [id], onDelete: Cascade)
   userId        String
   user          User     @relation("UserChildren", fields: [userId], references: [id], onDelete: Cascade)
-  enrollments   ClassPackageEnrollment[]
+  enrollments   ClassPackageEnrollment[] @relation("ChildEnrollments")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -330,7 +330,7 @@ model ClassPackageEnrollment {
   classPackage  ClassPackage @relation(fields: [classPackageId], references: [id], onDelete: Cascade)
   scheduleSlotId String
   scheduleSlot  ScheduleSlot @relation(fields: [scheduleSlotId], references: [id], onDelete: Cascade)
-  enrolledChildren Child[]
+  enrolledChildren Child[] @relation("ChildEnrollments")
   bookingStatus BookingStatus @default(PENDING)
   paymentType   PaymentType
   bookedAt      DateTime @default(now())

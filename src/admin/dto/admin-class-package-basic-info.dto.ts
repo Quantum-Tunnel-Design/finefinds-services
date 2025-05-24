@@ -6,11 +6,11 @@ export class AdminClassPackageBasicInfoDto {
   @Field(() => ID, { description: "Unique identifier of the class package." })
   id: string;
 
-  @Field({ description: "Name of the class package." })
-  name: string;
+  @Field({ description: "Title of the class package." })
+  title: string;
 
-  @Field(() => Float, { description: "Price per child for the class package." })
-  pricePerChild: number;
+  @Field(() => Float, { description: "Price for the class package." })
+  price: number;
 
   @Field(() => ClassPackageStatus, { description: "Current status of the class package (e.g., DRAFT, PUBLISHED)." })
   status: ClassPackageStatus;

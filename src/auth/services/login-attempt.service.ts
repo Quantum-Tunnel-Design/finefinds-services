@@ -40,8 +40,14 @@ export class LoginAttemptService {
     // Record new failed attempt
     await this.prisma.loginAttempt.create({
       data: {
-        userId: user.id,
         success: false,
+        ipAddress: '0.0.0.0', // Replace with actual IP address if available
+        userAgent: 'Unknown', // Replace with actual user agent if available
+        user: {
+          connect: {
+            id: user.id,
+          },
+        },
       },
     });
 

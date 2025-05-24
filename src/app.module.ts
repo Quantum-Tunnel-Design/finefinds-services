@@ -11,7 +11,6 @@ import { TransactionsModule } from './transactions/transactions.module';
 import { ClassPackagesModule } from './class-packages/class-packages.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { NotificationsModule } from './notifications/notifications.module';
-import { VendorsModule } from './vendors/vendors.module';
 import { AuditModule } from './audit/audit.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { AdminModule } from './admin/admin.module';
@@ -40,7 +39,6 @@ import { VendorProfileModule } from './vendor-profile/vendor-profile.module';
     ClassPackagesModule,
     BookingsModule,
     NotificationsModule,
-    VendorsModule,
     AuditModule,
     UploadsModule,
     AdminModule,

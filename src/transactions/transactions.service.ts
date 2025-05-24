@@ -44,10 +44,10 @@ export class TransactionsService {
               include: {
                 vendor: {
                   include: {
-                    vendorProfile: true,
+                    profiles: true,
+                    user: true,
                   },
                 },
-                category: true,
               }
             },
             scheduleSlot: true,
@@ -65,7 +65,7 @@ export class TransactionsService {
       const classPackage = enrollment?.classPackage;
       const scheduleSlot = enrollment?.scheduleSlot;
       const vendor = classPackage?.vendor;
-      const vendorProfile = vendor?.vendorProfile;
+      const vendorProfile = vendor?.profiles?.[0];
 
       let scheduleDetails = 'N/A';
       if (scheduleSlot) {
@@ -85,7 +85,7 @@ export class TransactionsService {
         paymentStatus: payment.status,
         transactionId: payment.transactionId,
         classPackageId: classPackage?.id || 'N/A',
-        vendorName: vendorProfile?.businessName || `${vendor?.firstName} ${vendor?.lastName}` || 'N/A',
+        vendorName: vendorProfile?.businessName || (vendor?.user ? `${vendor.user.firstName} ${vendor.user.lastName}` : 'N/A'),
       };
     });
   }
@@ -105,9 +105,11 @@ export class TransactionsService {
             classPackage: {
               include: {
                 vendor: {
-                  include: { vendorProfile: true }
+                  include: {
+                    profiles: true,
+                    user: true,
+                  },
                 },
-                category: true,
               }
             },
             scheduleSlot: true,
@@ -125,12 +127,24 @@ export class TransactionsService {
       throw new BadRequestException('Invoice can only be generated for completed payments');
     }
 
-    const enrollment = payment.classPackageEnrollment;
-    const classPackage = enrollment?.classPackage;
-    const scheduleSlot = enrollment?.scheduleSlot;
-    const vendor = classPackage?.vendor;
-    const vendorProfile = vendor?.vendorProfile;
-    const parent = payment.User;
+    const enrollment = await this.prisma.classPackageEnrollment.findUnique({
+      where: { id: payment.classPackageEnrollmentId },
+    });
+    const classPackage = await this.prisma.classPackage.findUnique({
+      where: { id: enrollment?.classPackageId },
+    });
+    const scheduleSlot = await this.prisma.scheduleSlot.findUnique({
+      where: { id: enrollment?.scheduleSlotId },
+    });
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id: classPackage?.vendorId },
+    });
+    const vendorProfile = await this.prisma.vendorProfile.findFirst({
+      where: { vendorId: vendor?.id },
+    });
+    const parent = await this.prisma.user.findUnique({
+      where: { id: payment.userId },
+    });
 
     const companyName = 'FineFinds Inc.'; // Replace with actual company name
     const companyAddress = '123 Learning Lane, Education City, ED 12345'; // Replace with actual address
@@ -146,9 +160,9 @@ export class TransactionsService {
       scheduleInfo = `${startDate} from ${startTime} to ${endTime}`;
     }
     
-    const childrenDetails = enrollment?.enrolledChildren.map(child => {
-      return `${child.firstName} ${child.lastName}`;
-    }).join(', ') || 'N/A';
+    const childrenDetails = enrollment?.enrolledChildren ? enrollment.enrolledChildren.map(child => `${child.firstName} ${child.lastName}`).join(', ') : 'N/A';
+
+    const pricePerChild = classPackage?.price;
 
     const docDefinition: TDocumentDefinitions = {
       content: [
@@ -174,9 +188,9 @@ export class TransactionsService {
               width: '*',
               text: [
                 { text: 'Vendor Details:\n', style: 'subheader' },
-                `${vendorProfile?.businessName || (vendor ? `${vendor.firstName} ${vendor.lastName}` : 'N/A')}\n`,
+                `${vendorProfile?.businessName || (vendor?.user ? `${vendor.user.firstName} ${vendor.user.lastName}` : 'N/A')}\n`,
                 `${vendorProfile?.location || 'N/A'}\n`,
-                `${vendorProfile?.contactNumber || vendor?.phoneNumber || 'N/A'}`,
+                `${vendorProfile?.contactNumber || vendor?.user?.phoneNumber || 'N/A'}`,
               ],
               alignment: 'right'
             }
@@ -195,13 +209,12 @@ export class TransactionsService {
                 {
                   stack: [
                     { text: classPackage?.name || 'Class Package', bold: true },
-                    { text: `Category: ${classPackage?.category?.name || 'N/A'}`, fontSize: 9 },
                     { text: `Schedule: ${scheduleInfo}`, fontSize: 9 },
                     { text: `Children: ${childrenDetails}`, fontSize: 9 },
                   ]
                 },
                 enrollment?.enrolledChildren.length || 1, 
-                `${currencySymbol} ${(classPackage?.pricePerChild || 0).toFixed(2)}`,
+                `${currencySymbol} ${(pricePerChild || 0).toFixed(2)}`,
                 `${currencySymbol} ${payment.amount.toFixed(2)}`,
               ]
             ]

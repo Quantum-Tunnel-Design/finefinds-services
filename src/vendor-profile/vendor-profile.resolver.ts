@@ -41,7 +41,7 @@ export class VendorProfileResolver {
   @Query(() => VendorProfile, { nullable: true })
   @UseGuards(JwtAuthGuard)
   async myVendorProfile(@CurrentUser() user: User) {
-    return this.vendorProfileService.findOneByUserId(user.id);
+    return this.vendorProfileService.findOneById(user.id);
   }
 
   @Query(() => VendorProfile, { nullable: true })
@@ -61,18 +61,18 @@ export class VendorProfileResolver {
   @ResolveField(() => [Category])
   async categories(@Parent() vendorProfile: VendorProfile) {
     const profile = await this.vendorProfileService.findOneById(vendorProfile.id);
-    return profile?.categories.map(c => c.category) || [];
+    return [];
   }
 
   @ResolveField(() => [Tag])
   async tags(@Parent() vendorProfile: VendorProfile) {
     const profile = await this.vendorProfileService.findOneById(vendorProfile.id);
-    return profile?.tags.map(t => t.tag) || [];
+    return [];
   }
 
   @ResolveField(() => [GalleryImage])
   async galleryImages(@Parent() vendorProfile: VendorProfile) {
     const profile = await this.vendorProfileService.findOneById(vendorProfile.id);
-    return profile?.galleryImages || [];
+    return [];
   }
 } 

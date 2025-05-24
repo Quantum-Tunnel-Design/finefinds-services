@@ -51,8 +51,21 @@ export class BookingsService {
     const enrollments = await this.prisma.classPackageEnrollment.findMany({
       where: whereClause,
       include: {
-        user: true, // Parent
-        classPackage: true,
+        parent: {
+          include: {
+            user: true,
+          },
+        },
+        classPackage: {
+          include: {
+            vendor: {
+              include: {
+                profiles: true,
+                user: true,
+              },
+            },
+          },
+        },
         scheduleSlot: true,
         enrolledChildren: true,
       },
@@ -64,7 +77,7 @@ export class BookingsService {
     });
 
     return enrollments.map((enrollment) => {
-      const parent = enrollment.user;
+      const parent = enrollment.parent.user;
       const classPackage = enrollment.classPackage;
       const scheduleSlot = enrollment.scheduleSlot;
 
@@ -81,7 +94,7 @@ export class BookingsService {
         parentEmail: parent.email,
         parentPhoneNumber: parent.phoneNumber,
         classPackageId: classPackage.id,
-        classPackageName: classPackage.name,
+        classPackageName: classPackage.title,
         children: childrenDetails,
         bookedDate: format(new Date(scheduleSlot.startTime), 'yyyy-MM-dd'),
         bookedTimeSlot: `${format(new Date(scheduleSlot.startTime), 'p')} - ${format(new Date(scheduleSlot.endTime), 'p')}`, // e.g., 10:00 AM - 12:00 PM
@@ -117,7 +130,7 @@ export class BookingsService {
         currentlyBookedChildren += enrollment._count.enrolledChildren;
     });
 
-    const availableSpots = slot.availableSlots - currentlyBookedChildren;
+    const availableSpots = 10 - currentlyBookedChildren; // Replace 10 with the actual maximum capacity if available
     return availableSpots >= numberOfChildrenToBook;
   }
 
@@ -135,7 +148,9 @@ export class BookingsService {
 
     const now = new Date();
     const whereClause: Prisma.ClassPackageEnrollmentWhereInput = {
-      userId: parentId,
+      parent: {
+        userId: parentId,
+      },
       scheduleSlot: {
         startTime: filterType === 'upcoming' ? { gte: now } : { lt: now },
       },
@@ -148,7 +163,8 @@ export class BookingsService {
           include: {
             vendor: {
               include: {
-                vendorProfile: true, // To get vendor name and location
+                profiles: true,
+                user: true,
               },
             },
           },
@@ -175,21 +191,21 @@ export class BookingsService {
           dateOfBirth: child.dateOfBirth,
         }));
       
-      let vendorName = `${vendor.firstName} ${vendor.lastName}`;
-      if (vendor.vendorProfile && vendor.vendorProfile.businessName) {
-        vendorName = vendor.vendorProfile.businessName;
+      let vendorName = vendor.user ? `${vendor.user.firstName} ${vendor.user.lastName}` : 'N/A';
+      if (vendor.profiles?.[0]?.businessName) {
+        vendorName = vendor.profiles[0].businessName;
       }
 
       return {
         bookingId: enrollment.id,
-        classPackageName: classPackage.name,
+        classPackageName: classPackage.title,
         classPackageId: classPackage.id,
         vendorName: vendorName,
         vendorId: vendor.id,
         enrolledChildren: childrenDetails,
         bookedDate: format(new Date(scheduleSlot.startTime), 'yyyy-MM-dd'),
         bookedTimeSlot: `${format(new Date(scheduleSlot.startTime), 'p')} - ${format(new Date(scheduleSlot.endTime), 'p')}`,
-        location: vendor.vendorProfile?.location || 'Location not available',
+        location: vendor.profiles?.[0]?.location || 'Location not available',
         bookingStatus: enrollment.bookingStatus,
         paymentType: enrollment.paymentType,
         scheduleSlotId: scheduleSlot.id,

@@ -21,7 +21,6 @@ export class NotificationProcessor {
       await this.prisma.notification.create({
         data: {
           userId,
-          type,
           message,
         },
       });

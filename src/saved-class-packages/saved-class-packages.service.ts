@@ -30,9 +30,6 @@ export class SavedClassPackagesService {
         userId: parentId,
         classPackageId: classPackageId,
       },
-      include: {
-        classPackage: true,
-      },
     });
   }
 
@@ -62,9 +59,6 @@ export class SavedClassPackagesService {
 
     return this.prisma.savedClassPackage.findMany({
       where: { userId: parentId },
-      include: {
-        classPackage: true,
-      },
       orderBy: {
         createdAt: 'desc',
       },

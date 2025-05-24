@@ -63,6 +63,7 @@ export class VendorProfileService {
     const createData: Prisma.VendorProfileCreateInput = {
       ...profileData,
       vendor: { connect: { id: vendor.id } },
+      user: { connect: { id: user.id } },
       categories: {
         create: categoryIds.map(catId => ({
           category: { connect: { id: catId } },
@@ -112,12 +113,18 @@ export class VendorProfileService {
           ...profileData,
           ...(categoryIds !== undefined && {
             categories: {
-              set: categoryIds.map(catId => ({ categoryId: catId })),
+              deleteMany: {},
+              create: categoryIds.map(catId => ({
+                category: { connect: { id: catId } },
+              })),
             },
           }),
           ...(tagIds !== undefined && {
             tags: {
-              set: tagIds.map(tagId => ({ tagId: tagId })),
+              deleteMany: {},
+              create: tagIds.map(tagId => ({
+                tag: { connect: { id: tagId } },
+              })),
             },
           }),
         },

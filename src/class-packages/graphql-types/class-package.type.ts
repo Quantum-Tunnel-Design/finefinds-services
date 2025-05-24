@@ -1,6 +1,6 @@
-import { ObjectType, Field, ID, Float, registerEnumType } from '@nestjs/graphql';
-import { ClassPackageStatus, CancellationPolicyType, UserRole } from '@prisma/client';
-import { User } from '../../users/models/user.model';
+import { ObjectType, Field, ID, Float } from '@nestjs/graphql';
+import { ClassPackageStatus } from '@prisma/client';
+import { registerEnumType } from '@nestjs/graphql';
 
 // --- Placeholder for UserType ---
 // @ObjectType('User') 
@@ -53,66 +53,30 @@ export class ScheduleSlotType {
 // --- End Placeholder for ScheduleSlotType ---
 
 registerEnumType(ClassPackageStatus, { name: 'ClassPackageStatus' });
-registerEnumType(CancellationPolicyType, { name: 'CancellationPolicyType' });
-// UserRole is expected to be registered elsewhere (e.g., UserModule or globally)
-// If not, it should be registered: registerEnumType(UserRole, { name: 'UserRole' });
 
-@ObjectType('ClassPackage')
-export class ClassPackageType {
+@ObjectType()
+export class ClassPackage {
   @Field(() => ID)
   id: string;
 
   @Field()
-  name: string;
+  title: string;
 
-  @Field({ nullable: true })
-  description?: string;
-
-  @Field({ nullable: true })
-  beforeYouComeInstructions?: string;
+  @Field()
+  description: string;
 
   @Field(() => Float)
-  pricePerChild: number;
+  price: number;
 
-  @Field({ nullable: true })
-  coverImageUrl?: string;
-
-  @Field(() => ClassPackageStatus)
+  @Field(() => String)
   status: ClassPackageStatus;
 
-  @Field(() => CancellationPolicyType)
-  cancellationPolicyType: CancellationPolicyType;
-
-  @Field(() => Float, { nullable: true })
-  rescheduleDaysBefore?: number;
-
-  @Field(() => User)
-  vendor: User; 
-
-  @Field(() => ID)
+  @Field()
   vendorId: string;
 
-  @Field(() => CategoryType) 
-  category: CategoryType; 
-
-  @Field(() => ID)
-  categoryId: string;
-
-  @Field(() => [AgeGroupType]) 
-  ageGroups: AgeGroupType[]; 
-
-  @Field(() => [String], { nullable: 'itemsAndList' })
-  tags?: string[];
-
-  @Field(() => [ScheduleSlotType], { nullable: 'itemsAndList' })
-  scheduleSlots?: ScheduleSlotType[]; 
-
-  @Field()
+  @Field(() => Date)
   createdAt: Date;
 
-  @Field()
+  @Field(() => Date)
   updatedAt: Date;
-
-  // enrollments: ClassPackageEnrollment[] - Decide if needed for these queries
-  // savedByUsers: SavedClassPackage[] - Decide if needed
 } 

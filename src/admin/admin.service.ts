@@ -103,16 +103,21 @@ export class AdminService {
         // Potentially add other filters, e.g., by status, user, etc.
       },
       include: {
-        User: true, // Parent who made the payment
         classPackageEnrollment: {
           include: {
             classPackage: {
               include: {
-                vendor: { // User who is the vendor
+                vendor: {
                   include: {
-                    vendorProfile: true, // To get businessName
+                    profiles: true,
+                    user: true,
                   },
                 },
+              },
+            },
+            parent: {
+              include: {
+                user: true,
               },
             },
           },
@@ -124,25 +129,23 @@ export class AdminService {
     });
 
     return payments.map((payment) => {
-      const parent = payment.User;
       const enrollment = payment.classPackageEnrollment;
       const classPackage = enrollment?.classPackage;
-      const vendorUser = classPackage?.vendor;
-      const vendorProfile = vendorUser?.vendorProfile;
-
-      const parentName = parent ? `${parent.firstName} ${parent.lastName}` : 'N/A';
-      const vendorName = vendorProfile?.businessName || (vendorUser ? `${vendorUser.firstName} ${vendorUser.lastName}` : 'N/A');
-      
+      const vendor = classPackage?.vendor;
+      const vendorProfile = vendor?.profiles?.[0];
+      const parent = enrollment?.parent;
+      const parentName = parent && parent.user ? `${parent.user.firstName ?? ''} ${parent.user.lastName ?? ''}`.trim() : 'N/A';
+      const vendorName = vendorProfile?.businessName || (vendor && vendor.user ? `${vendor.user.firstName ?? ''} ${vendor.user.lastName ?? ''}`.trim() : 'N/A');
       return {
         id: payment.id,
         gatewayTransactionId: payment.transactionId,
         paymentDate: payment.createdAt,
         parentId: parent?.id || 'N/A',
         parentName,
-        vendorId: vendorUser?.id || 'N/A',
+        vendorId: vendor?.id || 'N/A',
         vendorName,
         classPackageId: classPackage?.id || 'N/A',
-        classPackageName: classPackage?.name || 'N/A',
+        classPackageName: classPackage?.title || 'N/A',
         amount: payment.amount,
         paymentMethod: payment.paymentMethod,
         status: payment.status,
