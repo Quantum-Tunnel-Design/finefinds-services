@@ -19,14 +19,14 @@ type AdminClassPackageBasicInfo {
   """Unique identifier of the class package."""
   id: ID!
 
-  """Name of the class package."""
-  name: String!
-
-  """Price per child for the class package."""
-  pricePerChild: Float!
+  """Price for the class package."""
+  price: Float!
 
   """Current status of the class package (e.g., DRAFT, PUBLISHED)."""
   status: ClassPackageStatus!
+
+  """Title of the class package."""
+  title: String!
 
   """Timestamp when the class package was last updated."""
   updatedAt: DateTime!
@@ -123,11 +123,6 @@ Detailed view of a user for admin panel, including role-specific information.
 """
 type AdminUserDetails {
   """
-  Business profile of the user, if the user is a VENDOR and has a profile.
-  """
-  businessProfile: BusinessProfile
-
-  """
   Children of the user, if the user is a PARENT. Includes child's details.
   """
   children: [Child!]
@@ -165,9 +160,7 @@ type AdminUserDetails {
   """Timestamp when the user was last updated."""
   updatedAt: DateTime!
 
-  """
-  Vendor-specific profile details, if the user is a VENDOR and has a profile.
-  """
+  """Vendor profile of the user, if the user is a VENDOR and has a profile."""
   vendorProfile: VendorProfile
 }
 
@@ -201,11 +194,6 @@ type AdminUserView {
   updatedAt: DateTime!
 }
 
-type AgeGroup {
-  id: ID!
-  name: String
-}
-
 type AuthResponse {
   idToken: String
   message: String
@@ -236,8 +224,9 @@ input BookingFilterInput {
 
 enum BookingStatus {
   CANCELLED
-  PAID
-  RESCHEDULED
+  COMPLETED
+  CONFIRMED
+  PENDING
 }
 
 input BulkCreateVendorsInput {
@@ -245,8 +234,11 @@ input BulkCreateVendorsInput {
 }
 
 type Category {
+  createdAt: DateTime!
+  description: String
   id: ID!
-  name: String
+  name: String!
+  updatedAt: DateTime!
 }
 
 type Child {
@@ -274,49 +266,20 @@ input ChildInput {
 }
 
 type ClassPackage {
-  ageGroups: [AgeGroup!]!
-  beforeYouComeInstructions: String
-  cancellationPolicyType: CancellationPolicyType!
-  category: Category!
-  categoryId: ID!
-  coverImageUrl: String
   createdAt: DateTime!
-  description: String
+  description: String!
   id: ID!
-  name: String!
-  pricePerChild: Float!
-  rescheduleDaysBefore: Float
-  scheduleSlots: [ScheduleSlot]
-  status: ClassPackageStatus!
-  tags: [String]
+  price: Float!
+  status: String!
+  title: String!
   updatedAt: DateTime!
-  vendor: User!
-  vendorId: ID!
+  vendorId: String!
 }
 
 enum ClassPackageStatus {
   ARCHIVED
   DRAFT
   PUBLISHED
-}
-
-input CreateBusinessProfileInput {
-  accountNumber: String
-  bankName: String
-  branch: String
-  businessName: String!
-  categories: [String!]!
-  contactNumber: String!
-  coverImageUrl: String
-  description: String!
-  facebookUrl: String
-  galleryUrls: [String!]
-  instagramUrl: String
-  location: String!
-  logoUrl: String
-  tags: [String!]!
-  twitterUrl: String
-  website: String
 }
 
 input CreateChildInput {
@@ -327,21 +290,11 @@ input CreateChildInput {
 }
 
 input CreateClassPackageInput {
-  ageGroupIds: [ID!]!
-  beforeYouComeInstructions: String!
-  cancellationPolicyType: String!
-  categoryId: ID!
-  coverImageUrl: String
-  customDatesInput: CustomDatesRecurrenceInput
-  dailyRecurrenceInput: DailyRecurrenceInput
   description: String!
-  name: String!
-  pricePerChild: Float!
-  rescheduleDaysBefore: Int
-  schedulingType: SchedulingType!
+  price: Float!
   status: String
-  tags: [String!]!
-  weeklyRecurrenceInput: WeeklyRecurrenceInput
+  title: String!
+  vendorId: String!
 }
 
 input CreateNotificationInput {
@@ -349,30 +302,63 @@ input CreateNotificationInput {
   type: String!
 }
 
-input CreateVendorProfileDto {
+input CreateVendorProfileInput {
+  """Bank account number"""
+  accountNumber: String
+
+  """Bank branch"""
+  bankBranch: String
+
+  """Name of the bank"""
+  bankName: String
+
+  """Business name of the vendor"""
+  businessName: String!
+
+  """List of category IDs to associate with the profile"""
+  categoryIds: [ID!]!
+
+  """Contact number of the business"""
+  contactNumber: String!
+
+  """URL to the cover image"""
+  coverImageUrl: String!
+
+  """Description of the business"""
   description: String!
-  instituteName: String!
-  phoneNumber: String
-  website: String
-}
 
-input CustomDateSlotInput {
-  availableSlots: Int!
-  date: DateTime!
-  endTime: DateTime!
-  startTime: DateTime!
-}
+  """Facebook profile URL"""
+  facebookUrl: String
 
-input CustomDatesRecurrenceInput {
-  slots: [CustomDateSlotInput!]!
-}
+  """Gallery images (max 10)"""
+  galleryImages: [GalleryImageInput!]
 
-input DailyRecurrenceInput {
-  availableSlotsPerOccurrence: Int!
-  recurrenceEndDate: DateTime
-  recurrenceStartDate: DateTime!
-  slotEndTime: DateTime!
-  slotStartTime: DateTime!
+  """Instagram profile URL"""
+  instagramUrl: String
+
+  """LinkedIn profile URL"""
+  linkedInUrl: String
+
+  """Location of the business"""
+  location: String!
+
+  """URL to the profile logo image"""
+  profileLogoUrl: String!
+
+  """List of tag IDs to associate with the profile"""
+  tagIds: [ID!]!
+
+  """TikTok profile URL"""
+  tiktokUrl: String
+
+  """Twitter profile URL"""
+  twitterUrl: String
+
+  """Primary website URL"""
+  websiteUrl: String
+
+  """YouTube channel URL"""
+  youtubeUrl: String
 }
 
 type DashboardMetricsDto {
@@ -399,21 +385,6 @@ A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date
 """
 scalar DateTime
 
-"""Represents a day of the week."""
-enum DayOfWeek {
-  FRIDAY
-  MONDAY
-  SATURDAY
-  SUNDAY
-  THURSDAY
-  TUESDAY
-  WEDNESDAY
-}
-
-input DeleteBusinessProfileInput {
-  confirmation: String!
-}
-
 type DummyUserDto {
   email: String!
   firstName: String!
@@ -424,6 +395,25 @@ type DummyUserDto {
 
 input ForgotPasswordInput {
   email: String!
+}
+
+type GalleryImage {
+  caption: String
+  createdAt: DateTime!
+  id: ID!
+  order: Float
+  url: String!
+}
+
+input GalleryImageInput {
+  """Caption for the gallery image"""
+  caption: String
+
+  """Order of the image in the gallery"""
+  order: Float
+
+  """URL of the gallery image"""
+  url: String!
 }
 
 """Gender of a child or user"""
@@ -468,22 +458,11 @@ type Mutation {
     userId: ID!
   ): AdminUserView!
 
-  """Approves a vendor profile. Requires ADMIN privileges."""
-  approveVendor(
-    """The ID of the vendor to approve."""
-    vendorId: String!
-  ): VendorProfile!
-
   """Creates multiple vendor accounts in bulk. Requires ADMIN privileges."""
   bulkCreateVendors(input: BulkCreateVendorsInput!): AuthResponse!
 
   """Creates a new admin account. Formerly required ADMIN privileges."""
   createAdminAccount(input: AdminAccountInput!): AuthResponse!
-
-  """
-  Creates a new business profile for the authenticated vendor. Requires VENDOR role.
-  """
-  createMyBusinessProfile(input: CreateBusinessProfileInput!): BusinessProfile!
 
   """
   Creates a new class package for the currently authenticated vendor. Cover image URL can be optionally provided if already uploaded elsewhere.
@@ -492,19 +471,12 @@ type Mutation {
 
   """Creates a new notification for the currently authenticated user."""
   createNotification(input: CreateNotificationInput!): Notification!
+  createVendorProfile(input: CreateVendorProfileInput!): VendorProfile!
 
   """
   Deletes a child's profile for the authenticated parent. Restricted to PARENT role.
   """
   deleteChild(childId: ID!): OperationStatusDto!
-
-  """
-  Deletes the business profile of the currently authenticated vendor. This also archives associated classes. Cannot be undone.
-  """
-  deleteMyBusinessProfile(
-    """Confirmation input for deleting the business profile."""
-    input: DeleteBusinessProfileInput!
-  ): OperationStatusDto!
 
   """
   Deletes a class package owned by the currently authenticated vendor. This operation cannot be undone.
@@ -529,12 +501,6 @@ type Mutation {
 
   """Registers a new parent account in the system."""
   parentSignUp(input: ParentSignUpInput!): AuthResponse!
-
-  """Creates or updates the profile for the currently authenticated vendor."""
-  registerVendorProfile(
-    """Data for creating the vendor profile."""
-    input: CreateVendorProfileDto!
-  ): VendorProfile!
 
   """Remove a class package from the parent's favorites"""
   removeSavedClass(
@@ -562,11 +528,6 @@ type Mutation {
   updateChild(childId: ID!, input: UpdateChildInput!): Child!
 
   """
-  Updates the business profile for the authenticated vendor. Requires VENDOR role.
-  """
-  updateMyBusinessProfile(input: UpdateBusinessProfileInput!): BusinessProfile!
-
-  """
   Updates an existing class package for the currently authenticated vendor. Cover image URL can be optionally provided or set to null to remove.
   """
   updateMyClassPackage(
@@ -588,12 +549,7 @@ type Mutation {
     """The data to update for the user profile."""
     input: UpdateUserDto!
   ): User!
-
-  """Updates the profile for the currently authenticated vendor."""
-  updateVendorProfile(
-    """Data for updating the vendor profile."""
-    input: UpdateVendorProfileDto!
-  ): VendorProfile!
+  updateVendorProfile(id: String!, input: UpdateVendorProfileInput!): VendorProfile!
 
   """Authenticates a vendor and returns an access token."""
   vendorLogin(input: VendorLoginInput!): AuthResponse!
@@ -604,12 +560,10 @@ type Mutation {
 
 type Notification {
   createdAt: DateTime!
-  data: JSON!
+  data: JSON
   id: String!
+  isRead: Boolean!
   message: String!
-  read: Boolean!
-  title: String!
-  type: String!
   updatedAt: DateTime!
   userId: String!
 }
@@ -658,8 +612,9 @@ enum PaymentStatus {
 }
 
 enum PaymentType {
+  BANK_TRANSFER
   CARD
-  CLASS_PACKAGE_PURCHASE
+  CASH
 }
 
 type Query {
@@ -723,11 +678,6 @@ type Query {
   getChild(childId: ID!): Child
 
   """
-  Retrieves the business profile of the currently authenticated vendor. Requires VENDOR role.
-  """
-  getMyBusinessProfile: BusinessProfile
-
-  """
   Retrieves all children for the authenticated parent. Restricted to PARENT role.
   """
   listChildren: [Child!]!
@@ -739,9 +689,6 @@ type Query {
   Retrieves a list of users. (Placeholder - typically admin-only and with pagination/filtering)
   """
   listUsers: [User!]!
-
-  """Lists all vendor profiles. Requires ADMIN privileges."""
-  listVendors: [VendorProfile!]!
 
   """
   Retrieves the profile of the currently authenticated user. (Alias for AuthResolver.me)
@@ -776,17 +723,9 @@ type Query {
     """Optional filters for class package ID, start date, and end date."""
     filters: BookingFilterInput
   ): [BookingDetailsDto!]!
-
-  """
-  Retrieves dashboard data, including revenue metrics, for the currently authenticated vendor. Supports date range filtering.
-  """
-  myVendorDashboardRevenue(
-    """Optional date range (startDate, endDate) to filter revenue data."""
-    filters: DateRangeFilterDto
-  ): VendorDashboardDataDto!
-
-  """Retrieves the profile of the currently authenticated vendor."""
-  myVendorProfile: VendorProfile!
+  myVendorProfile: VendorProfile
+  vendorProfile(id: String!): VendorProfile
+  vendorProfiles: [VendorProfile!]!
 }
 
 input ResetAdminPasswordInput {
@@ -809,21 +748,6 @@ type SavedClassPackage {
   userId: ID!
 }
 
-type ScheduleSlot {
-  availableSlots: Float!
-  endTime: DateTime!
-  id: ID!
-  startTime: DateTime!
-}
-
-"""Defines the type of scheduling for a class package."""
-enum SchedulingType {
-  CUSTOM_DATES
-  DAILY
-  FIXED_SLOTS
-  WEEKLY
-}
-
 input SignInInput {
   email: String!
   password: String!
@@ -836,6 +760,14 @@ input SignUpInput {
   lastName: String!
   password: String!
   role: UserRole!
+}
+
+type Tag {
+  createdAt: DateTime!
+  description: String
+  id: ID!
+  name: String!
+  updatedAt: DateTime!
 }
 
 type TransactionViewDto {
@@ -851,25 +783,6 @@ type TransactionViewDto {
   vendorName: String!
 }
 
-input UpdateBusinessProfileInput {
-  accountNumber: String
-  bankName: String
-  branch: String
-  businessName: String
-  categories: [String!]
-  contactNumber: String
-  coverImageUrl: String
-  description: String
-  facebookUrl: String
-  galleryUrls: [String!]
-  instagramUrl: String
-  location: String
-  logoUrl: String
-  tags: [String!]
-  twitterUrl: String
-  website: String
-}
-
 input UpdateChildInput {
   dateOfBirth: DateTime
   firstName: String
@@ -878,21 +791,10 @@ input UpdateChildInput {
 }
 
 input UpdateClassPackageInput {
-  ageGroupIds: [ID!]
-  beforeYouComeInstructions: String
-  cancellationPolicyType: String
-  categoryId: ID
-  coverImageUrl: String
-  customDatesInput: CustomDatesRecurrenceInput
-  dailyRecurrenceInput: DailyRecurrenceInput
   description: String
-  name: String
-  pricePerChild: Float
-  rescheduleDaysBefore: Int
-  schedulingType: SchedulingType
+  price: Float
   status: String
-  tags: [String!]
-  weeklyRecurrenceInput: WeeklyRecurrenceInput
+  title: String
 }
 
 input UpdateParentPasswordInput {
@@ -912,11 +814,63 @@ input UpdateUserDto {
   name: String
 }
 
-input UpdateVendorProfileDto {
+input UpdateVendorProfileInput {
+  """Bank account number"""
+  accountNumber: String
+
+  """Bank branch"""
+  bankBranch: String
+
+  """Name of the bank"""
+  bankName: String
+
+  """Business name of the vendor"""
+  businessName: String
+
+  """List of category IDs to associate with the profile"""
+  categoryIds: [ID!]
+
+  """Contact number of the business"""
+  contactNumber: String
+
+  """URL to the cover image"""
+  coverImageUrl: String
+
+  """Description of the business"""
   description: String
-  instituteName: String
-  phoneNumber: String
-  website: String
+
+  """Facebook profile URL"""
+  facebookUrl: String
+
+  """Gallery images (max 10)"""
+  galleryImages: [GalleryImageInput!]
+
+  """Instagram profile URL"""
+  instagramUrl: String
+
+  """LinkedIn profile URL"""
+  linkedInUrl: String
+
+  """Location of the business"""
+  location: String
+
+  """URL to the profile logo image"""
+  profileLogoUrl: String
+
+  """List of tag IDs to associate with the profile"""
+  tagIds: [ID!]
+
+  """TikTok profile URL"""
+  tiktokUrl: String
+
+  """Twitter profile URL"""
+  twitterUrl: String
+
+  """Primary website URL"""
+  websiteUrl: String
+
+  """YouTube channel URL"""
+  youtubeUrl: String
 }
 
 type User {
@@ -935,13 +889,7 @@ type User {
 enum UserRole {
   ADMIN
   PARENT
-  STUDENT
   VENDOR
-}
-
-type VendorDashboardDataDto {
-  metrics: VendorRevenueMetricsDto!
-  monthlyPayments: [MonthlyPaymentDataDto!]!
 }
 
 input VendorLoginInput {
@@ -950,15 +898,32 @@ input VendorLoginInput {
 }
 
 type VendorProfile {
+  accountNumber: String
   approved: Boolean!
+  bankBranch: String
+  bankName: String
+  businessName: String!
+  categories: [Category]
+  contactNumber: String!
+  coverImageUrl: String
   createdAt: DateTime!
   description: String!
+  facebookUrl: String
+  galleryImages: [GalleryImage]
   id: ID!
-  instituteName: String!
-  phoneNumber: String
+  instagramUrl: String
+  linkedInUrl: String
+  location: String!
+  profileLogoUrl: String
+  tags: [Tag]
+  tiktokUrl: String
+  twitterUrl: String
   updatedAt: DateTime!
-  user: User
-  website: String
+
+  """The user this profile belongs to"""
+  user: User!
+  websiteUrl: String
+  youtubeUrl: String
 }
 
 type VendorRevenueMetricsDto {
@@ -975,13 +940,4 @@ input VendorSignUpInput {
   phoneNumber: String!
   secondaryPhoneNumber: String!
   termsAccepted: Boolean!
-}
-
-input WeeklyRecurrenceInput {
-  availableSlotsPerOccurrence: Int!
-  daysOfWeek: [DayOfWeek!]!
-  recurrenceEndDate: DateTime
-  recurrenceStartDate: DateTime!
-  slotEndTime: DateTime!
-  slotStartTime: DateTime!
 }
