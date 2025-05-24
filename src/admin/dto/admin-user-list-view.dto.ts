@@ -1,5 +1,6 @@
 import { Field, ObjectType } from '@nestjs/graphql';
 import { UserRole } from '@prisma/client';
+import { PaginatedResponse } from './pagination.dto';
 
 @ObjectType()
 export class AdminUserListViewDto {
@@ -52,4 +53,10 @@ export class AdminUserListViewDto {
   // Additional fields for parents
   @Field(() => Number, { nullable: true })
   childrenCount?: number;
+}
+
+@ObjectType()
+export class PaginatedUserListResponse extends PaginatedResponse {
+  @Field(() => [AdminUserListViewDto])
+  items: AdminUserListViewDto[];
 } 

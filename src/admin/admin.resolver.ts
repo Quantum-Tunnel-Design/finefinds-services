@@ -9,7 +9,7 @@ import { AdminDashboardDataDto } from './dto/admin-dashboard-data.dto';
 import { DateRangeFilterDto } from './dto/date-range-filter.dto';
 import { AdminTransactionListViewDto } from './dto/admin-transaction-list-view.dto';
 import { DashboardMetricsDto } from './dto/dashboard-metrics.dto';
-import { AdminUserListViewDto } from './dto/admin-user-list-view.dto';
+import { AdminUserListViewDto, PaginatedUserListResponse } from './dto/admin-user-list-view.dto';
 import { AdminUserListFilterDto } from './dto/admin-user-list-filter.dto';
 
 @Resolver()
@@ -51,36 +51,36 @@ export class AdminResolver {
     return this.adminService.listAllTransactions(filters);
   }
 
-  @Query(() => [AdminUserListViewDto], {
+  @Query(() => PaginatedUserListResponse, {
     name: 'adminListUsers',
-    description: 'Retrieves a list of all users with optional filtering. Requires ADMIN privileges.',
+    description: 'Retrieves a paginated list of all users with optional filtering. Requires ADMIN privileges.',
   })
   async listUsers(
     @Args('filters', { type: () => AdminUserListFilterDto, nullable: true })
     filters?: AdminUserListFilterDto,
-  ): Promise<AdminUserListViewDto[]> {
+  ): Promise<PaginatedUserListResponse> {
     return this.adminService.listUsers(filters);
   }
 
-  @Query(() => [AdminUserListViewDto], {
+  @Query(() => PaginatedUserListResponse, {
     name: 'adminListVendors',
-    description: 'Retrieves a list of all vendors with optional filtering. Requires ADMIN privileges.',
+    description: 'Retrieves a paginated list of all vendors with optional filtering. Requires ADMIN privileges.',
   })
   async listVendors(
     @Args('filters', { type: () => AdminUserListFilterDto, nullable: true })
     filters?: Omit<AdminUserListFilterDto, 'role'>,
-  ): Promise<AdminUserListViewDto[]> {
+  ): Promise<PaginatedUserListResponse> {
     return this.adminService.listVendors(filters);
   }
 
-  @Query(() => [AdminUserListViewDto], {
+  @Query(() => PaginatedUserListResponse, {
     name: 'adminListParents',
-    description: 'Retrieves a list of all parents with optional filtering. Requires ADMIN privileges.',
+    description: 'Retrieves a paginated list of all parents with optional filtering. Requires ADMIN privileges.',
   })
   async listParents(
     @Args('filters', { type: () => AdminUserListFilterDto, nullable: true })
     filters?: Omit<AdminUserListFilterDto, 'role'>,
-  ): Promise<AdminUserListViewDto[]> {
+  ): Promise<PaginatedUserListResponse> {
     return this.adminService.listParents(filters);
   }
 } 

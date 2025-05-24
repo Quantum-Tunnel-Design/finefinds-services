@@ -1,6 +1,7 @@
 import { Field, InputType } from '@nestjs/graphql';
 import { UserRole } from '@prisma/client';
 import { AgeGroup } from './age-group.enum';
+import { PaginationInput } from './pagination.dto';
 
 @InputType()
 export class AdminUserListFilterDto {
@@ -18,4 +19,7 @@ export class AdminUserListFilterDto {
 
   @Field(() => AgeGroup, { nullable: true })
   ageGroup?: AgeGroup;
+
+  @Field(() => PaginationInput, { nullable: true })
+  pagination?: PaginationInput;
 } 

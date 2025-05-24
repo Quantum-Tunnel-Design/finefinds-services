@@ -6,9 +6,10 @@ import { DashboardMetricsDto } from './dto/dashboard-metrics.dto';
 import { MonthlyPaymentDataDto } from './dto/monthly-payment-data.dto';
 import { DateRangeFilterDto } from './dto/date-range-filter.dto';
 import { AdminTransactionListViewDto } from './dto/admin-transaction-list-view.dto';
-import { AdminUserListViewDto } from './dto/admin-user-list-view.dto';
+import { AdminUserListViewDto, PaginatedUserListResponse } from './dto/admin-user-list-view.dto';
 import { AdminUserListFilterDto } from './dto/admin-user-list-filter.dto';
 import { AgeGroup } from './dto/age-group.enum';
+import { PaginationInfo } from './dto/pagination.dto';
 
 @Injectable()
 export class AdminService {
@@ -202,7 +203,19 @@ export class AdminService {
     return age;
   }
 
-  async listUsers(filters?: AdminUserListFilterDto): Promise<AdminUserListViewDto[]> {
+  private createPaginationInfo(total: number, page: number, limit: number): PaginationInfo {
+    const totalPages = Math.ceil(total / limit);
+    return {
+      total,
+      totalPages,
+      currentPage: page,
+      limit,
+      hasNextPage: page < totalPages,
+      hasPreviousPage: page > 1,
+    };
+  }
+
+  async listUsers(filters?: AdminUserListFilterDto): Promise<PaginatedUserListResponse> {
     const where: Prisma.UserWhereInput = {};
 
     if (filters?.role) {
@@ -224,6 +237,14 @@ export class AdminService {
         { lastName: { contains: filters.searchTerm, mode: 'insensitive' } },
       ];
     }
+
+    // Get total count for pagination
+    const total = await this.prisma.user.count({ where });
+
+    // Apply pagination
+    const page = filters?.pagination?.page || 1;
+    const limit = filters?.pagination?.limit || 10;
+    const skip = (page - 1) * limit;
 
     const users = await this.prisma.user.findMany({
       where,
@@ -247,6 +268,8 @@ export class AdminService {
       orderBy: {
         createdAt: 'desc',
       },
+      skip,
+      take: limit,
     });
 
     // Filter by age group if specified
@@ -273,7 +296,7 @@ export class AdminService {
       });
     }
 
-    return filteredUsers.map(user => {
+    const items = filteredUsers.map(user => {
       const vendorProfile = user.vendor?.profiles?.[0];
       return {
         id: user.vendor?.id || user.parent?.id || user.id,
@@ -296,13 +319,18 @@ export class AdminService {
         childrenCount: user.parent?.children?.length,
       };
     });
+
+    return {
+      items,
+      pagination: this.createPaginationInfo(total, page, limit),
+    };
   }
 
-  async listVendors(filters?: Omit<AdminUserListFilterDto, 'role'>): Promise<AdminUserListViewDto[]> {
+  async listVendors(filters?: Omit<AdminUserListFilterDto, 'role'>): Promise<PaginatedUserListResponse> {
     return this.listUsers({ ...filters, role: UserRole.VENDOR });
   }
 
-  async listParents(filters?: Omit<AdminUserListFilterDto, 'role'>): Promise<AdminUserListViewDto[]> {
+  async listParents(filters?: Omit<AdminUserListFilterDto, 'role'>): Promise<PaginatedUserListResponse> {
     return this.listUsers({ ...filters, role: UserRole.PARENT });
   }
 } 
